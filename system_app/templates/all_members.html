@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Members - Rival Gym System</title>
+    <style>
+        h1 {
+            color: white;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1em;
+            text-align: center;
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+            color: #fff;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            background-color: #333;
+            color: #fff;
+            z-index: 1;
+        }
+
+        .edit-link {
+            color: #007BFF;
+            text-decoration: none;
+        }
+
+        .edit-link:hover {
+            text-decoration: underline;
+        }
+
+        .index-btn {
+            background-color: #333;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 4px;
+            display: inline-block;
+            
+        }
+        .index-btn:hover{
+            background-color: #555;
+        }
+        
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Rival Gym System</h1>
+    </header>
+
+    <section>
+        <h2><a class="index-btn" href="{{ url_for('index') }}">Home </a>    All Members</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Member ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Age</th>
+                    <th>Gender</th>
+                    <th>actual starting_date</th>
+                    <th>starting date</th>
+                    <th>End date</th>
+                    <th>Membership packages</th>
+                    <th>Membership fees</th>
+                    <th>Membership status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in members_data %}
+                    <tr>
+                        <td>{{ member.id }}</td>
+                        <td>{{ member.name }}</td>
+                        <td>{{ member.email }}</td>
+                        <td>{{ member.phone }}</td>
+                        <td>{{ member.age }}</td>
+                        <td>{{ "Male" if member.gender == "Male" else "Female" }}</td>
+                        <td>{{ member.actual_starting_date }}</td>
+                        <td>{{ member.starting_date }}</td>
+                        <td>{{ member.End_date }}</td>
+                        <td>{{ member.membership_packages }}</td>
+                        <td>{{ member.membership_fees }}</td>
+                        <td>{{ member.membership_status }}</td>
+                        <td>
+                            <a class="edit-link" href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</body>
+
+</html>

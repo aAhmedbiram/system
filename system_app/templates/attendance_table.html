@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Table</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .add-id-form-container {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 200px; /* Adjust the width as needed */
+            padding: 10px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .add-id-form {
+            width: 100%;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        input {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            display: inline-block;
+        }
+
+        button {
+            background-color: #555;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: black;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd; 
+        }
+
+        th {
+            background-color: #555;
+            color: #fff;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .delete-all-button, .home-btn {
+            background-color: #555;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            text-underline-offset: none ;
+            text-decoration: none;
+        }
+
+        .delete-all-button:hover ,.home-btn:hover {
+            background-color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="add-id-form-container">
+        <form class="add-id-form" action="{{ url_for('attendance_table') }}" method="post">
+            <label class="search-member-id" for="member_id">Enter Member ID:</label>
+            <input class="search-id" type="text" id="member_id" name="member_id" required>
+            <button class="search-member-id-button" type="submit">Add</button>
+        </form>
+    </div>
+
+    <section class="member-data">
+        <h2>Attendance Table</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>number</th>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>End date</th>
+                    <th>Membership status</th>
+                    <th>Attendance time</th>
+                    <th>Attendance date</th>
+                    <th>Day</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in members_data %}
+                <tr>
+                    <td>{{ member['num'] }}</td>
+                    <td>{{ member['id'] }}</td>
+                    <td>{{ member['name'] }}</td>
+                    <td>{{ member['end_date'] }}</td>
+                    <td>{{ member['membership_status'] }}</td>
+                    <td>{{ member['attendance_time'] }}</td>
+                    <td>{{ member['attendance_date'] }}</td>
+                    <td>{{ member['day'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not members_data %}
+        <p class="no-member-found">No members found</p>
+        {% endif %}
+        
+        <form action="{{ url_for('delete_all_data') }}" method="post" id="delete-form">
+            <button type="submit">Delete All Data</button>
+            <br>
+            <br>
+            <br>
+            <a class="home-btn" href="{{url_for('index')}}">Home</a>
+        </form>
+    </section>
+    <!-- Add this script at the end of your HTML file -->
+    <script>
+        // Check if the form has been submitted
+        document.addEventListener("DOMContentLoaded", function () {
+            let form = document.querySelector('.add-id-form');
+            if (form) {
+                form.addEventListener('submit', function () {
+                    // Scroll to the bottom of the page
+                    window.scrollTo(0, document.body.scrollHeight);
+                });
+            }
+        });
+        document.addEventListener("DOMContentLoaded", function () {
+            // Scroll to the bottom of the page
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+        document.addEventListener("DOMContentLoaded", function () {
+            let inputField = document.getElementById('member_id');
+            if (inputField) {
+                inputField.focus();
+            }
+        });
+    </script>
+
+</body>
+
+</html>

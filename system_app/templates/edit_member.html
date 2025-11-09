@@ -1,0 +1,114 @@
+<!-- edit_member.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Member</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1em;
+            text-align: center;
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        form {
+            margin-top: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover{
+            background-color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Gym System</h1>
+    </header>
+
+    <section>
+        <h2>Edit Member</h2>
+        <form action="{{ url_for('edit_member', member_id=member.id) }}" method="post">
+            <label for="edit_member_name">Name:</label>
+            <input type="text" id="edit_member_name" name="edit_member_name" value="{{ member.name }}" >
+
+            <label for="edit_member_email">Email:</label>
+            <input type="text" id="edit_member_email" name="edit_member_email" value="{{ member.email }}" >
+
+            <label for="edit_member_phone">Phone:</label>
+            <input type="text" id="edit_member_phone" name="edit_member_phone" value="{{ member.phone }}" >
+
+            <label for="edit_member_age">Birthdate:</label>
+            <input type="date" id="edit_member_age" name="edit_member_age" value="{{ member.birthdate }}" >
+            
+            <label for="edit_member_gender">Gender:</label>
+            <input  list="gender" id="edit_member_gender" name="edit_member_gender" value="{{ member.gender }}" >
+            <datalist id="gender">
+                <option value="Male">
+                <option value="Female">
+            </datalist>
+                    
+            <label for="edit_actual_starting_date">Actual starting date:</label>
+            <input type="date" id="edit_actual_starting_date" name="edit_actual_starting_date" value="{{ member.actual_starting_date }}" >
+                    
+            <label for="edit_starting_date">Starting date:</label>
+            <input type="date" id="edit_starting_date" name="edit_starting_date" value="{{ member.starting_date }}" >
+                    
+        
+            
+            <label for="edit_membership_packages">Membership packages:</label>
+            <input  list="membership_packages" id="edit_membership_packages" name="edit_membership_packages" value="{{ member.membership_packages }}" >
+            <datalist id="membership_packages">
+                <option value="1 Month">
+                <option value="2 Months">
+                <option value="3 Months">
+                <option value="4 Months">
+                <option value="6 Months">
+                <option value="1 Year">
+            </datalist>
+
+            
+        
+            <button type="submit">Save Changes</button>
+        </form>
+    </section>
+</body>
+
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>show member data</title>
+    <style>
+        h3 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+            color: #fff;
+        }
+        .center-box {
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .edit-link {
+            color: #007BFF;
+            text-decoration: none;
+        }
+
+        .edit-link:hover {
+            text-decoration: underline;
+        }
+        h2, h3 {
+            color: #333;
+        }
+
+        h3 {
+            margin-top: 20px;
+        }
+
+        section {
+            margin: 20px;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1em;
+            text-align: center;
+        }
+        .back-btn {
+            background-color: #333;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .back-btn:hover{
+            background-color: black;
+        }
+        .no-member-found {
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: larger;
+        }
+    </style>
+</head>
+<body>
+    <section class="member-data">    
+        <!-- Display member data here -->
+        {% if member_data %}
+            <h3>Member Data</h3>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Member ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>age</th>
+                        <th>gender</th>
+                        <th>Actual starting date</th>
+                        <th>starting date</th>
+                        <th>End date</th>
+                        <th>Membership packages</th>
+                        <th>Membership fees</th>
+                        <th>Membership status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ member_data.id }}</td>
+                        <td>{{ member_data.name }}</td>
+                        <td>{{ member_data.email }}</td>
+                        <td>{{ member_data.phone }}</td>
+                        <td>{{ member_data.age }}</td>
+                        <td>{{ member_data.gender }}</td>
+                        <td>{{ member_data.actual_starting_date }}</td>
+                        <td>{{ member_data.starting_date }}</td>
+                        <td>{{ member_data.End_date }}</td>
+                        <td>{{ member_data.membership_packages }}</td>
+                        <td>{{ member_data.membership_fees }}</td>
+                        <td>{{ member_data.membership_status }}</td>
+                        <td>
+                            <a href="{{ url_for('edit_member', member_id=member_data.id) }}">Edit</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        {% else  %}
+        <p class="no-member-found">No member found</p>
+        {% endif %}
+        <br>
+        <a class="back-btn" href="{{url_for('index') }}">Back</a>
+    </section>
+</body>
+</html>

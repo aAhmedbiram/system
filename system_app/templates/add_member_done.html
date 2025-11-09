@@ -1,0 +1,66 @@
+<!-- add_member_done.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Added</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            text-align: center;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1em;
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        p {
+            color: #333;
+            font-size: 1.2em;
+        }
+
+        a {
+            text-decoration: none;
+            color: #007BFF;
+            font-weight: bold;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Gym System</h1>
+    </header>
+
+    <section>
+        
+            <h2>Member Added</h2>
+            <p>The new member has been successfully added  </p>
+            
+            <p>New member ID is : {{new_member_id}}</p>
+            <p><a href="{{ url_for('index') }}">Go back to the main page</a></p>
+        
+    </section>
+</body>
+
+</html>

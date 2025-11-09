@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rival Gym System</title>
+    <style>
+        /* Reset styles */
+        h1, h2, p, form, label, button {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-image: url("/static/signup.jpg");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1em;
+            text-align: center;
+            width: 100%;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        h2, h3 {
+            color: #333;
+            margin-top: 20px;
+        }
+
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            max-width: 900px; /* Adjust as needed */
+        }
+
+        section {
+            width: 45%; /* Adjust as needed */
+            margin: 20px;
+        }
+
+        form {
+            margin-top: 20px;
+            max-width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        button {
+            background-color: #555;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        .all-members-btn {
+            background-color: #555;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .all-members-btn:hover {
+            background-color: black;
+        }
+
+        .logo {
+            margin: 20px auto;
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .center-box {
+            text-align: center;
+            width: 100%;
+        }
+
+        /* Add New Member Section Styles */
+        .add-new-member-section,
+        .search-section {
+            flex: 1;
+            max-width: 400px;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .search-id-form,
+        .search-name-form,
+        .add-new-member-form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .search-member-id-button,
+        .search-member-name-button,
+        .add-new-member-button,
+        .search-member-phone-button,
+        .logout,
+        .attendance-btn
+        {
+            background-color: #555;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-underline-offset: none;
+            text-decoration: none;
+        }
+
+        .search-member-id-button:hover,
+        .search-member-name-button:hover,
+        .add-new-member-button:hover,
+        .search-member-phone-button:hover,
+        .logout:hover,
+        .attendance-btn:hover
+        {
+            background-color: black;
+        }
+
+        /* Radio Button Styles */
+        .label_gender {
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .gender-radio-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .label_male,
+        .label_female {
+            margin-right: 8px;
+        }
+
+        .male-radio,
+        .female-radio {
+            margin-bottom: 16px;
+        }
+        
+        
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Rival Gym System</h1>
+        <div class="logo">
+        </div>
+    </header>
+    
+
+    <div class="main-content">
+        <section class="search-section">
+            <h2>Search</h2>
+            <form class="search-id-form" action="{{ url_for('show_member_data') }}" method="post">
+                <label class="search-member-id" for="member_id">Enter Member ID:</label>
+                <input class="search-id" type="text" id="member_id" name="member_id" required>
+                <button class="search-member-id-button" type="submit">Search</button>
+            </form>
+
+            <form class="search-name-form" method="post" action="{{ url_for('result') }}">
+                <label class="search-member-name" for="member_name">Enter member name:</label>
+                <input class="search-name" type="text" id="member_name" name="member_name" required>
+                <button class="search-member-name-button" type="submit">Search</button>
+            </form>
+
+            <form class="search-phone-form" method="post" action="{{ url_for('search_by_mobile_number') }}">
+                <label class="search-member-phone" for="member_phone">Enter member mobile number:</label>
+                <input class="search-phone" type="number" id="member_phone" name="member_phone" required>
+                <button class="search-member-phone-button" type="submit">Search</button>
+            </form>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <div class="center-box">
+                <a class="all-members-btn" href="{{ url_for('all_members') }}">View All Members</a>
+            </div>
+        </section>
+
+        <section class="add-new-member-section">
+            <h2 class="add-new-member-h2">Add New Member</h2>
+            <form class="add-new-member-form" action="{{ url_for('add_member_route') }}" method="post">
+                <label class="label_name" for="member_name">Name:</label>
+                <input class="name-input" type="text" id="member_name" name="member_name" required>
+
+                <label class="label_email" for="member_email">Email:</label>
+                <input class="email-input" type="email" id="member_email" name="member_email" required>
+
+                <label class="label_phone" for="member_phone">Phone:</label>
+                <input class="phone-input" type="text" id="member_phone" name="member_phone" required>
+
+                <label for="birthdate">Birthdate:</label>
+                <input type="date" id="member_age" name="member_age" required>
+
+                <div class="label_gender">Gender:</div>
+                <div class="gender-radio-group">
+                    <label class="label_male" for="male">Male:</label>
+                    <input class="male-radio" type="radio" id="male" name="choice" value="Male">
+                    
+                    <label class="label_female" for="female">Female:</label>
+                    <input class="female-radio" type="radio" id="female" name="choice" value="Female">
+                </div>
+
+                <label for="actual_starting_date">Actual starting date:</label>
+                <input type="date" id="member_actual_starting_date" name="member_actual_starting_date" required>
+
+                <label for="starting_date">Starting date:</label>
+                <input type="date" id="member_starting_date" name="member_starting_date" required >
+
+                <label for="membership_packages">Membership packages:</label>
+                <input list="membership_packages" id="member_membership_packages" name="member_membership_packages"
+                    required>
+                <datalist class="packages" id="membership_packages">
+                    <option value="1 Month">
+                    <option value="2 Months">
+                    <option value="3 Months">
+                    <option value="4 Months">
+                    <option value="6 Months">
+                    <option value="12 Months">
+                </datalist>
+                <button class="add-new-member-button" type="submit">Add Member</button>
+            </form>
+        </section>
+    </div>
+    {% if 'username' in session %}
+    {% endif %}
+    
+    <br>
+    <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance table</a>
+    <form action="{{ url_for('logout') }}" method="get">
+        <button class="logout" type="submit">Logout</button>
+    </form>
+    <br>
+
+    
+</body>
+
+</html>
