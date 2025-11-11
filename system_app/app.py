@@ -1,27 +1,23 @@
-from flask import Flask, render_template, request, redirect, url_for,flash, session
-from datetime import datetime,timedelta
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from datetime import datetime
 import calendar
 import sqlite3
-from func import get_age_and_dob,add_member,calculate_age,calculate_end_date,membership_fees,compare_dates
-from queries import create_table,query_db,check_name_exists,check_id_exists
-# from werkzeug.security import check_password_hash, generate_password_hash
-from queries import get_db,commit_close
-from flask import jsonify
+import os
 
-# from flask_bcrypt import check_password_hash, generate_password_hash
+# ✅ Relative imports (لأن كل حاجة جوا system_app)
+from .func import get_age_and_dob, add_member, calculate_age, calculate_end_date, membership_fees, compare_dates
+from .queries import create_table, query_db, check_name_exists, check_id_exists, get_db, commit_close
 
 app = Flask(__name__)
-app.secret_key='my secret key'
+app.secret_key = 'my secret key'
 
 @app.route('/')
 def home():
-    return "التطبيق شغال 100% 🎉"
+    return "التطبيق شغال 100% يا وحش! 🎉"
 
 @app.route('/login')
-@app.route('/')
 def login():
     return render_template('login.html')
-
 
 @app.route("/home")
 def index():
@@ -44,6 +40,9 @@ def search_by_name():
             return render_template('result.html', name=name_to_check, data=None)
     return render_template('search.html')
 
+# باقي الروتس زي ما هي (مش هتتغير)
+# ... (كل الكود من add_member_route لحد logout)
+
 @app.route("/add_member", methods=["POST"])
 def add_member_route():
     if request.method == "POST":
@@ -59,19 +58,18 @@ def add_member_route():
         try:
             numeric_value, unit = user_input.split(maxsplit=1) if user_input else (None, None)
         except ValueError:
-            numeric_value,unit=("wrong package","")
+            numeric_value, unit = ("wrong package", "")
         member_End_date = calculate_end_date(member_starting_date, numeric_value)
-        member_membership_fees=membership_fees(user_input)
-        member_membership_status=compare_dates(member_End_date)
+        member_membership_fees = membership_fees(user_input)
+        member_membership_status = compare_dates(member_End_date)
         new_member_id = add_member(
             member_name, member_email, member_phone, member_age, member_gender, member_birthdate,
             member_actual_starting_date, member_starting_date, member_End_date,
-            f"{numeric_value} {unit}", member_membership_fees,member_membership_status
+            f"{numeric_value} {unit}", member_membership_fees, member_membership_status
         )
         parsed_date = datetime.strptime(member_actual_starting_date, '%Y-%m-%d')
         formatted_date = parsed_date.strftime('%d,%m,%Y')
-
-        return redirect(url_for("add_member_done", new_member_id=new_member_id,formatted_date=formatted_date))
+        return redirect(url_for("add_member_done", new_member_id=new_member_id, formatted_date=formatted_date))
     return redirect(url_for("index"))
 
 @app.route("/add_member_done/<int:new_member_id>")
@@ -319,6 +317,7 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
