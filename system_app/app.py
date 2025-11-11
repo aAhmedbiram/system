@@ -8,17 +8,20 @@ import os
 from .func import get_age_and_dob, add_member, calculate_age, calculate_end_date, membership_fees, compare_dates
 from .queries import create_table, query_db, check_name_exists, check_id_exists, get_db, commit_close
 
+from flask import g
+from .queries import create_table, close_db  # ← تأكد إن close_db مستوردة هنا
+
 app = Flask(__name__)
 app.secret_key = 'my secret key'
 
-# إنشاء الجداول عند بدء التطبيق
-with app.app_context():
-    create_table()
+# # إنشاء الجداول عند بدء التطبيق
+# with app.app_context():
+#     create_table()
 
-# إغلاق الـ DB بعد كل طلب
-@app.teardown_appcontext
-def teardown_db(exception):
-    close_db()
+# # إغلاق الـ DB بعد كل طلب
+# @app.teardown_appcontext
+# def teardown_db(exception):
+#     close_db()
 
 def init_db():
     """هتعمل الجداول لو مش موجودة"""
@@ -343,9 +346,19 @@ def success():
 with app.app_context():
     create_table()  # هتعمل الجداول أول مرة
 
+with app.app_context():
+    create_table()
+
+# إغلاق الـ DB بعد كل طلب
+@app.teardown_appcontext
+def teardown_db(exception):
+    close_db()  # ← دلوقتي هتعرفها
+    
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
