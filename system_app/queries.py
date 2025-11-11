@@ -87,7 +87,7 @@ def query_db(query, args=(), one=False, order_by=None):
     return (rv[0] if rv else None) if one else rv
 
 # In your route, fetch attendance data without specific ordering
-all_attendance_data = query_db("SELECT * FROM attendance", order_by=None)
+# all_attendance_data = query_db("SELECT * FROM attendance", order_by=None)
 
 
 #cheack name exists
@@ -103,4 +103,5 @@ def check_name_exists(name):
 def check_id_exists(id_to_check):
     cr.execute("SELECT COUNT(*) FROM members WHERE id = ?", (id_to_check,))
     count=cr.fetchone()[0]
+
     return count > 0
