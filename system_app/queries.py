@@ -1,107 +1,109 @@
 import sqlite3
 from flask import g
-import psycopg2
-
-dbname="rival"
-user="rival"
-password="01147216302"
-host="192.168.56.1"
-port="5432"
-
-
-
-
-
-
-
-
-
-
-
-
-conn = sqlite3.connect('gym_system.db')
-
-
-cr = conn.cursor()
 
 DATABASE = 'gym_system.db'
 
-
+# === اتصال بالـ DB ===
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
     return db
 
-def commit_close():
-    db = getattr(g, '_database', None)
+# === إغلاق الـ DB بعد كل طلب ===
+def close_db(e=None):
+    db = g.pop('_database', None)
     if db is not None:
-        db.commit()
         db.close()
-        
+
+# === حفظ التغييرات ===
+def commit_close():
+    db = get_db()
+    try:
+        db.commit()
+    finally:
+        close_db()
+
+# === إنشاء الجداول ===
 def create_table():
-    conn = sqlite3.connect('gym_system.db')
+    conn = sqlite3.connect(DATABASE)
     cr = conn.cursor()
-    cr.execute('CREATE TABLE IF NOT EXISTS attendance (id INTEGER PRIMARY KEY, date TEXT, member_id INTEGER, member_name TEXT, status TEXT)')
-    cr.execute("""CREATE TABLE IF NOT EXISTS members(
-            id INTEGER PRIMARY KEY,
-            name TEXT, email TEXT,
-            phone TEXT,age integer ,
-            gender text,
-            actual_starting_date integer,
-            starting_date integer,
-            End_date integer,
-            membership_packages text,
-            membership_fees integerو
-            membership_status text
-            )""")
+
+    # جدول الأعضاء
+    cr.execute('''
+        CREATE TABLE IF NOT EXISTS members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE,
+            phone TEXT,
+            age INTEGER,
+            gender TEXT,
+            birthdate TEXT,
+            actual_starting_date TEXT,
+            starting_date TEXT,
+            End_date TEXT,
+            membership_packages TEXT,
+            membership_fees REAL,
+            membership_status TEXT
+        )
+    ''')
+
+    # جدول الحضور
+    cr.execute('''
+        CREATE TABLE IF NOT EXISTS attendance (
+            num INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER,
+            name TEXT,
+            end_date TEXT,
+            membership_status TEXT,
+            attendance_time TEXT,
+            attendance_date TEXT,
+            day TEXT
+        )
+    ''')
+
+    # جدول المستخدمين (للـ Signup)
+    cr.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    ''')
+
+    # جدول النسخ الاحتياطي
+    cr.execute('''
+        CREATE TABLE IF NOT EXISTS attendance_backup (
+            id INTEGER,
+            name TEXT,
+            end_date TEXT,
+            membership_status TEXT,
+            attendance_time TEXT,
+            attendance_date TEXT,
+            day TEXT
+        )
+    ''')
+
     conn.commit()
     conn.close()
+    print("All tables created successfully!")
 
-# def query_db(query, args=(), one=False):
-#     conn = sqlite3.connect('gym_system.db')
-#     conn.row_factory = sqlite3.Row
-#     cur = conn.cursor()
-#     cur.execute(query, args)
-#     rv = cur.fetchall()
-#     conn.commit()
-#     conn.close()
-#     return (rv[0] if rv else None) if one else rv
-
-
-
-
-def query_db(query, args=(), one=False, order_by=None):
-    conn = sqlite3.connect('gym_system.db')
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    cur.execute(query, args)
+# === استعلام آمن ===
+def query_db(query, args=(), one=False):
+    cur = get_db().execute(query, args)
     rv = cur.fetchall()
-    conn.commit()
-    conn.close()
-
-    if order_by:
-        # Use the specified ORDER BY clause
-        rv = sorted(rv, key=lambda x: x[order_by], reverse=True)  # Use reverse=True for descending order
-
+    cur.close()
+    commit_close()
     return (rv[0] if rv else None) if one else rv
 
-# In your route, fetch attendance data without specific ordering
-# all_attendance_data = query_db("SELECT * FROM attendance", order_by=None)
-
-
-#cheack name exists
+# === فحص الاسم ===
 def check_name_exists(name):
-    with sqlite3.connect("gym_system.db") as conn:
-        cr = conn.cursor()
-        cr.execute("SELECT COUNT(*) FROM members WHERE Name = ?", (name,))
-        count = cr.fetchone()[0]
-        return count > 0
+    result = query_db('SELECT 1 FROM members WHERE name = ? LIMIT 1', (name,), one=True)
+    return result is not None
 
-
-
-def check_id_exists(id_to_check):
-    cr.execute("SELECT COUNT(*) FROM members WHERE id = ?", (id_to_check,))
-    count=cr.fetchone()[0]
-
-    return count > 0
+# === فحص الـ ID ===
+def check_id_exists(member_id):
+    result = query_db('SELECT 1 FROM members WHERE id = ? LIMIT 1', (member_id,), one=True)
+    return result is not None
