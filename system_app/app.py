@@ -191,27 +191,34 @@ def logout():
     flash('success Logged out successfully', 'success')
     return render_template("logout.html")
 
-
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
-        conn = sqlite3.connect('gym_system.db')
-        cr = conn.cursor()
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+
+        if not username or not email or not password:
+            flash('error All fields are required!', 'error')
+            return render_template('signup.html')
+
         try:
-            cr.execute('''
-                INSERT INTO users (username, email, password)
-                VALUES (?, ?, ?)
-            ''', (username, email, password))
+            conn = get_db()
+            cr = conn.cursor()
+            cr.execute(
+                'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+                (username, email, password)
+            )
             conn.commit()
-            flash('success User created successfully', 'success')
+            flash('success User created successfully!', 'success')
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
-            conn.rollback()
-            flash('error Username or email already exists. Please choose another.', 'error')
-        conn.close()
+            flash('error Username or email already exists!', 'error')
+        except Exception as e:
+            flash(f'error Server error: {str(e)}', 'error')
+        finally:
+            commit_close()
+
     return render_template('signup.html')
 
 @app.route('/change_password', methods=['POST', 'GET'])
@@ -339,6 +346,7 @@ with app.app_context():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
