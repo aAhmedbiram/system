@@ -103,5 +103,4 @@ zope.lifecycleevent==5.0
 zope.proxy==5.1
 Flask
 gunicorn
-sqlite3
 Werkzeug
