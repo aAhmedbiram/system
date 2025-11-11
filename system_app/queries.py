@@ -107,3 +107,10 @@ def check_name_exists(name):
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = ? LIMIT 1', (member_id,), one=True)
     return result is not None
+
+
+def close_db(e=None):
+    db = g.pop('_database', None)
+    if db is not None:
+        db.close()
+
