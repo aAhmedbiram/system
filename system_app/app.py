@@ -11,6 +11,17 @@ from .queries import create_table, query_db, check_name_exists, check_id_exists,
 app = Flask(__name__)
 app.secret_key = 'my secret key'
 
+def init_db():
+    """هتعمل الجداول لو مش موجودة"""
+    try:
+        create_table()
+        print("✅ Database initialized successfully!")  # للـ logs
+    except Exception as e:
+        print(f"❌ DB Error: {e}")  # للـ logs
+
+init_db()  # شغلها فورًا
+
+# باقي الروتس زي ما هي...
 @app.route('/')
 def home():
     return "التطبيق شغال 100% يا وحش! 🎉"
@@ -319,6 +330,7 @@ with app.app_context():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
