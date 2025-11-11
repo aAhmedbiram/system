@@ -312,11 +312,14 @@ def delete_all_data():
 def success():
     return render_template('success.html')
 
-
+# في آخر الملف، بعد كل الروتس
+with app.app_context():
+    create_table()  # هتعمل الجداول أول مرة
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
