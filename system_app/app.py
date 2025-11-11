@@ -279,55 +279,75 @@ def get_member_data(member_id):
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    current_time = ""
-    current_date = ""
-    current_day = ""
     if request.method == 'POST':
-        member_id = request.form.get('member_id')
-        query = f"SELECT * FROM members WHERE id = {member_id}"
-        cursor = get_db().cursor()
-        cursor.execute(query)
-        row = cursor.fetchone()
-        
+        member_id_str = request.form.get('member_id', '')
+        try:
+            member_id = int(member_id_str)  # تأكد إنه رقم
+        except ValueError:
+            flash('error Invalid member ID! Must be a number.', 'error')
+            all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+            return render_template("attendance_table.html", members_data=all_attendance_data)
 
-        if row:
-            columns = [col[0] for col in cursor.description]
-            member_data = dict(zip(columns, row))
+        try:
+            # استعلام آمن بـ parameterized query
+            member = query_db('SELECT * FROM members WHERE id = ?', (member_id,), one=True)
+            if not member:
+                flash('error Member not found!', 'error')
+                all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+                return render_template("attendance_table.html", members_data=all_attendance_data)
+
+            member_data = dict(member)  # تحويل Row إلى dict
             now = datetime.now()
             current_time = now.strftime("%H:%M:%S")
             current_date = now.strftime("%Y-%m-%d")
             current_day = now.strftime("%A")
 
-            # Update or insert data into the first table (attendance)
-            existing_data = query_db(f"SELECT * FROM attendance WHERE id = {member_data['id']}")
+            # تحقق من الـ existing data
+            existing_data = query_db('SELECT * FROM attendance WHERE id = ?', (member_id,))
+            conn = get_db()
+            cursor = conn.cursor()
+
             if existing_data:
-                update_query = f"UPDATE attendance SET name = '{member_data['name']}', " \
-                                f"end_date = '{member_data['End_date']}', " \
-                                f"membership_status = '{member_data['membership_status']}', " \
-                                f"attendance_time = '{current_time}', " \
-                                f"attendance_date = '{current_date}', " \
-                                f"day = '{current_day}' WHERE id = {member_data['id']}"
-                cursor.execute(update_query)
+                # Update query آمن
+                cursor.execute("""
+                    UPDATE attendance SET 
+                    name = ?, end_date = ?, membership_status = ?, 
+                    attendance_time = ?, attendance_date = ?, day = ? 
+                    WHERE id = ?
+                """, (member_data['name'], member_data['End_date'], member_data['membership_status'],
+                      current_time, current_date, current_day, member_id))
             else:
-                insert_query = f"INSERT INTO attendance (id, name, end_date, membership_status, " \
-                                f"attendance_time, attendance_date, day) VALUES ({member_data['id']}, " \
-                                f"'{member_data['name']}', '{member_data['End_date']}', " \
-                                f"'{member_data['membership_status']}', '{current_time}', " \
-                                f"'{current_date}', '{current_day}')"
-                cursor.execute(insert_query)
+                # Insert query آمن
+                cursor.execute("""
+                    INSERT INTO attendance (id, name, end_date, membership_status, 
+                    attendance_time, attendance_date, day) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (member_id, member_data['name'], member_data['End_date'], 
+                      member_data['membership_status'], current_time, current_date, current_day))
 
-            # Insert data into the second table (attendance_backup)
-            insert_query_backup = f"INSERT INTO attendance_backup (id, name, end_date, membership_status, " \
-                                f"attendance_time, attendance_date, day) VALUES ({member_data['id']}, " \
-                                f"'{member_data['name']}', '{member_data['End_date']}', " \
-                                f"'{member_data['membership_status']}', '{current_time}', " \
-                                f"'{current_date}', '{current_day}')"
-            cursor.execute(insert_query_backup)
+            # Backup insert آمن
+            cursor.execute("""
+                INSERT INTO attendance_backup (id, name, end_date, membership_status, 
+                attendance_time, attendance_date, day) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (member_id, member_data['name'], member_data['End_date'], 
+                  member_data['membership_status'], current_time, current_date, current_day))
 
-            get_db().commit()
-            session.setdefault('members_data', []).append(member_data)
-    
-    all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num asc", order_by=None)
+            conn.commit()
+            close_db()  # إغلاق الـ DB
+
+            # Session (من Flask)
+            if 'members_data' not in session:
+                session['members_data'] = []
+            session['members_data'].append(member_data)
+            flash('success Attendance updated successfully!', 'success')
+
+        except Exception as e:
+            flash(f'error Error updating attendance: {str(e)}', 'error')
+            commit_close()
+
+    # GET: جيب البيانات
+    all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
     return render_template("attendance_table.html", members_data=all_attendance_data)
 
 @app.route('/delete_all_data', methods=['POST'])
@@ -360,6 +380,7 @@ def teardown_db(exception):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
