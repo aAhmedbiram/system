@@ -3,7 +3,6 @@ from flask import g
 
 DATABASE = 'gym_system.db'
 
-# === اتصال بالـ DB ===
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
@@ -11,13 +10,11 @@ def get_db():
         db.row_factory = sqlite3.Row
     return db
 
-# === إغلاق الـ DB بعد كل طلب ===
 def close_db(e=None):
     db = g.pop('_database', None)
     if db is not None:
         db.close()
 
-# === حفظ التغييرات ===
 def commit_close():
     db = get_db()
     try:
@@ -25,7 +22,6 @@ def commit_close():
     finally:
         close_db()
 
-# === إنشاء الجداول ===
 def create_table():
     conn = sqlite3.connect(DATABASE)
     cr = conn.cursor()
@@ -63,7 +59,7 @@ def create_table():
         )
     ''')
 
-    # جدول المستخدمين (للـ Signup)
+    # جدول المستخدمين
     cr.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,7 +69,7 @@ def create_table():
         )
     ''')
 
-    # جدول النسخ الاحتياطي
+    # جدول النسخ الاحتياطي (المهم!)
     cr.execute('''
         CREATE TABLE IF NOT EXISTS attendance_backup (
             id INTEGER,
@@ -90,27 +86,16 @@ def create_table():
     conn.close()
     print("All tables created successfully!")
 
-# === استعلام آمن ===
 def query_db(query, args=(), one=False):
     cur = get_db().execute(query, args)
     rv = cur.fetchall()
     cur.close()
-    commit_close()
     return (rv[0] if rv else None) if one else rv
 
-# === فحص الاسم ===
 def check_name_exists(name):
     result = query_db('SELECT 1 FROM members WHERE name = ? LIMIT 1', (name,), one=True)
     return result is not None
 
-# === فحص الـ ID ===
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = ? LIMIT 1', (member_id,), one=True)
     return result is not None
-
-
-def close_db(e=None):
-    db = g.pop('_database', None)
-    if db is not None:
-        db.close()
-
