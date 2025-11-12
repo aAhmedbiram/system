@@ -9,7 +9,7 @@ from .func import get_age_and_dob, add_member, calculate_age, calculate_end_date
 from .queries import create_table, query_db, check_name_exists, check_id_exists, get_db, commit_close
 
 from flask import g
-from .queries import create_table, close_db  # ← تأكد إن close_db مستوردة هنا
+
 
 from .queries import create_table, close_db
 
@@ -380,6 +380,7 @@ def teardown_db(exception):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
