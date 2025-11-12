@@ -15,13 +15,13 @@ from .queries import create_table, close_db
 import os
 
 from system_app.queries import create_table
-with app.app_context():
-    create_table()
 
 
 app = Flask(__name__)
 app.secret_key = 'my secret key'
 
+with app.app_context():
+    create_table()
 
 
 @app.teardown_appcontext
@@ -388,6 +388,7 @@ if os.getenv("RUN_INIT_DB") == "true":
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
