@@ -1,35 +1,28 @@
-import sqlite3
+import os
+import psycopg2
 from flask import g
 
-DATABASE = 'gym_system.db'
+DATABASE_URL = os.environ['DATABASE_URL']
 
 def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row
-    return db
+    if 'db' not in g:
+        g.db = psycopg2.connect(DATABASE_URL, sslmode='require')
+        g.db.autocommit = True
+    return g.db
 
 def close_db(e=None):
-    db = g.pop('_database', None)
+    db = g.pop('db', None)
     if db is not None:
         db.close()
 
-def commit_close():
-    db = get_db()
-    try:
-        db.commit()
-    finally:
-        close_db()
-
 def create_table():
-    conn = sqlite3.connect(DATABASE)
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cr = conn.cursor()
 
     # جدول الأعضاء
     cr.execute('''
         CREATE TABLE IF NOT EXISTS members (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             email TEXT UNIQUE,
             phone TEXT,
@@ -48,7 +41,7 @@ def create_table():
     # جدول الحضور
     cr.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
-            num INTEGER PRIMARY KEY AUTOINCREMENT,
+            num SERIAL PRIMARY KEY,
             id INTEGER,
             name TEXT,
             end_date TEXT,
@@ -62,14 +55,14 @@ def create_table():
     # جدول المستخدمين
     cr.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL
         )
     ''')
 
-    # جدول النسخ الاحتياطي (المهم!)
+    # جدول النسخ الاحتياطي
     cr.execute('''
         CREATE TABLE IF NOT EXISTS attendance_backup (
             id INTEGER,
@@ -82,20 +75,20 @@ def create_table():
         )
     ''')
 
-    conn.commit()
     conn.close()
-    print("All tables created successfully!")
+    print("PostgreSQL tables created successfully!")
 
 def query_db(query, args=(), one=False):
-    cur = get_db().execute(query, args)
+    cur = get_db().cursor()
+    cur.execute(query, args)
     rv = cur.fetchall()
     cur.close()
     return (rv[0] if rv else None) if one else rv
 
 def check_name_exists(name):
-    result = query_db('SELECT 1 FROM members WHERE name = ? LIMIT 1', (name,), one=True)
+    result = query_db('SELECT 1 FROM members WHERE name = %s LIMIT 1', (name,), one=True)
     return result is not None
 
 def check_id_exists(member_id):
-    result = query_db('SELECT 1 FROM members WHERE id = ? LIMIT 1', (member_id,), one=True)
+    result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None
