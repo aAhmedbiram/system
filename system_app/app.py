@@ -199,6 +199,8 @@ def logout():
     flash('success Logged out successfully', 'success')
     return render_template("logout.html")
 
+from werkzeug.security import generate_password_hash
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -210,22 +212,22 @@ def signup():
             flash('error All fields are required!', 'error')
             return render_template('signup.html')
 
+        # تشفير الباسورد
+        hashed_password = generate_password_hash(password)
+
         try:
-            conn = get_db()
-            cr = conn.cursor()
-            cr.execute(
-                'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                (username, email, password)
+            # INSERT مع commit
+            query_db(
+                'INSERT INTO users (username, email, password) VALUES (%s, %s, %s)',
+                (username, email, hashed_password),
+                commit=True
             )
-            conn.commit()
             flash('success User created successfully!', 'success')
             return redirect(url_for('login'))
-        except sqlite3.IntegrityError:
-            flash('error Username or email already exists!', 'error')
+
         except Exception as e:
-            flash(f'error Server error: {str(e)}', 'error')
-        finally:
-            commit_close()
+            # أي خطأ هيظهرلك في الـ flash
+            flash(f'error Error: {str(e)}', 'error')
 
     return render_template('signup.html')
 
@@ -388,6 +390,7 @@ if os.getenv("RUN_INIT_DB") == "true":
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
