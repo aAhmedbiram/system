@@ -89,18 +89,12 @@ def create_table():
     print("✅ PostgreSQL tables created successfully!")
 
 # ✅ تنفيذ الاستعلامات العامة
-def query_db(query, args=(), one=False):
-    conn = get_db()
-    cur = conn.cursor()
+def query_db(query, args=(), one=False, commit=False):
+    cur = get_db().cursor()
     cur.execute(query, args)
-
-    try:
-        # في حالة SELECT
-        rv = cur.fetchall()
-    except psycopg2.ProgrammingError:
-        # في حالة INSERT / UPDATE / DELETE
-        rv = None
-
+    if commit:
+        get_db().commit()
+    rv = cur.fetchall()
     cur.close()
     return (rv[0] if rv else None) if one else rv
 
@@ -113,3 +107,4 @@ def check_name_exists(name):
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None
+
