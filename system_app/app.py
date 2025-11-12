@@ -12,6 +12,8 @@ from flask import g
 
 
 from .queries import create_table, close_db
+import os
+
 
 app = Flask(__name__)
 app.secret_key = 'my secret key'
@@ -374,11 +376,17 @@ with app.app_context():
 @app.teardown_appcontext
 def teardown_db(exception):
     close_db()  # ← دلوقتي هتعرفها
-    
+
+
+
+if os.getenv("RUN_INIT_DB") == "true":
+    from init_db import *  # ده هيشغل الكود اللي بيعمل create_all()
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
