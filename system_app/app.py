@@ -16,14 +16,13 @@ from .queries import create_table, close_db
 app = Flask(__name__)
 app.secret_key = 'my secret key'
 
-# # إنشاء الجداول عند بدء التطبيق
-# with app.app_context():
-#     create_table()
+# إنشاء الجداول
+with app.app_context():
+    create_table()
 
-# # إغلاق الـ DB بعد كل طلب
-# @app.teardown_appcontext
-# def teardown_db(exception):
-#     close_db()
+@app.teardown_appcontext
+def teardown_db(exception):
+    close_db()
 
 def init_db():
     """هتعمل الجداول لو مش موجودة"""
@@ -380,6 +379,7 @@ def teardown_db(exception):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
