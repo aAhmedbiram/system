@@ -1,20 +1,28 @@
 import os
 import psycopg2
-from flask import g
+from flask import g, current_app
 
-DATABASE_URL = os.environ['DATABASE_URL']
+# ✅ قراءة متغير الاتصال من بيئة التشغيل
+# لو Railway بيستخدم اسم مختلف (مثلاً PGURL)، عدل هنا
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGURL")
 
+if not DATABASE_URL:
+    raise Exception("❌ DATABASE_URL not found. Make sure it's set in Railway Variables.")
+
+# ✅ إنشاء اتصال بقاعدة البيانات
 def get_db():
     if 'db' not in g:
         g.db = psycopg2.connect(DATABASE_URL, sslmode='require')
         g.db.autocommit = True
     return g.db
 
+# ✅ إغلاق الاتصال بعد انتهاء الطلب
 def close_db(e=None):
     db = g.pop('db', None)
     if db is not None:
         db.close()
 
+# ✅ إنشاء الجداول الأساسية في PostgreSQL
 def create_table():
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cr = conn.cursor()
@@ -31,7 +39,7 @@ def create_table():
             birthdate TEXT,
             actual_starting_date TEXT,
             starting_date TEXT,
-            End_date TEXT,
+            end_date TEXT,
             membership_packages TEXT,
             membership_fees REAL,
             membership_status TEXT
@@ -42,7 +50,7 @@ def create_table():
     cr.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
             num SERIAL PRIMARY KEY,
-            id INTEGER,
+            member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
             name TEXT,
             end_date TEXT,
             membership_status TEXT,
@@ -62,10 +70,11 @@ def create_table():
         )
     ''')
 
-    # جدول النسخ الاحتياطي
+    # جدول النسخ الاحتياطي للحضور
     cr.execute('''
         CREATE TABLE IF NOT EXISTS attendance_backup (
-            id INTEGER,
+            id SERIAL PRIMARY KEY,
+            member_id INTEGER,
             name TEXT,
             end_date TEXT,
             membership_status TEXT,
@@ -75,20 +84,32 @@ def create_table():
         )
     ''')
 
+    conn.commit()
     conn.close()
-    print("PostgreSQL tables created successfully!")
+    print("✅ PostgreSQL tables created successfully!")
 
+# ✅ تنفيذ الاستعلامات العامة
 def query_db(query, args=(), one=False):
-    cur = get_db().cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute(query, args)
-    rv = cur.fetchall()
+
+    try:
+        # في حالة SELECT
+        rv = cur.fetchall()
+    except psycopg2.ProgrammingError:
+        # في حالة INSERT / UPDATE / DELETE
+        rv = None
+
     cur.close()
     return (rv[0] if rv else None) if one else rv
 
+# ✅ التحقق من وجود اسم
 def check_name_exists(name):
     result = query_db('SELECT 1 FROM members WHERE name = %s LIMIT 1', (name,), one=True)
     return result is not None
 
+# ✅ التحقق من وجود ID
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None
