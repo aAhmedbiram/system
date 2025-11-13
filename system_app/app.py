@@ -105,66 +105,90 @@ def search_by_name():
 
 @app.route("/add_member", methods=["POST"])
 def add_member_route():
-    if request.method == "POST":
-        try:
-            # --- جلب البيانات بأمان ---
-            member_name = request.form.get("member_name", "").strip().capitalize()
-            member_email = request.form.get("member_email", "").strip()
-            member_phone = request.form.get("member_phone", "").strip()
+    if request.method != "POST":
+        return redirect(url_for("index"))
 
-            # العمر: من تاريخ الميلاد (مش من الحقل بتاع العمر!)
-            birthdate_input = request.form.get("member_birthdate", "").strip()  # تأكد إن الحقل اسمه كده في الـ HTML
-            member_age = calculate_age(birthdate_input) if birthdate_input else None
+    try:
+        # --- جلب البيانات بأمان ---
+        member_name = request.form.get("member_name", "").strip().capitalize()
+        if not member_name:
+            flash("الاسم مطلوب!", "error")
+            return redirect(url_for("add_member"))
 
-            member_gender = request.form.get("choice", "").strip()
-            member_birthdate = birthdate_input  # مش member_age!
+        member_email = request.form.get("member_email", "").strip()
+        member_phone = request.form.get("member_phone", "").strip()
 
-            member_actual_starting_date = request.form.get("member_actual_starting_date", "").strip()
-            member_starting_date = request.form.get("member_starting_date", "").strip()
+        # تاريخ الميلاد
+        birthdate_input = request.form.get("member_birthdate", "").strip()
+        member_age = calculate_age(birthdate_input) if birthdate_input else None
+        member_birthdate = birthdate_input
 
-            # --- معالجة الباقة بأمان ---
-            user_input = request.form.get("member_membership_packages", "").strip()
-            numeric_value, unit = ("", "")
-            if user_input:
+        member_gender = request.form.get("choice", "").strip()
+        member_actual_starting_date = request.form.get("member_actual_starting_date", "").strip()
+        member_starting_date = request.form.get("member_starting_date", "").strip()
+
+        # الباقة
+        user_input = request.form.get("member_membership_packages", "").strip()
+        numeric_value, unit = ("", "")
+        if user_input:
+            try:
                 parts = user_input.split(maxsplit=1)
-                numeric_value = parts[0] if len(parts) > 0 else ""
+                numeric_value = parts[0]
                 unit = parts[1] if len(parts) > 1 else ""
+            except:
+                numeric_value, unit = ("", "")
 
-            # --- حساب التواريخ والرسوم ---
+        # --- حساب التواريخ والرسوم ---
+        try:
             member_End_date = calculate_end_date(member_starting_date, numeric_value) or ""
-            member_membership_fees = membership_fees(user_input) or 0.0
-            member_membership_status = compare_dates(member_End_date) or "غير معروف"
+        except:
+            member_End_date = ""
 
-            # --- إضافة العضو ---
+        try:
+            member_membership_fees = float(membership_fees(user_input) or 0)
+        except:
+            member_membership_fees = 0.0
+
+        try:
+            member_membership_status = compare_dates(member_End_date) or "غير معروف"
+        except:
+            member_membership_status = "غير معروف"
+
+        # --- إضافة العضو ---
+        try:
             new_member_id = add_member(
                 member_name, member_email, member_phone, member_age, member_gender,
                 member_birthdate, member_actual_starting_date, member_starting_date,
                 member_End_date, f"{numeric_value} {unit}", member_membership_fees,
                 member_membership_status
             )
-
-            # --- تنسيق التاريخ للعرض ---
-            formatted_date = ""
-            if member_actual_starting_date:
-                try:
-                    parsed = datetime.strptime(member_actual_starting_date, '%Y-%m-%d')
-                    formatted_date = parsed.strftime('%d,%m,%Y')
-                except:
-                    formatted_date = member_actual_starting_date
-
-            flash('تم إضافة العضو بنجاح!', 'success')
-            return redirect(url_for("add_member_done", new_member_id=new_member_id, formatted_date=formatted_date))
-
         except Exception as e:
-            # لو حصل أي خطأ → اعرضه وما تعطلش السيرفر
-            flash(f'خطأ: {str(e)}', 'error')
-            return redirect(url_for("add_member"))  # رجّعه للنموذج
+            flash(f"فشل في إضافة العضو: {str(e)}", "error")
+            return redirect(url_for("add_member"))
 
-    return redirect(url_for("index"))
+        # --- تنسيق التاريخ ---
+        formatted_date = ""
+        if member_actual_starting_date:
+            try:
+                parsed = datetime.strptime(member_actual_starting_date, "%Y-%m-%d")
+                formatted_date = parsed.strftime("%d,%m,%Y")
+            except:
+                formatted_date = member_actual_starting_date
+
+        flash("تم إضافة العضو بنجاح!", "success")
+        return redirect(url_for("add_member_done", new_member_id=new_member_id, formatted_date=formatted_date))
+
+    except Exception as e:
+        # أي خطأ عام → ارجع للنموذج
+        flash(f"خطأ غير متوقع: {str(e)}", "error")
+        return redirect(url_for("add_member"))
 
 @app.route("/add_member_done/<int:new_member_id>")
 def add_member_done(new_member_id):
-    return render_template("add_member_done.html", new_member_id=new_member_id)
+    formatted_date = request.args.get("formatted_date", "")
+    return render_template("add_member_done.html", 
+                         new_member_id=new_member_id, 
+                         formatted_date=formatted_date)
 
 @app.route("/all_members")
 def all_members():
@@ -328,5 +352,6 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
