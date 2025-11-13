@@ -6,14 +6,14 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 # === إنشاء الـ app ===
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'my secret key')
+app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 
 # === الـ imports من المجلدات ===
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates
 from .queries import (
     create_table, query_db, check_name_exists, check_id_exists,
     get_db, close_db, add_member, get_member, update_member,
-    add_attendance, get_today_attendance
+    add_attendance
 )
 
 # === إنشاء الجداول عند بدء التطبيق ===
@@ -103,12 +103,12 @@ def add_member_route():
         member_name = request.form.get("member_name", "").strip().capitalize()
         if not member_name:
             flash("الاسم مطلوب!", "error")
-            return redirect(url_for("add_member"))
+            return redirect(url_for("index"))
 
         member_email = request.form.get("member_email", "").strip()
         member_phone = request.form.get("member_phone", "").strip()
         birthdate_input = request.form.get("member_birthdate", "").strip()
-        member_age = calculate_age(birthdate_input) if birthdate_input else None
+        member_age = calculate_age(birthdate_input)  # ← int دايمًا
         member_birthdate = birthdate_input
         member_gender = request.form.get("choice", "").strip()
         member_actual_starting_date = request.form.get("member_actual_starting_date", "").strip()
@@ -126,15 +126,15 @@ def add_member_route():
                 pass
 
         # --- الحسابات ---
-        member_End_date = calculate_end_date(member_starting_date, numeric_value) or ""
-        member_membership_fees = membership_fees(user_input)  # ← بيرجّع float دايمًا
-        member_membership_status = compare_dates(member_End_date) or "غير معروف"
+        member_end_date = calculate_end_date(member_starting_date, numeric_value) or ""
+        member_membership_fees = membership_fees(user_input)  # ← float دايمًا
+        member_membership_status = compare_dates(member_end_date) or "غير معروف"
 
         # --- إضافة العضو ---
         new_member_id = add_member(
             member_name, member_email, member_phone, member_age, member_gender,
             member_birthdate, member_actual_starting_date, member_starting_date,
-            member_End_date, f"{numeric_value} {unit}", member_membership_fees,
+            member_end_date, f"{numeric_value} {unit}", member_membership_fees,
             member_membership_status
         )
 
@@ -152,7 +152,7 @@ def add_member_route():
 
     except Exception as e:
         flash(f"خطأ: {str(e)}", "error")
-        return redirect(url_for("add_member"))
+        return redirect(url_for("index"))
 
 @app.route("/add_member_done/<int:new_member_id>")
 def add_member_done(new_member_id):
@@ -182,7 +182,7 @@ def edit_member(member_id):
             email = request.form.get("edit_member_email", "")
             phone = request.form.get("edit_member_phone", "")
             birthdate = request.form.get("edit_member_birthdate", "")
-            age = calculate_age(birthdate)
+            age = calculate_age(birthdate)  # ← int دايمًا
             gender = request.form.get("edit_member_gender", "")
             actual_starting_date = request.form.get("edit_actual_starting_date", "")
             starting_date = request.form.get("edit_starting_date", "")
@@ -196,7 +196,7 @@ def edit_member(member_id):
                 except:
                     pass
             end_date = calculate_end_date(starting_date, numeric_value) or ""
-            member_membership_fees = membership_fees(user_input)  # ← بيرجّع float دايمًا
+            fees = membership_fees(user_input)
             status = compare_dates(end_date) or "غير معروف"
 
             update_member(member_id,
@@ -269,14 +269,7 @@ def attendance_table():
             if not member:
                 flash('العضو غير موجود!', 'error')
             else:
-                now = datetime.now()
-                current_time = now.strftime("%H:%M:%S")
-                current_date = now.strftime("%Y-%m-%d")
-                current_day = now.strftime("%A")
-
-                # استخدم add_attendance من queries.py
                 add_attendance(member_id, member['name'], member['end_date'], member['membership_status'])
-
                 flash('تم تسجيل الحضور بنجاح!', 'success')
 
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
@@ -297,6 +290,3 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
-
-
-
