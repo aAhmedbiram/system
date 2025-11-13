@@ -108,7 +108,7 @@ def add_member_route():
         member_email = request.form.get("member_email", "").strip()
         member_phone = request.form.get("member_phone", "").strip()
         birthdate_input = request.form.get("member_birthdate", "").strip()
-        member_age = calculate_age(birthdate_input)  # ← int أو None
+        member_age = calculate_age(birthdate_input) if birthdate_input else None
         member_birthdate = birthdate_input
         member_gender = request.form.get("choice", "").strip()
         member_actual_starting_date = request.form.get("member_actual_starting_date", "").strip()
@@ -297,5 +297,6 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
