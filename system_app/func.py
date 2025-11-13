@@ -1,4 +1,4 @@
-import sqlite3
+
 
 from datetime import datetime,timedelta
 
@@ -81,6 +81,7 @@ def compare_dates(input_date):
         return 'VAL'  
     else:
         return 'EX'  
+
 
 
 
