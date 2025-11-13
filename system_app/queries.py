@@ -110,10 +110,10 @@ def query_db(query, args=(), one=False, commit=False):
 
 # === دوال الأعضاء (Members) ===
 
+# queries.py
 def add_member(name, email, phone, age, gender, birthdate,
                actual_starting_date, starting_date, end_date,
                membership_packages, membership_fees, membership_status):
-    """إضافة عضو جديد"""
     try:
         result = query_db('''
             INSERT INTO members 
@@ -213,3 +213,4 @@ def check_name_exists(name):
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None
+
