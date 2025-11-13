@@ -31,19 +31,27 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
+        
         try:
-            user = query_db('SELECT * FROM users WHERE username = %s', (username,), one=True)
+            # جيب البيانات كـ dict مش tuple
+            user = query_db(
+                'SELECT id, username, password FROM users WHERE username = %s', 
+                (username,), 
+                one=True
+            )
+            
+            # تأكد إن user موجود ومش None
             if user and check_password_hash(user['password'], password):
                 session['user_id'] = user['id']
                 session['username'] = user['username']
-                flash('success Login successful!', 'success')
+                flash('Login successful!', 'success')
                 return redirect(url_for('index'))
             else:
-                flash('error Invalid username or password!', 'error')
+                flash('Invalid username or password!', 'error')
+                
         except Exception as e:
-            flash(f'error DB Error: {str(e)}', 'error')
-
+            flash(f'DB Error: {str(e)}', 'error')
+    
     return render_template('login.html')
 
 @app.route('/logout')
@@ -295,3 +303,4 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
