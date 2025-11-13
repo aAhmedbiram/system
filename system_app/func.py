@@ -2,16 +2,21 @@
 from datetime import datetime, timedelta
 
 def calculate_age(birthdate_str):
-    """يرجّع العمر كـ int أو None"""
-    if not birthdate_str:
-        return None
+    """
+    يحسب العمر من تاريخ الميلاد (YYYY-MM-DD)
+    يرجّع int دايمًا، أو 0 لو خطأ
+    """
+    if not birthdate_str or birthdate_str.strip() == "":
+        return 0  # مش هيحصل، لأننا بنتحقق في app.py
+    
     try:
-        birthdate = datetime.strptime(birthdate_str, "%Y-%m-%d").date()
+        birthdate = datetime.strptime(birthdate_str.strip(), "%Y-%m-%d").date()
         today = datetime.now().date()
         age = today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
-        return int(age)
-    except ValueError:
-        return None
+        return int(age) if age >= 0 else 0
+    except Exception as e:
+        print(f"Error calculating age: {e}")
+        return 0  # بدل None
 
 
 def calculate_end_date(start_date, duration_str):
@@ -50,3 +55,4 @@ def compare_dates(end_date_str):
         return "VAL" if end_date >= today else "EX"
     except ValueError:
         return "غير معروف"
+
