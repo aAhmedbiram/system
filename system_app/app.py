@@ -127,7 +127,7 @@ def add_member_route():
 
         # --- الحسابات ---
         member_End_date = calculate_end_date(member_starting_date, numeric_value) or ""
-        member_membership_fees = float(membership_fees(user_input) or 0)
+        member_membership_fees = membership_fees(user_input)  # ← بيرجّع float دايمًا
         member_membership_status = compare_dates(member_End_date) or "غير معروف"
 
         # --- إضافة العضو ---
@@ -297,3 +297,4 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
