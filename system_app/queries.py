@@ -1,8 +1,10 @@
-# db.py
+# queries.py
 import os
 import psycopg2
 from flask import g
 from psycopg2.extras import RealDictCursor
+from psycopg2 import IntegrityError
+from datetime import date
 
 # === قراءة الـ DATABASE_URL ===
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGURL")
@@ -91,8 +93,7 @@ def create_table():
     finally:
         conn.close()
 
-from psycopg2.extras import RealDictCursor
-
+# === تنفيذ الاستعلامات (آمن + يرجع dict) ===
 def query_db(query, args=(), one=False, commit=False):
     db = get_db()
     cur = None
@@ -103,7 +104,13 @@ def query_db(query, args=(), one=False, commit=False):
             db.commit()
         rv = cur.fetchall()
         return (rv[0] if rv else None) if one else rv
+    except IntegrityError as e:
+        print(f"DB Integrity Error: {e}")
+        if commit:
+            db.rollback()
+        raise ValueError("Duplicate entry (email or username already exists)")
     except Exception as e:
+        print(f"Query Error: {e}")
         if commit:
             db.rollback()
         raise e
@@ -112,11 +119,10 @@ def query_db(query, args=(), one=False, commit=False):
             cur.close()
 
 # === دوال الأعضاء (Members) ===
-
-# queries.py
 def add_member(name, email, phone, age, gender, birthdate,
                actual_starting_date, starting_date, end_date,
                membership_packages, membership_fees, membership_status):
+    """إضافة عضو جديد"""
     try:
         result = query_db('''
             INSERT INTO members 
@@ -139,14 +145,15 @@ def get_member(member_id):
 
 def update_member(member_id, **kwargs):
     """تحديث عضو (أي حقل)"""
+    if not kwargs:
+        return
     fields = [f"{k} = %s" for k in kwargs.keys()]
-    values = list(kwargs.values())
-    values.append(member_id)
+    values = list(kwargs.values()) + [member_id]
     query = f"UPDATE members SET {', '.join(fields)} WHERE id = %s"
     query_db(query, tuple(values), commit=True)
 
 def delete_member(member_id):
-    """حذف عضو (وحذف حضوره تلقائيًا بسبب ON DELETE CASCADE)"""
+    """حذف عضو"""
     query_db('DELETE FROM members WHERE id = %s', (member_id,), commit=True)
 
 def search_members(name=None, phone=None, email=None):
@@ -167,11 +174,9 @@ def search_members(name=None, phone=None, email=None):
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY id DESC"
-    
     return query_db(query, tuple(args))
 
 # === دوال الحضور (Attendance) ===
-
 def add_attendance(member_id, name, end_date, membership_status):
     """تسجيل حضور"""
     from datetime import datetime
@@ -188,12 +193,10 @@ def add_attendance(member_id, name, end_date, membership_status):
 
 def get_today_attendance():
     """جلب حضور اليوم"""
-    from datetime import date
     today = date.today().isoformat()
     return query_db('SELECT * FROM attendance WHERE attendance_date = %s ORDER BY attendance_time DESC', (today,))
 
 # === دوال المستخدمين (Users) ===
-
 def add_user(username, email, password_hash):
     """إضافة مستخدم (للـ Signup)"""
     try:
@@ -201,7 +204,7 @@ def add_user(username, email, password_hash):
             INSERT INTO users (username, email, password)
             VALUES (%s, %s, %s)
         ''', (username, email, password_hash), commit=True)
-    except psycopg2.errors.UniqueViolation:
+    except IntegrityError:
         raise ValueError("Username or email already exists")
 
 def get_user_by_username(username):
@@ -216,5 +219,3 @@ def check_name_exists(name):
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None
-
-
