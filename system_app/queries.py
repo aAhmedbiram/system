@@ -1,32 +1,30 @@
 import os
 import psycopg2
 from flask import g, current_app
+from psycopg2.extras import RealDictCursor  # ← مهم جدًا
 
-# ✅ قراءة متغير الاتصال من بيئة التشغيل
-# لو Railway بيستخدم اسم مختلف (مثلاً PGURL)، عدل هنا
+# قراءة متغير الاتصال من بيئة التشغيل
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGURL")
-
 if not DATABASE_URL:
-    raise Exception("❌ DATABASE_URL not found. Make sure it's set in Railway Variables.")
+    raise Exception("DATABASE_URL not found. Make sure it's set in Railway Variables.")
 
-# ✅ إنشاء اتصال بقاعدة البيانات
+# إنشاء اتصال بقاعدة البيانات
 def get_db():
     if 'db' not in g:
         g.db = psycopg2.connect(DATABASE_URL, sslmode='require')
         g.db.autocommit = True
     return g.db
 
-# ✅ إغلاق الاتصال بعد انتهاء الطلب
+# إغلاق الاتصال بعد انتهاء الطلب
 def close_db(e=None):
     db = g.pop('db', None)
     if db is not None:
         db.close()
 
-# ✅ إنشاء الجداول الأساسية في PostgreSQL
+# إنشاء الجداول الأساسية في PostgreSQL
 def create_table():
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cr = conn.cursor()
-
     # جدول الأعضاء
     cr.execute('''
         CREATE TABLE IF NOT EXISTS members (
@@ -45,7 +43,6 @@ def create_table():
             membership_status TEXT
         )
     ''')
-
     # جدول الحضور
     cr.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
@@ -59,7 +56,6 @@ def create_table():
             day TEXT
         )
     ''')
-
     # جدول المستخدمين
     cr.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -69,7 +65,6 @@ def create_table():
             password TEXT NOT NULL
         )
     ''')
-
     # جدول النسخ الاحتياطي للحضور
     cr.execute('''
         CREATE TABLE IF NOT EXISTS attendance_backup (
@@ -83,14 +78,13 @@ def create_table():
             day TEXT
         )
     ''')
-
     conn.commit()
     conn.close()
-    print("✅ PostgreSQL tables created successfully!")
+    print("PostgreSQL tables created successfully!")
 
-# ✅ تنفيذ الاستعلامات العامة
+# تنفيذ الاستعلامات العامة (يرجع dict الآن)
 def query_db(query, args=(), one=False, commit=False):
-    cur = get_db().cursor()
+    cur = get_db().cursor(cursor_factory=RealDictCursor)  # ← dict
     cur.execute(query, args)
     if commit:
         get_db().commit()
@@ -98,13 +92,12 @@ def query_db(query, args=(), one=False, commit=False):
     cur.close()
     return (rv[0] if rv else None) if one else rv
 
-# ✅ التحقق من وجود اسم
+# التحقق من وجود اسم
 def check_name_exists(name):
     result = query_db('SELECT 1 FROM members WHERE name = %s LIMIT 1', (name,), one=True)
     return result is not None
 
-# ✅ التحقق من وجود ID
+# التحقق من وجود ID
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None
-
