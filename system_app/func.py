@@ -15,15 +15,15 @@ def get_age_and_dob(date_str):
         
         return None, None
 
-def add_member(name, email, phone,age,gender,birthdate ,actual_starting_date ,starting_date,End_date,membership_packages,membership_fees,membership_status):
-    conn = sqlite3.connect('gym_system.db')
-    cur = conn.cursor()
-    cur.execute('INSERT INTO members (name, email, phone, age ,gender ,birthdate,actual_starting_date, starting_date, End_date,membership_packages,membership_fees,membership_status) VALUES (?, ?, ? ,? ,?,?,?,?,?,?,?,? )'
-                                    , (name, email, phone, age, gender,birthdate,actual_starting_date,starting_date,End_date,membership_packages,membership_fees,membership_status))
-    new_member_id = cur.lastrowid
-    conn.commit()
-    conn.close()
-    return new_member_id
+# def add_member(name, email, phone,age,gender,birthdate ,actual_starting_date ,starting_date,End_date,membership_packages,membership_fees,membership_status):
+#     conn = sqlite3.connect('gym_system.db')
+#     cur = conn.cursor()
+#     cur.execute('INSERT INTO members (name, email, phone, age ,gender ,birthdate,actual_starting_date, starting_date, End_date,membership_packages,membership_fees,membership_status) VALUES (?, ?, ? ,? ,?,?,?,?,?,?,?,? )'
+#                                     , (name, email, phone, age, gender,birthdate,actual_starting_date,starting_date,End_date,membership_packages,membership_fees,membership_status))
+#     new_member_id = cur.lastrowid
+#     conn.commit()
+#     conn.close()
+#     return new_member_id
 
 ##################################################
 
@@ -81,5 +81,6 @@ def compare_dates(input_date):
         return 'VAL'  
     else:
         return 'EX'  
+
 
 
