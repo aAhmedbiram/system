@@ -8,8 +8,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'my secret key')
 
 # === الـ imports من المجلدات ===
-from .func import get_age_and_dob, add_member, calculate_age, calculate_end_date, membership_fees, compare_dates
-from .queries import create_table, query_db, check_name_exists, check_id_exists, get_db, close_db
+from .func import get_age_and_dob, calculate_age, calculate_end_date, membership_fees, compare_dates
+from .queries import create_table, query_db, check_name_exists, check_id_exists, get_db, close_db,add_member
 
 # === إنشاء الجداول عند بدء التطبيق ===
 with app.app_context():
@@ -352,6 +352,7 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
