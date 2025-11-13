@@ -91,22 +91,25 @@ def create_table():
     finally:
         conn.close()
 
-# === تنفيذ الاستعلامات (يرجع dict) ===
+from psycopg2.extras import RealDictCursor
+
 def query_db(query, args=(), one=False, commit=False):
-    cur = get_db().cursor(cursor_factory=RealDictCursor)
+    db = get_db()
+    cur = None
     try:
+        cur = db.cursor(cursor_factory=RealDictCursor)
         cur.execute(query, args)
         if commit:
-            get_db().commit()
+            db.commit()
         rv = cur.fetchall()
         return (rv[0] if rv else None) if one else rv
     except Exception as e:
-        print(f"Query Error: {e}")
         if commit:
-            get_db().rollback()
+            db.rollback()
         raise e
     finally:
-        cur.close()
+        if cur:
+            cur.close()
 
 # === دوال الأعضاء (Members) ===
 
@@ -213,4 +216,5 @@ def check_name_exists(name):
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None
+
 
