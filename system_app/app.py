@@ -196,7 +196,7 @@ def edit_member(member_id):
                 except:
                     pass
             end_date = calculate_end_date(starting_date, numeric_value) or ""
-            fees = float(membership_fees(user_input) or 0)
+            member_membership_fees = membership_fees(user_input)  # ← بيرجّع float دايمًا
             status = compare_dates(end_date) or "غير معروف"
 
             update_member(member_id,
@@ -297,4 +297,5 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
