@@ -163,7 +163,7 @@ def add_member_done(new_member_id):
 
 @app.route("/all_members")
 def all_members():
-    members_data = query_db('SELECT * FROM members ORDER BY id DESC')
+    members_data = query_db('SELECT * FROM members ORDER BY id ASC')
     return render_template("all_members.html", members_data=members_data)
 
 # === تعديل عضو ===
@@ -290,3 +290,4 @@ def success():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
