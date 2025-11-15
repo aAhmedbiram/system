@@ -1,70 +1,109 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تم إضافة العضو</title>
+    <title>Member Added - Rival Gym System</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            background-image: url("/static/signup.jpg");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            font-family: 'Arial', sans-serif;
             color: #fff;
-            margin: 0;
-            padding: 0;
+            min-height: 100vh;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
         }
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1em;
+            text-align: center;
+            width: 100%;
+        }
+        h1 { color: white; font-size: 1.8em; }
         .container {
-            background: rgba(255, 255, 255, 0.1);
+            background: #f9f9f9;
             padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             text-align: center;
             max-width: 500px;
             width: 90%;
+            margin: 30px auto;
+            color: #333;
         }
-        h1 { font-size: 2.2em; margin-bottom: 10px; color: #00d4ff; }
-        h2 { font-size: 1.6em; margin: 15px 0; color: #a8e6cf; }
-        p { font-size: 1.2em; margin: 10px 0; color: #ddd; }
-        .id { 
-            font-size: 1.8em; 
-            font-weight: bold; 
-            color: #ffd700; 
-            background: rgba(0, 0, 0, 0.3); 
-            padding: 10px 20px; 
-            border-radius: 10px; 
-            display: inline-block; 
+        .success-title {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .id-box {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #555;
+            background: #eee;
+            padding: 12px 25px;
+            border-radius: 6px;
+            display: inline-block;
             margin: 15px 0;
         }
-        a {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 12px 25px;
-            background: #00d4ff;
-            color: #1e3c72;
+        .date-info {
+            font-size: 1.1em;
+            margin: 10px 0;
+            color: #555;
+        }
+        .home-btn {
+            background-color: #555;
+            color: #fff;
+            padding: 12px 30px;
             text-decoration: none;
             font-weight: bold;
-            border-radius: 8px;
-            transition: 0.3s;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 20px;
         }
-        a:hover {
-            background: #ffd700;
-            color: #1e3c72;
-            transform: scale(1.05);
+        .home-btn:hover {
+            background-color: #000;
+        }
+        .footer-links a {
+            color: #555;
+            text-decoration: none;
+            margin: 0 10px;
+            font-size: 0.9em;
+        }
+        .footer-links a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
+    <header>
+        <h1>Rival Gym System</h1>
+    </header>
+
     <div class="container">
-        <h1>تم إضافة العضو بنجاح!</h1>
-        <h2>The new member has been successfully added</h2>
-        <p class="id">رقم العضو الجديد: <strong>{{ new_member_id }}</strong></p>
+        <div class="success-title">Member Added Successfully!</div>
+        <p>The new member has been added to the system</p>
+
+        <div class="id-box">{{ new_member_id }}</div>
+
         {% if formatted_date %}
-            <p>تاريخ البدء الفعلي: <strong>{{ formatted_date }}</strong></p>
+            <div class="date-info">
+                Actual Start Date: <strong>{{ formatted_date }}</strong>
+            </div>
         {% endif %}
-        <a href="{{ url_for('index') }}">العودة إلى الصفحة الرئيسية</a>
+
+        <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
+
+        <div class="footer-links">
+            <a href="{{ url_for('all_members') }}">View All Members</a> |
+            <a href="{{ url_for('attendance_table') }}">Attendance Table</a>
+        </div>
     </div>
 </body>
 </html>
