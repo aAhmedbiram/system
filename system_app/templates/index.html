@@ -211,27 +211,15 @@
                 <label class="label_phone" for="member_phone">Phone:</label>
                 <input class="phone-input" type="text" id="member_phone" name="member_phone" required>
 
-                <!-- تاريخ الميلاد: يقبل الكتابة + يعرض اقتراحات -->
-                <label for="member_birthdate">Birthdate (dd/mm/yyyy):</label>
+                <!-- تاريخ الميلاد: كالندر + كتابة يدوية -->
+                <label for="member_birthdate">تاريخ الميلاد:</label>
                 <input 
-                    type="text" 
+                    type="date" 
                     id="member_birthdate" 
                     name="member_birthdate" 
-                    list="birthdate_suggestions"
-                    placeholder="15/05/2000"
-                    pattern="(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}"
-                    title="أدخل التاريخ بالشكل: dd/mm/yyyy"
+                    lang="ar-EG"
                     required
                 >
-                
-                <!-- اقتراحات تاريخ الميلاد (يمكنك تعديلها أو إزالتها) -->
-                <datalist id="birthdate_suggestions">
-                    <option value="01/01/2000">
-                    <option value="15/05/1998">
-                    <option value="22/12/1995">
-                    <option value="10/08/2002">
-                    <option value="30/06/1990">
-                </datalist>
                 
                 <div class="label_gender">Gender:</div>
                 <div class="gender-radio-group">
