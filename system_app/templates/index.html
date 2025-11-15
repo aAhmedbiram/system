@@ -260,29 +260,52 @@
     </form>
     <br>
 
-    <!-- JavaScript لتحويل dd/mm/yyyy → YYYY-MM-DD قبل الإرسال -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const form = document.querySelector('.add-new-member-form');
         const birthdateInput = document.getElementById('member_birthdate');
-
-        form.addEventListener('submit', function(e) {
-            const value = birthdateInput.value.trim();
-            if (!value) return;
-
-            const parts = value.split('/');
-            if (parts.length !== 3) return;
-
-            const day = parts[0].padStart(2, '0');
-            const month = parts[1].padStart(2, '0');
-            const year = parts[2];
-
-            if (day && month && year && year.length === 4) {
-                birthdateInput.value = `${year}-${month}-${day}`;
+        const form = birthdateInput.closest('form');
+    
+        // السماح بالكتابة اليدوية (dd/mm/yyyy)
+        birthdateInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, ''); // أرقام فقط
+            if (value.length >= 8) {
+                const day = value.slice(0, 2);
+                const month = value.slice(2, 4);
+                const year = value.slice(4, 8);
+                if (day && month && year) {
+                    e.target.value = `${year}-${month}-${day}`;
+                }
+            } else if (value.length >= 4) {
+                e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4) + '/' + value.slice(4);
+            } else if (value.length >= 2) {
+                e.target.value = value.slice(0, 2) + '/' + value.slice(2);
             }
         });
+    
+        // تحويل dd/mm/yyyy → YYYY-MM-DD قبل الإرسال
+        form.addEventListener('submit', function(e) {
+            const value = birthdateInput.value;
+            if (!value.includes('/')) return;
+    
+            const parts = value.split('/');
+            if (parts.length === 3) {
+                const [d, m, y] = parts.map(p => p.padStart(2, '0'));
+                if (d && m && y && y.length === 4) {
+                    birthdateInput.value = `${y}-${m}-${d}`;
+                }
+            }
+        });
+    
+        // عرض التاريخ كـ dd/mm/yyyy عند التحميل (لو في edit)
+        const currentValue = birthdateInput.value;
+        if (currentValue && currentValue.includes('-')) {
+            const [y, m, d] = currentValue.split('-');
+            birthdateInput.value = `${d}/${m}/${y}`;
+        }
     });
     </script>
+    
 </body>
 </html>
+
 
