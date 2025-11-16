@@ -35,6 +35,7 @@
         h1 {
             color: white;
             margin-bottom: 10px;
+            font-size: 1.8em;
         }
         h2, h3 {
             color: #333;
@@ -45,6 +46,8 @@
             flex-wrap: wrap;
             justify-content: space-between;
             max-width: 900px;
+            width: 100%;
+            padding: 20px;
         }
         section {
             width: 45%;
@@ -72,9 +75,10 @@
             text-decoration: none;
             font-size: 16px;
             border-radius: 4px;
+            transition: background-color 0.3s;
         }
         button:hover {
-            background-color: #555;
+            background-color: #000;
         }
         .all-members-btn {
             background-color: #555;
@@ -86,9 +90,10 @@
             font-size: 16px;
             border-radius: 4px;
             display: inline-block;
+            transition: background-color 0.3s;
         }
         .all-members-btn:hover {
-            background-color: black;
+            background-color: #000;
         }
         .logo {
             margin: 20px auto;
@@ -141,6 +146,7 @@
             border-radius: 4px;
             cursor: pointer;
             text-decoration: none;
+            transition: background-color 0.3s;
         }
         .search-member-id-button:hover,
         .search-member-name-button:hover,
@@ -148,7 +154,7 @@
         .search-member-phone-button:hover,
         .logout:hover,
         .attendance-btn:hover {
-            background-color: black;
+            background-color: #000;
         }
         .label_gender {
             margin-bottom: 8px;
@@ -158,6 +164,7 @@
         .gender-radio-group {
             display: flex;
             align-items: center;
+            gap: 15px;
         }
         .label_male,
         .label_female {
@@ -167,9 +174,48 @@
         .female-radio {
             margin-bottom: 16px;
         }
+
+        /* Flash Messages */
+        .flash-message {
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 600px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            font-size: 1.1em;
+            animation: fadeIn 0.5s ease;
+        }
+        .flash-message.error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+        .flash-message.success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ category }}">
+            {{ message | safe }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <header>
         <h1>Rival Gym System</h1>
         <div class="logo"></div>

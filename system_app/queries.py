@@ -120,21 +120,37 @@ def query_db(query, args=(), one=False, commit=False):
 
 # === دوال الأعضاء (Members) ===
 def add_member(name, email, phone, age, gender, birthdate,
-               actual_starting_date, starting_date, end_date,
-               membership_packages, membership_fees, membership_status):
-    """إضافة عضو جديد"""
+                actual_starting_date, starting_date, end_date,
+                membership_packages, membership_fees, membership_status,
+                custom_id=None):
+    """إضافة عضو جديد مع دعم تخصيص الـ ID"""
     try:
-        result = query_db('''
-            INSERT INTO members 
-            (name, email, phone, age, gender, birthdate, actual_starting_date, 
-             starting_date, end_date, membership_packages, membership_fees, membership_status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
-        ''', (
-            name, email, phone, age, gender, birthdate, actual_starting_date,
-            starting_date, end_date, membership_packages, membership_fees, membership_status
-        ), one=True, commit=True)
-        return result['id']
+        if custom_id is not None:
+            # لو في custom_id → نستخدمه
+            result = query_db('''
+                INSERT INTO members 
+                (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
+                starting_date, end_date, membership_packages, membership_fees, membership_status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            ''', (
+                custom_id, name, email, phone, age, gender, birthdate, actual_starting_date,
+                starting_date, end_date, membership_packages, membership_fees, membership_status
+            ), one=True, commit=True)
+            return result['id']
+        else:
+            # لو مفيش → نستخدم الـ auto-increment
+            result = query_db('''
+                INSERT INTO members 
+                (name, email, phone, age, gender, birthdate, actual_starting_date, 
+                starting_date, end_date, membership_packages, membership_fees, membership_status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            ''', (
+                name, email, phone, age, gender, birthdate, actual_starting_date,
+                starting_date, end_date, membership_packages, membership_fees, membership_status
+            ), one=True, commit=True)
+            return result['id']
     except Exception as e:
         print(f"DB Error in add_member: {e}")
         raise e

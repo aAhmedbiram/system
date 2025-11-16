@@ -86,7 +86,8 @@ def search_by_name():
         return render_template('result.html', name=name, data=member)
     return render_template('search.html')
 
-# === إضافة عضو ===
+
+
 @app.route("/add_member", methods=["POST"])
 def add_member_route():
     if request.method != "POST":
@@ -96,40 +97,55 @@ def add_member_route():
         # --- جلب البيانات ---
         member_name = request.form.get("member_name", "").strip().capitalize()
         if not member_name:
-            flash("الاسم مطلوب!", "error")
+            flash("Member name is required!", "error")
             return redirect(url_for("index"))
 
-        member_email = request.form.get("member_email", "").strip()
+        member_email = request.form.get("member_email", "").strip().lower()
         member_phone = request.form.get("member_phone", "").strip()
         birthdate_input = request.form.get("member_birthdate", "").strip()
-        member_age = calculate_age(birthdate_input)  # ← int دايمًا
+        member_age = calculate_age(birthdate_input) if birthdate_input else None
         member_birthdate = birthdate_input
         member_gender = request.form.get("choice", "").strip()
         member_actual_starting_date = request.form.get("member_actual_starting_date", "").strip()
         member_starting_date = request.form.get("member_starting_date", "").strip()
 
-        # --- الباقة ---
         user_input = request.form.get("member_membership_packages", "").strip()
         numeric_value, unit = ("", "")
         if user_input:
-            try:
-                parts = user_input.split(maxsplit=1)
-                numeric_value = parts[0]
-                unit = parts[1] if len(parts) > 1 else ""
-            except:
-                pass
+            parts = user_input.split(maxsplit=1)
+            numeric_value = parts[0]
+            unit = parts[1] if len(parts) > 1 else ""
 
         # --- الحسابات ---
         member_end_date = calculate_end_date(member_starting_date, numeric_value) or ""
-        member_membership_fees = membership_fees(user_input)  # ← float دايمًا
+        member_membership_fees = membership_fees(user_input)
         member_membership_status = compare_dates(member_end_date) or "غير معروف"
 
-        # --- إضافة العضو ---
-        new_member_id = add_member(
+        # --- 1. فحص التكرار ---
+        existing = query_db('''
+            SELECT id FROM members 
+            WHERE email = %s OR phone = %s
+            LIMIT 1
+        ''', (member_email, member_phone), one=True)
+
+        if existing:
+            flash(
+                f"The member you tried to add is already a member. His ID is: <strong>{existing['id']}</strong>",
+                "error"
+            )
+            return redirect(url_for("index"))
+
+        # --- 2. جلب آخر ID ---
+        last_member = query_db('SELECT id FROM members ORDER BY id DESC LIMIT 1', one=True)
+        new_member_id = (last_member['id'] + 1) if last_member else 1
+
+        # --- 3. إضافة العضو الجديد ---
+        add_member(
             member_name, member_email, member_phone, member_age, member_gender,
             member_birthdate, member_actual_starting_date, member_starting_date,
             member_end_date, f"{numeric_value} {unit}", member_membership_fees,
-            member_membership_status
+            member_membership_status,
+            custom_id=new_member_id
         )
 
         # --- تنسيق التاريخ ---
@@ -141,19 +157,17 @@ def add_member_route():
             except:
                 formatted_date = member_actual_starting_date
 
-        flash("تم إضافة العضو بنجاح!", "success")
-        return redirect(url_for("add_member_done", new_member_id=new_member_id, formatted_date=formatted_date))
+        # --- نجاح ---
+        flash("Member added successfully!", "success")
+        return redirect(url_for("add_member_done", 
+                                new_member_id=new_member_id, 
+                                formatted_date=formatted_date))
 
     except Exception as e:
-        flash(f"خطأ: {str(e)}", "error")
+        flash(f"Error: {str(e)}", "error")
         return redirect(url_for("index"))
-
-@app.route("/add_member_done/<int:new_member_id>")
-def add_member_done(new_member_id):
-    formatted_date = request.args.get("formatted_date", "")
-    return render_template("add_member_done.html",
-                         new_member_id=new_member_id,
-                         formatted_date=formatted_date)
+    
+    
 
 @app.route("/all_members")
 def all_members():
