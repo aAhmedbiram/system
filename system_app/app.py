@@ -176,6 +176,19 @@ def add_member_route():
         return redirect(url_for("index"))
     
     
+    
+    
+@app.route("/add_member_done")
+def add_member_done():
+    new_member_id = request.args.get('new_member_id')
+    formatted_date = request.args.get('formatted_date')
+    return render_template("add_member_done.html", 
+                        new_member_id=new_member_id, 
+                        formatted_date=formatted_date)
+    
+    
+    
+    
 
 @app.route("/all_members")
 def all_members():
