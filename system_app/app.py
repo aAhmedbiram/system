@@ -1,14 +1,11 @@
-# app.py
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g
 from datetime import datetime
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# === إنشاء الـ app ===
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 
-# === الـ imports من المجلدات ===
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates
 from .queries import (
     create_table, query_db, check_name_exists, check_id_exists,
@@ -16,19 +13,16 @@ from .queries import (
     add_attendance
 )
 
-# === إنشاء الجداول عند بدء التطبيق ===
 with app.app_context():
     create_table()
 
-# === إغلاق الـ DB بعد كل طلب ===
+
 @app.teardown_appcontext
 def teardown_db(exception):
     close_db()
 
-# ====================== الروتس ======================
-@app.route('/')
-def home():
-    return "التطبيق شغال 100% يا وحش!"
+
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
