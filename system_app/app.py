@@ -21,7 +21,15 @@ with app.app_context():
 def teardown_db(exception):
     close_db()
 
-
+@app.route('/')
+@app.route('/home')
+def index():
+    # ما تعملش أي flash هنا أبدًا
+    attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
+    members_data = query_db('SELECT * FROM members ORDER BY id DESC')
+    return render_template("index.html", 
+                        attendance_data=attendance_data, 
+                        members_data=members_data)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -72,11 +80,11 @@ def signup():
             flash(f'خطأ: {str(e)}', 'error')
     return render_template('signup.html')
 
-@app.route("/home")
-def index():
-    attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
-    members_data = query_db('SELECT * FROM members ORDER BY id DESC')
-    return render_template("index.html", attendance_data=attendance_data, members_data=members_data)
+# @app.route("/home")
+# def index():
+#     attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
+#     members_data = query_db('SELECT * FROM members ORDER BY id DESC')
+#     return render_template("index.html", attendance_data=attendance_data, members_data=members_data)
 
 @app.route('/search', methods=['GET', 'POST'])
 def search_by_name():
