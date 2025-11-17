@@ -289,95 +289,58 @@ def change_password():
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    # جلب كل بيانات الحضور للعرض
+    # أول حاجة نجيب الداتا للعرض
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
 
-    if request.method == 'POST':
+    # لو الطلب POST وفيه member_id يبقى ده تسجيل حضور
+    if request.method == 'POST' and request.form.get('member_id'):
         member_id_str = request.form.get('member_id', '').strip()
 
         if not member_id_str:
-            flash('الرجاء إدخال رقم العضو!', 'error')
+            flash('ادخل رقم العضو!', 'error')
         else:
             try:
                 member_id = int(member_id_str)
-            except ValueError:
-                flash('رقم العضو يجب أن يكون أرقام فقط!', 'error')
-            else:
-                # جلب بيانات العضو من جدول members
                 member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
 
                 if not member:
-                    flash(f'العضو رقم {member_id} غير موجود في قاعدة البيانات!', 'error')
+                    flash(f'العضو رقم {member_id} غير موجود!', 'error')
                 else:
-                    try:
-                        # جلب القيم بأمان مهما كان اسم العمود
-                        end_date = member.get('end_date') or member.get('End_date') or ''
-                        membership_status = member.get('membership_status') or member.get('Membership_status') or 'غير معروف'
+                    # جلب القيم بأمان
+                    end_date = member.get('end_date') or member.get('End_date') or ''
+                    status = member.get('membership_status') or 'غير معروف'
 
-                        # الوقت والتاريخ الحالي
-                        now = datetime.now()
-                        current_time = now.strftime("%H:%M:%S")
-                        current_date = now.strftime("%Y-%m-%d")
-                        current_day = now.strftime("%A")  # Monday, Tuesday, ...
+                    now = datetime.now()
+                    t = now.strftime("%H:%M:%S")
+                    d = now.strftime("%Y-%m-%d")
+                    day = now.strftime("%A")
 
-                        # فحص إذا كان مسجل حضور اليوم بالفعل (بناءً على member_id)
-                        existing = query_db("SELECT 1 FROM attendance WHERE member_id = %s", (member_id,), one=True)
-
-                        if existing:
-                            # تحديث السجل الموجود
-                            query_db("""
-                                UPDATE attendance 
-                                SET name = %s, 
-                                    end_date = %s, 
-                                    membership_status = %s,
-                                    attendance_time = %s, 
-                                    attendance_date = %s, 
-                                    day = %s
-                                WHERE member_id = %s
-                            """, (
-                                member['name'],
-                                str(end_date),
-                                membership_status,
-                                current_time,
-                                current_date,
-                                current_day,
-                                member_id
-                            ), commit=True)
-                        else:
-                            # إضافة سجل جديد
-                            query_db("""
-                                INSERT INTO attendance 
-                                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                            """, (
-                                member_id,
-                                member['name'],
-                                str(end_date),
-                                membership_status,
-                                current_time,
-                                current_date,
-                                current_day
-                            ), commit=True)
-
-                        # إضافة في جدول الـ backup (سجل تاريخي)
+                    # تحديث أو إضافة
+                    existing = query_db("SELECT 1 FROM attendance WHERE member_id = %s", (member_id,), one=True)
+                    if existing:
                         query_db("""
-                            INSERT INTO attendance_backup 
-                            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                            UPDATE attendance SET name=%s, end_date=%s, membership_status=%s,
+                            attendance_time=%s, attendance_date=%s, day=%s
+                            WHERE member_id = %s
+                        """, (member['name'], str(end_date), status, t, d, day, member_id), commit=True)
+                    else:
+                        query_db("""
+                            INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
                             VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """, (
-                            member_id,
-                            member['name'],
-                            str(end_date),
-                            membership_status,
-                            current_time,
-                            current_date,
-                            current_day
-                        ), commit=True)
+                        """, (member_id, member['name'], str(end_date), status, t, d, day), commit=True)
 
-                        flash(f'تم تسجيل حضور العضو {member["name"]} بنجاح!', 'success')
+                    # الـ backup
+                    query_db("""
+                        INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (member_id, member['name'], str(end_date), status, t, d, day), commit=True)
 
-                    except Exception as e:
-                        flash(f'خطأ في قاعدة البيانات: {str(e)}', 'error')
+                    flash(f'تم تسجيل حضور {member["name"]} بنجاح!', 'success')
+
+            except ValueError:
+                flash('رقم العضو لازم يكون أرقام بس!', 'error')
+            except Exception as e:
+                flash(f'خطأ: {str(e)}', 'error')
 
     return render_template("attendance_table.html", members_data=all_attendance_data)
 
