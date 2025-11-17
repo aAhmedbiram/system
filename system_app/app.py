@@ -285,40 +285,74 @@ def change_password():
             flash('اسم المستخدم أو كلمة المرور القديمة غير صحيحة!', 'error')
     return render_template('change_password.html')
 
-
-
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    # دايمًا نجيب بيانات الحضور أول حاجة
+    # جلب بيانات الحضور دايمًا (للعرض)
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
 
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
-        
+
         if not member_id_str:
             flash('الرجاء إدخال رقم العضو!', 'error')
-        else:
-            try:
-                member_id = int(member_id_str)
-            except ValueError:
-                flash('رقم العضو غير صحيح! يجب أن يكون أرقام فقط.', 'error')
-            else:
-                member = get_member(member_id)
-                if not member:
-                    flash(f'العضو رقم {member_id} غير موجود!', 'error')
-                else:
-                    try:
-                        add_attendance(
-                            member_id=member_id,
-                            name=member['name'],
-                            end_date=member['end_date'],
-                            membership_status=member['membership_status']
-                        )
-                        flash(f'تم تسجيل حضور العضو {member["name"]} بنجاح!', 'success')
-                    except Exception as e:
-                        flash(f'خطأ في تسجيل الحضور: {str(e)}', 'error')
+            return render_template("attendance_table.html", members_data=all_attendance_data)
 
-    # نرجع الصفحة في كل الحالات
+        try:
+            member_id = int(member_id_str)
+        except ValueError:
+            flash('رقم العضو يجب أن يكون أرقام فقط!', 'error')
+            return render_template("attendance_table.html", members_data=all_attendance_data)
+
+        # جلب بيانات العضو بأمان
+        member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
+
+        if not member:
+            flash(f'العضو رقم {member_id} غير موجود!', 'error')
+            return render_template("attendance_table.html", members_data=all_attendance_data)
+
+        # التاريخ والوقت الحالي
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        current_date = now.strftime("%Y-%m-%d")
+        current_day = now.strftime("%A")
+
+        # تحديث أو إضافة في جدول attendance
+        existing = query_db("SELECT 1 FROM attendance WHERE id = %s", (member_id,), one=True)
+
+        if existing:
+            # تحديث
+            query_db("""
+                UPDATE attendance 
+                SET name = %s, end_date = %s, membership_status = %s,
+                    attendance_time = %s, attendance_date = %s, day = %s
+                WHERE id = %s
+            """, (
+                member['name'], member['end_date'], member['membership_status'],
+                current_time, current_date, current_day, member_id
+            ), commit=True)
+        else:
+            # إضافة جديدة
+            query_db("""
+                INSERT INTO attendance 
+                (id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                member_id, member['name'], member['end_date'], member['membership_status'],
+                current_time, current_date, current_day
+            ), commit=True)
+
+        # إضافة تلقائيًا في جدول الـ backup (مهما كان موجود أو لا)
+        query_db("""
+            INSERT INTO attendance_backup 
+            (id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            member_id, member['name'], member['end_date'], member['membership_status'],
+            current_time, current_date, current_day
+        ), commit=True)
+
+        flash(f'تم تسجيل حضور العضو {member["name"]} بنجاح!', 'success')
+
     return render_template("attendance_table.html", members_data=all_attendance_data)
 
 
