@@ -285,9 +285,10 @@ def change_password():
             flash('اسم المستخدم أو كلمة المرور القديمة غير صحيحة!', 'error')
     return render_template('change_password.html')
 
+
+
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    # جلب بيانات الحضور دايمًا (للعرض)
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
 
     if request.method == 'POST':
@@ -303,12 +304,16 @@ def attendance_table():
             flash('رقم العضو يجب أن يكون أرقام فقط!', 'error')
             return render_template("attendance_table.html", members_data=all_attendance_data)
 
-        # جلب بيانات العضو بأمان
+        # جلب العضو بأمان
         member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
 
         if not member:
             flash(f'العضو رقم {member_id} غير موجود!', 'error')
             return render_template("attendance_table.html", members_data=all_attendance_data)
+
+        # الحل السحري: نأخذ القيم بأكثر من طريقة عشان نضمن ما يحصلش KeyError
+        end_date = member.get('end_date') or member.get('End_date') or member.get('END_DATE') or ''
+        membership_status = member.get('membership_status') or member.get('Membership_status') or 'غير معروف'
 
         # التاريخ والوقت الحالي
         now = datetime.now()
@@ -316,44 +321,34 @@ def attendance_table():
         current_date = now.strftime("%Y-%m-%d")
         current_day = now.strftime("%A")
 
-        # تحديث أو إضافة في جدول attendance
+        # تحديث أو إضافة في attendance
         existing = query_db("SELECT 1 FROM attendance WHERE id = %s", (member_id,), one=True)
 
         if existing:
-            # تحديث
             query_db("""
-                UPDATE attendance 
-                SET name = %s, end_date = %s, membership_status = %s,
+                UPDATE attendance SET 
+                    name = %s, end_date = %s, membership_status = %s,
                     attendance_time = %s, attendance_date = %s, day = %s
                 WHERE id = %s
-            """, (
-                member['name'], member['end_date'], member['membership_status'],
-                current_time, current_date, current_day, member_id
-            ), commit=True)
+            """, (member['name'], end_date, membership_status, current_time, current_date, current_day, member_id), commit=True)
         else:
-            # إضافة جديدة
             query_db("""
                 INSERT INTO attendance 
                 (id, name, end_date, membership_status, attendance_time, attendance_date, day)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                member_id, member['name'], member['end_date'], member['membership_status'],
-                current_time, current_date, current_day
-            ), commit=True)
+            """, (member_id, member['name'], end_date, membership_status, current_time, current_date, current_day), commit=True)
 
-        # إضافة تلقائيًا في جدول الـ backup (مهما كان موجود أو لا)
+        # إضافة في الـ backup
         query_db("""
             INSERT INTO attendance_backup 
             (id, name, end_date, membership_status, attendance_time, attendance_date, day)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            member_id, member['name'], member['end_date'], member['membership_status'],
-            current_time, current_date, current_day
-        ), commit=True)
+        """, (member_id, member['name'], end_date, membership_status, current_time, current_date, current_day), commit=True)
 
         flash(f'تم تسجيل حضور العضو {member["name"]} بنجاح!', 'success')
 
     return render_template("attendance_table.html", members_data=all_attendance_data)
+
 
 
 @app.route('/delete_all_data', methods=['POST'])
