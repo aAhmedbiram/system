@@ -157,13 +157,14 @@
 </head>
 
 <body>
-    <div class="add-id-form-container">
-        <form class="add-id-form" action="{{ url_for('attendance_table') }}" method="post">
-            <label class="search-member-id" for="member_id">Enter Member ID:</label>
-            <input class="search-id" type="text" id="member_id" name="member_id" required>
-            <button class="search-member-id-button" type="submit">Add</button>
-        </form>
-    </div>
+<!-- استبدل الفورم اللي فوق خالص بالكود ده -->
+<div class="add-id-form-container">
+    <form class="add-id-form" action="{{ url_for('attendance_table') }}" method="post" onsubmit="return this.member_id.value.trim() !== '' || (alert('ادخل رقم العضو أولاً!'), false);">
+        <label for="member_id">Enter Member ID:</label>
+        <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus>
+        <button type="submit">Add</button>
+    </form>
+</div>
 
     <section class="member-data">
         <h2>Attendance Table</h2>
@@ -201,18 +202,21 @@
 <!-- استبدل كل الـ form بتاع Delete بالكود ده -->
 <!-- استبدل الجزء ده بالكود ده بالظبط -->
 <br><br>
-<div style="text-align: center; margin: 30px 0;">
-    <form action="{{ url_for('delete_all_data') }}" method="post" style="display: inline;">
-        <button type="submit" onclick="return confirm('متأكد 100%؟ كل الحضور هيتمسح وينتقل للنسخة الاحتياطية!');"
-                style="background:#c62828; color:white; padding:15px 40px; font-size:18px; border:none; border-radius:8px; cursor:pointer;">
-            Delete All Data
-        </button>
-    </form>
-    &nbsp;&nbsp;&nbsp;
-    <a href="{{ url_for('index') }}" style="background:#555; color:white; padding:15px 40px; text-decoration:none; border-radius:8px; font-size:18px;">
-        Home
-    </a>
-</div>
+<br><br><br>
+        <div style="text-align: center;">
+            <form action="{{ url_for('delete_all_data') }}" method="post" style="display: inline-block; margin: 0 10px;">
+                <button type="submit" 
+                        onclick="return confirm('متأكد 100%؟ كل بيانات الحضور هتتمسح وتنتقل للـ backup!');"
+                        style="background:#c62828; color:white; padding:15px 50px; font-size:18px; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">
+                    Delete All Data
+                </button>
+            </form>
+
+            <a href="{{ url_for('index') }}" 
+            style="background:#555; color:white; padding:15px 50px; text-decoration:none; border-radius:8px; font-size:18px; display: inline-block;">
+                Home
+            </a>
+        </div>
     </section>
     <!-- Add this script at the end of your HTML file -->
     <script>
