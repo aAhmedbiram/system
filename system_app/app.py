@@ -386,26 +386,25 @@ def attendance_table():
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     try:
-        # 1. ننقل كل الداتا للـ backup أولاً (حتى لو مكررة → تاريخي)
+        # 1. ننقل كل الداتا للـ backup (تاريخي كامل)
         query_db("""
             INSERT INTO attendance_backup 
             SELECT * FROM attendance
         """, commit=True)
 
-        # 2. نحذف كل شيء من attendance بطريقة قوية (تتخطى أي قيود مؤقتًا)
+        # 2. نحذف الجدول كله + نرجّع العداد لـ 1 تلقائيًا (الطريقة الأقوى والأضمن)
         query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
-        # TRUNCATE أقوى من DELETE و بيرجّع الـ num لـ 1 تلقائيًا
 
-        flash('تم حذف جميع بيانات الحضور ونقلها إلى النسخة الاحتياطية بنجاح!', 'success')
+        flash('تم حذف جميع بيانات الحضور وإعادة العداد إلى 1 بنجاح!', 'success')
 
     except Exception as e:
-        # لو TRUNCATE ما نفعش، نجرب DELETE عادي
+        # لو TRUNCATE ما نفعش (نادر جدًا)، نستخدم الحل البديل
         try:
             query_db("DELETE FROM attendance", commit=True)
             query_db("ALTER SEQUENCE attendance_num_seq RESTART WITH 1", commit=True)
-            flash('تم الحذف بنجاح (بطريقة بديلة)', 'success')
+            flash('تم الحذف وإعادة العداد بنجاح (طريقة بديلة)', 'success')
         except Exception as e2:
-            flash(f'خطأ أثناء الحذف: {str(e)} | {str(e2)}', 'error')
+            flash(f'خطأ أثناء الحذف: {str(e)}', 'error')
 
     return redirect(url_for('attendance_table'))
 
