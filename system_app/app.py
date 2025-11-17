@@ -285,24 +285,42 @@ def change_password():
             flash('اسم المستخدم أو كلمة المرور القديمة غير صحيحة!', 'error')
     return render_template('change_password.html')
 
+
+
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    if request.method == 'POST':
-        member_id_str = request.form.get('member_id', '')
-        try:
-            member_id = int(member_id_str)
-        except:
-            flash('رقم العضو غير صحيح!', 'error')
-        else:
-            member = get_member(member_id)
-            if not member:
-                flash('العضو غير موجود!', 'error')
-            else:
-                add_attendance(member_id, member['name'], member['end_date'], member['membership_status'])
-                flash('تم تسجيل الحضور بنجاح!', 'success')
-
+    # دايمًا نجيب بيانات الحضور أول حاجة
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+
+    if request.method == 'POST':
+        member_id_str = request.form.get('member_id', '').strip()
+        
+        if not member_id_str:
+            flash('الرجاء إدخال رقم العضو!', 'error')
+        else:
+            try:
+                member_id = int(member_id_str)
+            except ValueError:
+                flash('رقم العضو غير صحيح! يجب أن يكون أرقام فقط.', 'error')
+            else:
+                member = get_member(member_id)
+                if not member:
+                    flash(f'العضو رقم {member_id} غير موجود!', 'error')
+                else:
+                    try:
+                        add_attendance(
+                            member_id=member_id,
+                            name=member['name'],
+                            end_date=member['end_date'],
+                            membership_status=member['membership_status']
+                        )
+                        flash(f'تم تسجيل حضور العضو {member["name"]} بنجاح!', 'success')
+                    except Exception as e:
+                        flash(f'خطأ في تسجيل الحضور: {str(e)}', 'error')
+
+    # نرجع الصفحة في كل الحالات
     return render_template("attendance_table.html", members_data=all_attendance_data)
+
 
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
