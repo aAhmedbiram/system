@@ -349,12 +349,25 @@ def attendance_table():
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     try:
-        query_db("INSERT INTO attendance_backup SELECT * FROM attendance", commit=True)
+        # 1. ننقل البيانات للـ backup من غير الـ Primary Key (id) عشان ما يتكررش
+        query_db("""
+            INSERT INTO attendance_backup 
+            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
+            FROM attendance
+        """, commit=True)
+
+        # 2. نمسح كل حاجة من attendance
         query_db("DELETE FROM attendance", commit=True)
+
+        # 3. نرجّع العداد لـ 1
         query_db("ALTER SEQUENCE attendance_num_seq RESTART WITH 1", commit=True)
-        flash('تم حذف جميع بيانات الحضور وإعادة العداد إلى 1 بنجاح!', 'success')
+
+        flash('تم حذف جميع بيانات الحضور ونقلها للنسخة الاحتياطية بنجاح!', 'success')
+
     except Exception as e:
-        flash(f'خطأ: {str(e)}', 'error')
+        flash(f'خطأ أثناء الحذف: {str(e)}', 'error')
+
     return redirect(url_for('attendance_table'))
 
 
