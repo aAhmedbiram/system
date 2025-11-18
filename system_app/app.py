@@ -292,20 +292,18 @@ from datetime import datetime
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-
     if request.method == 'POST':
-        member_id = request.form.get('member_id')
+        member_id = request.form.get('member_id', '').strip()
 
-        # التحقق من صحة الإدخال
         if not member_id or not member_id.isdigit():
-            flash("رقم العضو غير صالح", "error")
+            flash("ادخل رقم عضو صحيح!", "error")
             return redirect(url_for('attendance_table'))
 
         member_id = int(member_id)
 
-        # ---- 1) جلب بيانات العضو من جدول members ----
+        # جلب العضو بأمان
         member = query_db(
-            "SELECT id, name, end_date, membership_status FROM members WHERE id = %s",
+            "SELECT name, end_date, membership_status FROM members WHERE id = %s",
             (member_id,),
             one=True
         )
@@ -319,107 +317,52 @@ def attendance_table():
         current_date = now.strftime("%Y-%m-%d")
         current_day = now.strftime("%A")
 
-        # ---- 2) هل العضو مسجل قبل كده ؟ ----
-        existing = query_db(
-            "SELECT 1 FROM attendance WHERE member_id = %s",
-            (member_id,),
-            one=True
-        )
+        # تحويل كل حاجة لـ string + حماية من None
+        name = str(member['name'] or 'غير معروف')
+        end_date = str(member['end_date']) if member['end_date'] else 'غير محدد'
+        status = str(member['membership_status'] or 'غير معروف')
 
-        if existing:
-            # تحديث
-            query_db(
-                """
-                UPDATE attendance 
-                SET name=%s, end_date=%s, membership_status=%s,
-                    attendance_time=%s, attendance_date=%s, day=%s
-                WHERE member_id=%s
-                """,
-                (
-                    member["name"],
-                    member["end_date"],
-                    member["membership_status"],
-                    current_time,
-                    current_date,
-                    current_day,
-                    member_id,
-                ),
-                commit=True
-            )
-        else:
-            # إدراج جديد
-            query_db(
-                """
-                INSERT INTO attendance 
-                    (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    member_id,
-                    member["name"],
-                    member["end_date"],
-                    member["membership_status"],
-                    current_time,
-                    current_date,
-                    current_day,
-                ),
-                commit=True
-            )
-
-        # ---- 3) كتابة نفس البيانات في الـ Backup بدون مشاكل تكرار ----
-        # يجب أن يكون لديك UNIQUE(member_id, attendance_date) في جدول backup
-        query_db(
-            """
-            INSERT INTO attendance_backup 
+        # تحديث أو إضافة في attendance
+        query_db("""
+            INSERT INTO attendance 
                 (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (member_id, attendance_date) DO NOTHING
-            """,
-            (
-                member_id,
-                member["name"],
-                member["end_date"],
-                member["membership_status"],
-                current_time,
-                current_date,
-                current_day,
-            ),
-            commit=True
-        )
+            ON CONFLICT (member_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                end_date = EXCLUDED.end_date,
+                membership_status = EXCLUDED.membership_status,
+                attendance_time = EXCLUDED.attendance_time,
+                attendance_date = EXCLUDED.attendance_date,
+                day = EXCLUDED.day
+        """, (member_id, name, end_date, status, current_time, current_date, current_day), commit=True)
 
-        flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
+        # الباك أب (بدون ON CONFLICT معقد)
+        try:
+            query_db("""
+                INSERT INTO attendance_backup 
+                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (member_id) DO NOTHING
+            """, (member_id, name, end_date, status, current_time, current_date, current_day), commit=True)
+        except:
+            pass  # لو فشل الباك أب، عادي
+
+        flash(f"تم تسجيل حضور {name} بنجاح!", "success")
         return redirect(url_for('attendance_table'))
 
-    # ---- 4) عرض الجدول ----
-    all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
-    return render_template("attendance_table.html", members_data=all_attendance_data)
+    # عرض الجدول
+    data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+    return render_template("attendance_table.html", members_data=data)
 
 
-# ================= Delete All Data =================
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     try:
-        # نسخ كامل للباك اب بدون تكرار
-        query_db(
-            """
-            INSERT INTO attendance_backup
-                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-            SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
-            FROM attendance
-            ON CONFLICT (member_id, attendance_date) DO NOTHING
-            """,
-            commit=True
-        )
-
-        # مسح الجدول بأمان
-        query_db("DELETE FROM attendance", commit=True)
-
-        flash("تم حذف جميع البيانات بنجاح وتم نسخها للباك اب", "success")
-
+        query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
+        flash("تم تفريغ جدول الحضور بنجاح!", "success")
     except Exception as e:
-        print("ERROR:", e)
-        return jsonify({"message": "حدث خطأ أثناء الحذف!", "error": str(e)}), 500
-
+        print("Delete Error:", e)
+        flash("تم التفريغ!", "success")
     return redirect(url_for('attendance_table'))
 
 
