@@ -366,12 +366,14 @@ def attendance_table():
                 commit=True
             )
 
-        # ---- 3) كتابة نفس البيانات في الـ Backup ----
+        # ---- 3) كتابة نفس البيانات في الـ Backup بدون مشاكل تكرار ----
+        # يجب أن يكون لديك UNIQUE(member_id, attendance_date) في جدول backup
         query_db(
             """
-            INSERT INTO attendance_backup
+            INSERT INTO attendance_backup 
                 (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (member_id, attendance_date) DO NOTHING
             """,
             (
                 member_id,
@@ -393,40 +395,32 @@ def attendance_table():
     return render_template("attendance_table.html", members_data=all_attendance_data)
 
 
-
-# =================================================================
-
-
-from flask import jsonify 
-
+# ================= Delete All Data =================
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     try:
-        # Backup كامل
+        # نسخ كامل للباك اب بدون تكرار
         query_db(
             """
-            INSERT INTO attendance_backup 
+            INSERT INTO attendance_backup
                 (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
             FROM attendance
+            ON CONFLICT (member_id, attendance_date) DO NOTHING
             """,
             commit=True
         )
 
-        # مسح الجدول
-        query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
+        # مسح الجدول بأمان
+        query_db("DELETE FROM attendance", commit=True)
 
         flash("تم حذف جميع البيانات بنجاح وتم نسخها للباك اب", "success")
-
 
     except Exception as e:
         print("ERROR:", e)
         return jsonify({"message": "حدث خطأ أثناء الحذف!", "error": str(e)}), 500
 
-
     return redirect(url_for('attendance_table'))
-
-
 
 
 
