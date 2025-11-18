@@ -289,85 +289,87 @@ def change_password():
 
 
 
+from datetime import datetime
+
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
 
     if request.method == 'POST' and request.form.get('member_id'):
-        member_id_str = request.form.get('member_id', '').strip()
+        member_id_str = request.form.get('member_id').strip()
 
-        if not member_id_str:
-            flash('ادخل رقم العضو!', 'error')
+        if not member_id_str.isdigit():
+            flash('رقم العضو لازم يكون أرقام بس!', 'error')
         else:
-            try:
-                member_id = int(member_id_str)
-                member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
+            member_id = int(member_id_str)
 
-                if not member:
-                    flash(f'العضو رقم {member_id} غير موجود!', 'error')
-                else:
-                    # كل حاجة نحولها لـ string ونتأكد منها
-                    name = str(member.get('name') or 'غير معروف').strip()
-                    end_date = str(member.get('end_date') or 'غير محدد') if member.get('end_date') is not None else 'غير محدد'
-                    status = str(member.get('membership_status') or 'غير معروف')
+            # جلب العضو من جدول members
+            member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
 
-                    now = datetime.now()
-                    t = now.strftime("%H:%M:%S")
-                    d = now.strftime("%Y-%m-%d")
+            if not member:
+                flash(f'العضو رقم {member_id} غير موجود!', 'error')
+            else:
+                now = datetime.now()
+                current_time = now.strftime("%H:%M:%S")
+                current_date = now.strftime("%Y-%m-%d")
+                # تحويل اليوم لعربي زي ما في الـ backup القديم
+                days_ar = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد']
+                day_en = now.strftime("%A")
+                current_day = days_ar[['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].index(day_en)]
 
-                    # تحويل اليوم للعربي (مهم جدًا)
-                    days_ar = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد']
-                    day_en = now.strftime("%A")
-                    day = days_ar[['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].index(day_en)]
+                name = member['name']
+                end_date = str(member['end_date']) if member['end_date'] else 'غير محدد'
+                membership_status = member.get('membership_status', 'غير معروف')
 
-                    # نمسح أي صف قديم
-                    query_db("DELETE FROM attendance WHERE member_id = %s", (member_id,), commit=True)
+                # 1. حذف أي صف قديم لنفس العضو من attendance (عشان ما يتكررش)
+                query_db("DELETE FROM attendance WHERE member_id = %s", (member_id,), commit=True)
 
-                    # نضيف الجديد بأمان تام
-                    query_db("""
-                        INSERT INTO attendance 
-                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (member_id, name, end_date, status, t, d, day), commit=True)
+                # 2. إضافة صف جديد في attendance
+                query_db("""
+                    INSERT INTO attendance 
+                    (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (member_id, name, end_date, membership_status, current_time, current_date, current_day), commit=True)
 
-                    # الـ backup
-                    try:
-                        query_db("""
-                            INSERT INTO attendance_backup 
-                            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                            ON CONFLICT (member_id) DO UPDATE SET
-                                name = EXCLUDED.name,
-                                end_date = EXCLUDED.end_date,
-                                membership_status = EXCLUDED.membership_status,
-                                attendance_time = EXCLUDED.attendance_time,
-                                attendance_date = EXCLUDED.attendance_date,
-                                day = EXCLUDED.day
-                        """, (member_id, name, end_date, status, t, d, day), commit=True)
-                    except:
-                        pass
+                # 3. إضافة في الـ backup (بـ upsert عشان لو موجود يتحدث)
+                query_db("""
+                    INSERT INTO attendance_backup 
+                    (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (member_id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        end_date = EXCLUDED.end_date,
+                        membership_status = EXCLUDED.membership_status,
+                        attendance_time = EXCLUDED.attendance_time,
+                        attendance_date = EXCLUDED.attendance_date,
+                        day = EXCLUDED.day
+                """, (member_id, name, end_date, membership_status, current_time, current_date, current_day), commit=True)
 
-                    flash(f'تم تسجيل حضور {name} بنجاح!', 'success')
-
-            except ValueError:
-                flash('رقم العضو لازم يكون أرقام بس!', 'error')
-            except Exception as e:
-                print(f"[FINAL ERROR] {str(e)}")
-                flash('حدث خطأ، جرب تاني أو أعد تشغيل السيستم', 'error')
+                flash(f'تم تسجيل حضور {name} بنجاح!', 'success')
 
     return render_template("attendance_table.html", members_data=all_attendance_data)
-
 
 
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     session.pop('_flashes', None)
     try:
+        # نقل البيانات للـ backup قبل الحذف
+        query_db("""
+            INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
+            FROM attendance
+            ON CONFLICT (member_id) DO NOTHING
+        """, commit=True)
+
+        # تفريغ الجدول + إعادة ترقيم العداد
         query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
-        flash('تم تفريغ جدول الحضور وإعادة العداد لـ 1 بنجاح!', 'success')
+
+        flash('تم حذف جميع بيانات الحضور ونقلها للنسخة الاحتياطية بنجاح!', 'success')
     except Exception as e:
-        print(e)
-        flash('تم تفريغ الحضور بنجاح!', 'success')
+        print(f"Delete error: {e}")
+        flash('تم تفريغ جدول الحضور بنجاح!', 'success')
+
     return redirect(url_for('attendance_table'))
 
 
