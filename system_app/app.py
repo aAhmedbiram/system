@@ -319,7 +319,7 @@ def attendance_table():
                     str(member['membership_status'] or ''), 
                     now.strftime("%H:%M:%S"), today, now.strftime("%A")), 
                     commit=True)
-            flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
+            flash(f"تم تسجيل حضر {member['name']} بنجاح!", "success")
 
         return redirect(url_for('attendance_table'))
 
