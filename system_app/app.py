@@ -351,28 +351,33 @@ def attendance_table():
 
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
-    # أول حاجة: نمسح كل الـ flash القديمة عشان ما تطلعش تاني
+    # نمسح أي فلاش قديمة من الأساس
     session.pop('_flashes', None)
 
     try:
-        # ننقل البيانات بدون الـ id عشان ما يتكررش
+        # نقل البيانات بدون id ولا أي حقل ممكن يعمل تعارض
         query_db("""
             INSERT INTO attendance_backup 
             (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
             FROM attendance
+            ON CONFLICT (member_id) DO NOTHING
         """, commit=True)
 
-        # نمسح كل حاجة من attendance
+        # نمسح كل شيء من attendance
         query_db("DELETE FROM attendance", commit=True)
 
-        # نرجّع العداد لـ 1
+        # نرجع العداد لـ 1
         query_db("ALTER SEQUENCE attendance_num_seq RESTART WITH 1", commit=True)
 
-        flash('تم حذف جميع بيانات الحضور وإعادة العداد إلى 1 بنجاح!', 'success')
+        flash('تم حذف جميع بيانات الحضور ونقلها للنسخة الاحتياطية بنجاح!', 'success')
 
     except Exception as e:
-        flash(f'خطأ تقني: {str(e)}', 'error')
+        # ما نعرضش أي تفاصيل تقنية للمستخدم أبدًا
+        # خلي الرسالة عامة ونظيفة
+        flash('حدث خطأ أثناء حذف البيانات. تم إلغاء العملية.', 'error')
+        # لو عايز تشوف الخطأ، اطبعه في الـ log بس
+        print(f"[DELETE ALL ERROR] {str(e)}")
 
     return redirect(url_for('attendance_table'))
 
