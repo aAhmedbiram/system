@@ -343,7 +343,7 @@ def attendance_table():
         return redirect(url_for('attendance_table'))
 
     # عرض الجدول
-    data = query_db("SELECT * FROM attendance ORDER BY num DESC")
+    data = query_db("SELECT * FROM attendance ORDER BY num ASC")
     return render_template("attendance_table.html", members_data=data)
 
 
