@@ -291,19 +291,17 @@ def change_password():
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    # جلب البيانات للعرض دايمًا
+    # جلب البيانات دايمًا
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
 
     if request.method == 'POST' and request.form.get('member_id'):
         member_id_str = request.form.get('member_id', '').strip()
-
         if not member_id_str:
             flash('ادخل رقم العضو!', 'error')
         else:
             try:
                 member_id = int(member_id_str)
                 member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
-
                 if not member:
                     flash(f'العضو رقم {member_id} غير موجود!', 'error')
                 else:
@@ -311,13 +309,12 @@ def attendance_table():
                     status = member.get('membership_status') or 'غير معروف'
                     now = datetime.now()
                     t = now.strftime("%H:%M:%S")
-                    d = now.strftime("%Y-%M-%d")
+                    d = now.strftime("%Y-%m-%d")
                     day = now.strftime("%A")
 
-                    # الطريقة الوحيدة اللي ما بتفشلش أبدًا
+                    # إضافة أو تحديث في attendance (باستخدام num كـ serial)
                     query_db("""
-                        INSERT INTO attendance 
-                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                        INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (member_id) DO UPDATE SET
                             name = EXCLUDED.name,
@@ -326,27 +323,24 @@ def attendance_table():
                             attendance_time = EXCLUDED.attendance_time,
                             attendance_date = EXCLUDED.attendance_date,
                             day = EXCLUDED.day
-                    """, (member_id, member['name'], str(end_date), status, t, d, day), commit=True)
+                    """, (member_id, member['name'], end_date, status, t, d, day), commit=True)
 
-                    # الـ backup بدون أي مشكلة
+                    # إضافة في الـ backup بدون أي تعارض
                     query_db("""
-                        INSERT INTO attendance_backup 
-                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                        INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT DO NOTHING
-                    """, (member_id, member['name'], str(end_date), status, t, d, day), commit=True)
+                        ON CONFLICT (member_id) DO NOTHING
+                    """, (member_id, member['name'], end_date, status, t, d, day), commit=True)
 
                     flash(f'تم تسجيل حضور {member["name"]} بنجاح!', 'success')
 
             except ValueError:
                 flash('رقم العضو لازم يكون أرقام بس!', 'error')
             except Exception as e:
-                print(f"[ATTENDANCE FATAL ERROR] {str(e)}")
-                flash('خطأ فني مؤقت، جرب تاني بعد ثواني', 'error')
+                print(f"[ATTENDANCE ERROR] {str(e)}")
+                flash('حدث خطأ مؤقت، جرب تاني', 'error')
 
     return render_template("attendance_table.html", members_data=all_attendance_data)
-
-
 
 
 @app.route('/delete_all_data', methods=['POST'])
@@ -354,21 +348,21 @@ def delete_all_data():
     session.pop('_flashes', None)
 
     try:
+        # نقل البيانات للـ backup (بدون الـ id ولا الـ num)
         query_db("""
-            INSERT INTO attendance_backup 
-            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
             FROM attendance
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (member_id) DO NOTHING
         """, commit=True)
 
+        # تفريغ الجدول + إعادة العداد لـ 1
         query_db("TRUNCATE TABLE attendance RESTART IDENTITY CASCADE", commit=True)
 
         flash('تم تفريغ جدول الحضور وإعادة العداد لـ 1 بنجاح!', 'success')
     except Exception as e:
         print(f"[DELETE ERROR] {e}")
-        # حتى لو فشل النقل، الجدول فاضي خلاص
-        flash('تم تفريغ جدول الحضور بنجاح!', 'success')
+        flash('تم تفريغ الحضور بنجاح!', 'success')
 
     return redirect(url_for('attendance_table'))
 
