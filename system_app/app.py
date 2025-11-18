@@ -292,117 +292,136 @@ from datetime import datetime
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    all_attendance_data = query_db("SELECT * FROM attendance ORDER BY member_id ASC")
 
     if request.method == 'POST':
         member_id = request.form.get('member_id')
 
-        # التحقق من رقم العضو
+        # التحقق من صحة الإدخال
         if not member_id or not member_id.isdigit():
-            flash('ادخل رقم العضو صحيح!', 'error')
+            flash("رقم العضو غير صالح", "error")
             return redirect(url_for('attendance_table'))
 
         member_id = int(member_id)
 
-        # جلب بيانات العضو من جدول members
-        member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
+        # ---- 1) جلب بيانات العضو من جدول members ----
+        member = query_db(
+            "SELECT id, name, end_date, membership_status FROM members WHERE id = %s",
+            (member_id,),
+            one=True
+        )
 
         if not member:
-            flash(f'العضو رقم {member_id} غير موجود!', 'error')
+            flash(f"العضو رقم {member_id} غير موجود!", "error")
             return redirect(url_for('attendance_table'))
 
-        # بيانات الوقت والتاريخ
         now = datetime.now()
         current_time = now.strftime("%H:%M:%S")
         current_date = now.strftime("%Y-%m-%d")
         current_day = now.strftime("%A")
 
-        # هل العضو موجود بالفعل في attendance؟
-        existing = query_db("SELECT 1 FROM attendance WHERE member_id = %s", (member_id,), one=True)
+        # ---- 2) هل العضو مسجل قبل كده ؟ ----
+        existing = query_db(
+            "SELECT 1 FROM attendance WHERE member_id = %s",
+            (member_id,),
+            one=True
+        )
 
         if existing:
-            # UPDATE آمن ومضمون
-            query_db("""
+            # تحديث
+            query_db(
+                """
                 UPDATE attendance 
-                SET name=%s, 
-                    end_date=%s, 
-                    membership_status=%s,
-                    attendance_time=%s, 
-                    attendance_date=%s, 
-                    day=%s
-                WHERE member_id = %s
-                RETURNING member_id
-            """, (
-                member['name'],
-                member['end_date'],
-                member['membership_status'],
+                SET name=%s, end_date=%s, membership_status=%s,
+                    attendance_time=%s, attendance_date=%s, day=%s
+                WHERE member_id=%s
+                """,
+                (
+                    member["name"],
+                    member["end_date"],
+                    member["membership_status"],
+                    current_time,
+                    current_date,
+                    current_day,
+                    member_id,
+                ),
+                commit=True
+            )
+        else:
+            # إدراج جديد
+            query_db(
+                """
+                INSERT INTO attendance 
+                    (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    member_id,
+                    member["name"],
+                    member["end_date"],
+                    member["membership_status"],
+                    current_time,
+                    current_date,
+                    current_day,
+                ),
+                commit=True
+            )
+
+        # ---- 3) كتابة نفس البيانات في الـ Backup ----
+        query_db(
+            """
+            INSERT INTO attendance_backup
+                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                member_id,
+                member["name"],
+                member["end_date"],
+                member["membership_status"],
                 current_time,
                 current_date,
                 current_day,
-                member_id
-            ), commit=True)
+            ),
+            commit=True
+        )
 
-        else:
-            # INSERT جديد
-            query_db("""
-                INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                member_id,
-                member['name'],
-                member['end_date'],
-                member['membership_status'],
-                current_time,
-                current_date,
-                current_day
-            ), commit=True)
-
-        # النسخة الاحتياطية
-        query_db("""
-            INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            member_id,
-            member['name'],
-            member['end_date'],
-            member['membership_status'],
-            current_time,
-            current_date,
-            current_day
-        ), commit=True)
-
-        flash(f'تم تسجيل حضور {member["name"]} بنجاح!', 'success')
+        flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
         return redirect(url_for('attendance_table'))
 
+    # ---- 4) عرض الجدول ----
+    all_attendance_data = query_db("SELECT * FROM attendance ORDER BY num ASC")
     return render_template("attendance_table.html", members_data=all_attendance_data)
 
 
 
+# =================================================================
+
+
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
-    session.pop('_flashes', None)
-
     try:
-        # Backup كامل للبيانات
-        query_db("""
-            INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+        # Backup كامل
+        query_db(
+            """
+            INSERT INTO attendance_backup 
+                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
             FROM attendance
-        """, commit=True)
+            """,
+            commit=True
+        )
 
-        # حذف آمن بدون مشاكل علاقات
-        query_db("DELETE FROM attendance", commit=True)
+        # مسح الجدول
+        query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
 
-        # إعادة تشغيل العداد (num)
-        query_db("ALTER SEQUENCE attendance_num_seq RESTART WITH 1", commit=True)
-
-        flash('تم حذف جميع البيانات ونقلها للنسخة الاحتياطية بنجاح!', 'success')
+        flash("تم حذف جميع البيانات بنجاح وتم نسخها للباك اب", "success")
 
     except Exception as e:
         print("DELETE ERROR:", e)
-        flash('حدث خطأ أثناء الحذف!', 'error')
+        flash("حدث خطأ أثناء الحذف!", "error")
 
     return redirect(url_for('attendance_table'))
+
 
 
 
