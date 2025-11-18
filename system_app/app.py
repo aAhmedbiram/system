@@ -297,53 +297,53 @@ def attendance_table():
 
         if not member_id_str.isdigit():
             flash("ادخل رقم عضو صحيح!", "error")
-            return redirect(url_for('attendance_table'))
+        else:
+            member_id = int(member_id_str)
 
-        member_id = int(member_id_str)
+            # جلب العضو من members
+            member = query_db(
+                "SELECT name, end_date, membership_status FROM members WHERE id = %s",
+                (member_id,), one=True
+            )
 
-        # 1) جلب العضو من members
-        member = query_db(
-            "SELECT name, end_date, membership_status FROM members WHERE id = %s",
-            (member_id,), one=True
-        )
+            if not member:
+                flash(f"العضو رقم {member_id} غير موجود في قاعدة البيانات!", "error")
+            else:
+                today = datetime.now().strftime("%Y-%m-%d")
 
-        if not member:
-            flash(f"العضو رقم {member_id} غير موجود!", "error")
-            return redirect(url_for('attendance_table'))
+                # نشوف لو جه النهاردة فعلاً
+                already_today = query_db(
+                    "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s",
+                    (member_id, today), one=True
+                )
 
-        today = datetime.now().strftime("%Y-%m-%d")
+                if already_today:
+                    flash(f"{member['name']} جه النهاردة بالفعل!", "success")
+                else:
+                    # تسجيل الحضور
+                    now = datetime.now()
+                    query_db("""
+                        INSERT INTO attendance 
+                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        member_id,
+                        member['name'],
+                        str(member['end_date']) if member['end_date'] else 'غير محدد',
+                        member.get('membership_status') or 'غير معروف',
+                        now.strftime("%H:%M:%S"),
+                        today,
+                        now.strftime("%A")
+                    ), commit=True)
 
-        # 2) نشوف لو جه النهاردة فعلاً
-        already_came = query_db(
-            "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s",
-            (member_id, today), one=True
-        )
+                    flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
-        if already_came:
-            flash(f"{member['name']} جه النهاردة بالفعل!", "success")
-            return redirect(url_for('attendance_table'))
+        # بعد أي حاجة (سواء نجاح أو فشل أو "جه النهاردة") → نعرض الصفحة مباشرة بدون ريديركت
+        data = query_db("SELECT * FROM attendance ORDER BY num DESC")
+        return render_template("attendance_table.html", members_data=data)
 
-        # 3) لو أول مرة → نسجله
-        now = datetime.now()
-        query_db("""
-            INSERT INTO attendance 
-            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            member_id,
-            member['name'],
-            str(member['end_date']) if member['end_date'] else 'غير محدد',
-            member['membership_status'] or 'غير معروف',
-            now.strftime("%H:%M:%S"),
-            today,
-            now.strftime("%A")
-        ), commit=True)
-
-        flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
-        return redirect(url_for('attendance_table'))
-
-    # عرض الجدول
-    data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+    # لو GET عادي (أول مرة تفتح الصفحة)
+    data = query_db("SELECT * FROM attendance ORDER BY num DESC")
     return render_template("attendance_table.html", members_data=data)
 
 
