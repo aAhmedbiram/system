@@ -293,65 +293,57 @@ from datetime import datetime
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
     if request.method == 'POST':
-        member_id = request.form.get('member_id', '').strip()
+        member_id_str = request.form.get('member_id', '').strip()
 
-        if not member_id or not member_id.isdigit():
+        if not member_id_str.isdigit():
             flash("ادخل رقم عضو صحيح!", "error")
             return redirect(url_for('attendance_table'))
 
-        member_id = int(member_id)
+        member_id = int(member_id_str)
 
-        # جلب العضو بأمان
+        # 1) جلب العضو من members
         member = query_db(
             "SELECT name, end_date, membership_status FROM members WHERE id = %s",
-            (member_id,),
-            one=True
+            (member_id,), one=True
         )
 
         if not member:
             flash(f"العضو رقم {member_id} غير موجود!", "error")
             return redirect(url_for('attendance_table'))
 
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 2) نشوف لو جه النهاردة فعلاً
+        already_came = query_db(
+            "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s",
+            (member_id, today), one=True
+        )
+
+        if already_came:
+            flash(f"{member['name']} جه النهاردة بالفعل!", "success")
+            return redirect(url_for('attendance_table'))
+
+        # 3) لو أول مرة → نسجله
         now = datetime.now()
-        current_time = now.strftime("%H:%M:%S")
-        current_date = now.strftime("%Y-%m-%d")
-        current_day = now.strftime("%A")
-
-        # تحويل كل حاجة لـ string + حماية من None
-        name = str(member['name'] or 'غير معروف')
-        end_date = str(member['end_date']) if member['end_date'] else 'غير محدد'
-        status = str(member['membership_status'] or 'غير معروف')
-
-        # تحديث أو إضافة في attendance
         query_db("""
             INSERT INTO attendance 
-                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (member_id) DO UPDATE SET
-                name = EXCLUDED.name,
-                end_date = EXCLUDED.end_date,
-                membership_status = EXCLUDED.membership_status,
-                attendance_time = EXCLUDED.attendance_time,
-                attendance_date = EXCLUDED.attendance_date,
-                day = EXCLUDED.day
-        """, (member_id, name, end_date, status, current_time, current_date, current_day), commit=True)
+        """, (
+            member_id,
+            member['name'],
+            str(member['end_date']) if member['end_date'] else 'غير محدد',
+            member['membership_status'] or 'غير معروف',
+            now.strftime("%H:%M:%S"),
+            today,
+            now.strftime("%A")
+        ), commit=True)
 
-        # الباك أب (بدون ON CONFLICT معقد)
-        try:
-            query_db("""
-                INSERT INTO attendance_backup 
-                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (member_id) DO NOTHING
-            """, (member_id, name, end_date, status, current_time, current_date, current_day), commit=True)
-        except:
-            pass  # لو فشل الباك أب، عادي
-
-        flash(f"تم تسجيل حضور {name} بنجاح!", "success")
+        flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
         return redirect(url_for('attendance_table'))
 
     # عرض الجدول
-    data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+    data = query_db("SELECT * FROM attendance ORDER BY num DESC")
     return render_template("attendance_table.html", members_data=data)
 
 
