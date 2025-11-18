@@ -397,7 +397,7 @@ def attendance_table():
 # =================================================================
 
 
-import jsonify 
+from flask import jsonify 
 
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
