@@ -397,6 +397,8 @@ def attendance_table():
 # =================================================================
 
 
+import jsonify 
+
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     try:
@@ -416,9 +418,11 @@ def delete_all_data():
 
         flash("تم حذف جميع البيانات بنجاح وتم نسخها للباك اب", "success")
 
+
     except Exception as e:
-        print("DELETE ERROR:", e)
-        flash("حدث خطأ أثناء الحذف!", "error")
+        print("ERROR:", e)
+        return jsonify({"message": "حدث خطأ أثناء الحذف!", "error": str(e)}), 500
+
 
     return redirect(url_for('attendance_table'))
 
