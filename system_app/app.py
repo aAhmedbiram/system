@@ -292,7 +292,6 @@ from datetime import datetime
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    # جدول attendance مفيهوش num → نرتب بالعضو أو التاريخ
     all_attendance_data = query_db("SELECT * FROM attendance ORDER BY member_id ASC")
 
     if request.method == 'POST':
@@ -300,70 +299,72 @@ def attendance_table():
 
         if not member_id or not member_id.isdigit():
             flash('ادخل رقم العضو صحيح!', 'error')
+            return redirect(url_for('attendance_table'))
+
+        member_id = int(member_id)
+
+        # جلب العضو
+        member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
+
+        if not member:
+            flash(f'العضو رقم {member_id} غير موجود!', 'error')
+            return redirect(url_for('attendance_table'))
+
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        current_date = now.strftime("%Y-%m-%d")
+        current_day = now.strftime("%A")
+
+        # هل العضو مسجل قبل كده؟
+        existing = query_db("SELECT 1 FROM attendance WHERE member_id = %s", (member_id,), one=True)
+
+        if existing:
+            query_db("""
+                UPDATE attendance 
+                SET name=%s, end_date=%s, membership_status=%s,
+                    attendance_time=%s, attendance_date=%s, day=%s
+                WHERE member_id = %s
+            """, (
+                member['name'],
+                member['end_date'],
+                member['membership_status'],
+                current_time,
+                current_date,
+                current_day,
+                member_id
+            ), commit=True)
         else:
-            member_id = int(member_id)
+            query_db("""
+                INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                member_id,
+                member['name'],
+                member['end_date'],
+                member['membership_status'],
+                current_time,
+                current_date,
+                current_day
+            ), commit=True)
 
-            # جلب العضو
-            member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
+        # BACKUP
+        query_db("""
+            INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            member_id,
+            member['name'],
+            member['end_date'],
+            member['membership_status'],
+            current_time,
+            current_date,
+            current_day
+        ), commit=True)
 
-            if not member:
-                flash(f'العضو رقم {member_id} غير موجود!', 'error')
-            else:
-                now = datetime.now()
-                current_time = now.strftime("%H:%M:%S")
-                current_date = now.strftime("%Y-%m-%d")
-                current_day = now.strftime("%A")
-
-                # هل العضو مسجل قبل كده؟
-                existing = query_db("SELECT 1 FROM attendance WHERE member_id = %s", (member_id,), one=True)
-
-                if existing:
-                    query_db("""
-                        UPDATE attendance 
-                        SET name=%s, end_date=%s, membership_status=%s,
-                            attendance_time=%s, attendance_date=%s, day=%s
-                        WHERE member_id = %s
-                    """, (
-                        member['name'],
-                        member['end_date'],
-                        member['membership_status'],
-                        current_time,
-                        current_date,
-                        current_day,
-                        member_id
-                    ), commit=True)
-                else:
-                    query_db("""
-                        INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        member_id,
-                        member['name'],
-                        member['end_date'],
-                        member['membership_status'],
-                        current_time,
-                        current_date,
-                        current_day
-                    ), commit=True)
-
-                # Backup (بدون ON CONFLICT)
-                query_db("""
-                    INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    member_id,
-                    member['name'],
-                    member['end_date'],
-                    member['membership_status'],
-                    current_time,
-                    current_date,
-                    current_day
-                ), commit=True)
-
-                flash(f'تم تسجيل حضور {member["name"]} بنجاح!', 'success')
+        flash(f'تم تسجيل حضور {member["name"]} بنجاح!', 'success')
+        return redirect(url_for('attendance_table'))   # ← الحل
 
     return render_template("attendance_table.html", members_data=all_attendance_data)
-
 
 
 
@@ -376,15 +377,16 @@ def delete_all_data():
             SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
             FROM attendance
         """, commit=True)
-        
+
         query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
         flash('تم حذف جميع البيانات ونقلها للنسخة الاحتياطية بنجاح!', 'success')
 
     except Exception as e:
-        print(e)
-        flash('تم تفريغ الجدول بنجاح!', 'success')
+        print("DELETE ERROR:", e)
+        flash('حدث خطأ أثناء الحذف!', 'error')
     
     return redirect(url_for('attendance_table'))
+
 
 
 
