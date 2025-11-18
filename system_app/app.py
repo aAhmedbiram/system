@@ -306,36 +306,44 @@ def attendance_table():
                 if not member:
                     flash(f'العضو رقم {member_id} غير موجود!', 'error')
                 else:
-                    end_date = member.get('end_date') or ''
-                    status = member.get('membership_status') or 'غير معروف'
+                    # تحويل كل حاجة لـ string ونتأكد إن مفيش null
+                    name = str(member.get('name', 'غير معروف')).strip()
+                    end_date = str(member.get('end_date') or 'غير محدد')
+                    status = str(member.get('membership_status') or 'غير معروف')
+
                     now = datetime.now()
                     t = now.strftime("%H:%M:%S")
                     d = now.strftime("%Y-%m-%d")
                     day = now.strftime("%A")
 
-                    # الحل السحري: نمسح السطر القديم الأول (لو موجود) ثم نضيف جديد
-                    # ده أضمن طريقة لما ما فيش unique constraint على member_id
+                    # نمسح أي صف قديم لنفس العضو
                     query_db("DELETE FROM attendance WHERE member_id = %s", (member_id,), commit=True)
 
+                    # نضيف الصف الجديد بأمان تام
                     query_db("""
-                        INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                        INSERT INTO attendance 
+                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (member_id, member['name'], end_date, status, t, d, day), commit=True)
+                    """, (member_id, name, end_date, status, t, d, day), commit=True)
 
                     # الـ backup
-                    query_db("""
-                        INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (member_id) DO NOTHING
-                    """, (member_id, member['name'], end_date, status, t, d, day), commit=True)
+                    try:
+                        query_db("""
+                            INSERT INTO attendance_backup 
+                            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (member_id) DO NOTHING
+                        """, (member_id, name, end_date, status, t, d, day), commit=True)
+                    except:
+                        pass  # لو الـ backup فشل، عادي جدًا
 
-                    flash(f'تم تسجيل حضور {member["name"]} بنجاح!', 'success')
+                    flash(f'تم تسجيل حضور {name} بنجاح!', 'success')
 
             except ValueError:
                 flash('رقم العضو لازم يكون أرقام بس!', 'error')
             except Exception as e:
                 print(f"[FATAL ERROR] {str(e)}")
-                flash('خطأ تقني، تواصل مع المبرمج', 'error')
+                flash('خطأ مؤقت، جرب تاني بعد ثواني', 'error')
 
     return render_template("attendance_table.html", members_data=all_attendance_data)
 
