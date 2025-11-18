@@ -297,33 +297,41 @@ def attendance_table():
     if request.method == 'POST':
         member_id = request.form.get('member_id')
 
+        # التحقق من رقم العضو
         if not member_id or not member_id.isdigit():
             flash('ادخل رقم العضو صحيح!', 'error')
             return redirect(url_for('attendance_table'))
 
         member_id = int(member_id)
 
-        # جلب العضو
+        # جلب بيانات العضو من جدول members
         member = query_db("SELECT * FROM members WHERE id = %s", (member_id,), one=True)
 
         if not member:
             flash(f'العضو رقم {member_id} غير موجود!', 'error')
             return redirect(url_for('attendance_table'))
 
+        # بيانات الوقت والتاريخ
         now = datetime.now()
         current_time = now.strftime("%H:%M:%S")
         current_date = now.strftime("%Y-%m-%d")
         current_day = now.strftime("%A")
 
-        # هل العضو مسجل قبل كده؟
+        # هل العضو موجود بالفعل في attendance؟
         existing = query_db("SELECT 1 FROM attendance WHERE member_id = %s", (member_id,), one=True)
 
         if existing:
+            # UPDATE آمن ومضمون
             query_db("""
                 UPDATE attendance 
-                SET name=%s, end_date=%s, membership_status=%s,
-                    attendance_time=%s, attendance_date=%s, day=%s
+                SET name=%s, 
+                    end_date=%s, 
+                    membership_status=%s,
+                    attendance_time=%s, 
+                    attendance_date=%s, 
+                    day=%s
                 WHERE member_id = %s
+                RETURNING member_id
             """, (
                 member['name'],
                 member['end_date'],
@@ -333,7 +341,9 @@ def attendance_table():
                 current_day,
                 member_id
             ), commit=True)
+
         else:
+            # INSERT جديد
             query_db("""
                 INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -347,7 +357,7 @@ def attendance_table():
                 current_day
             ), commit=True)
 
-        # BACKUP
+        # النسخة الاحتياطية
         query_db("""
             INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -362,7 +372,7 @@ def attendance_table():
         ), commit=True)
 
         flash(f'تم تسجيل حضور {member["name"]} بنجاح!', 'success')
-        return redirect(url_for('attendance_table'))   # ← الحل
+        return redirect(url_for('attendance_table'))
 
     return render_template("attendance_table.html", members_data=all_attendance_data)
 
@@ -371,20 +381,27 @@ def attendance_table():
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     session.pop('_flashes', None)
+
     try:
+        # Backup كامل للبيانات
         query_db("""
             INSERT INTO attendance_backup (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
             FROM attendance
         """, commit=True)
 
-        query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
+        # حذف آمن بدون مشاكل علاقات
+        query_db("DELETE FROM attendance", commit=True)
+
+        # إعادة تشغيل العداد (num)
+        query_db("ALTER SEQUENCE attendance_num_seq RESTART WITH 1", commit=True)
+
         flash('تم حذف جميع البيانات ونقلها للنسخة الاحتياطية بنجاح!', 'success')
 
     except Exception as e:
         print("DELETE ERROR:", e)
         flash('حدث خطأ أثناء الحذف!', 'error')
-    
+
     return redirect(url_for('attendance_table'))
 
 
