@@ -339,11 +339,11 @@ def attendance_table():
                     flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
         # بعد أي حاجة (سواء نجاح أو فشل أو "جه النهاردة") → نعرض الصفحة مباشرة بدون ريديركت
-        data = query_db("SELECT * FROM attendance ORDER BY num DESC")
+        data = query_db("SELECT * FROM attendance ORDER BY num ASC")
         return render_template("attendance_table.html", members_data=data)
 
     # لو GET عادي (أول مرة تفتح الصفحة)
-    data = query_db("SELECT * FROM attendance ORDER BY num DESC")
+    data = query_db("SELECT * FROM attendance ORDER BY num ASC")
     return render_template("attendance_table.html", members_data=data)
 
 
