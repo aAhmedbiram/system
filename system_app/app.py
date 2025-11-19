@@ -290,9 +290,10 @@ def change_password():
 
 from datetime import datetime
 
+from flask import g
+
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
-    # لو POST
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
         if not member_id_str.isdigit():
@@ -319,13 +320,18 @@ def attendance_table():
                             str(member['membership_status'] or ''),
                             now.strftime("%H:%M:%S"), today, now.strftime("%A")),
                             commit=True)
+
+                    # السطر السحري اللي بيحل كل المشكلة
+                    if hasattr(g, 'db'):
+                        g.db.close()  # نقفل الـ connection القديم
+
                     flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
-        # الحل السحري: نرجع نعرض الصفحة مباشرة بدون redirect
+        # نعرض الصفحة مباشرة (مع connection جديد)
         data = query_db("SELECT * FROM attendance ORDER BY num DESC")
         return render_template("attendance_table.html", members_data=data)
 
-    # لو GET عادي
+    # GET عادي
     data = query_db("SELECT * FROM attendance ORDER BY num DESC")
     return render_template("attendance_table.html", members_data=data)
 
