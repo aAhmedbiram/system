@@ -226,4 +226,4 @@ def check_name_exists(name):
 
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
-    return result is not None          # ← صح كده
+    return result is not None   # بالظبط كده، مفيش كلمة "return" زيادة
