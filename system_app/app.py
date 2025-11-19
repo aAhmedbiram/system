@@ -318,17 +318,15 @@ def attendance_table():
                             (member_id, member['name'],
                             str(member['end_date'] or ''),
                             str(member['membership_status'] or ''),
-                            now.strftime("%H:%M:%S"), today, now.strftime("%A")),
+                            now.strftime("%H:%M:%S"), today, now.strftime("%Y-%m-%d")),
                             commit=True)
                     flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
-        # نعرض الصفحة مباشرة
         data = query_db("SELECT * FROM attendance ORDER BY num DESC")
-        return render_template("attendance_table.html", members_data=data)
+        return render_template("attendance_table.html", attendance_data=data)
 
-    # GET عادي
     data = query_db("SELECT * FROM attendance ORDER BY num DESC")
-    return render_template("attendance_table.html", members_data=data)
+    return render_template("attendance_table.html", attendance_data=data)
 
 
 @app.route('/delete_all_data', methods=['POST'])
