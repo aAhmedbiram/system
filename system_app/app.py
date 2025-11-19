@@ -296,43 +296,63 @@ from flask import g
 def attendance_table():
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
+
+        # لو ال id مش رقم
         if not member_id_str.isdigit():
             flash("ادخل رقم عضو صحيح!", "error")
+
         else:
             member_id = int(member_id_str)
-            member = query_db("SELECT name, end_date, membership_status FROM members WHERE id = %s", (member_id,), one=True)
+
+            # احضار بيانات العضو من members
+            member = query_db(
+                "SELECT name, end_date, membership_status FROM members WHERE id = %s",
+                (member_id,),
+                one=True
+            )
 
             if not member:
                 flash(f"العضو رقم {member_id} غير موجود!", "error")
+
             else:
-                today = datetime.now.strftime("%A")
-                already = query_db("SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", (member_id, today), one=True)
+                today = datetime.now().strftime("%Y-%m-%d")
+
+                # هل العضو حضر اليوم بالفعل؟
+                already = query_db(
+                    "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s",
+                    (member_id, today),
+                    one=True
+                )
 
                 if already:
                     flash(f"{member['name']} جه النهاردة بالفعل!", "success")
+
                 else:
                     now = datetime.now()
                     query_db("""
-                        INSERT INTO attendance 
-                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, att_day)
+                        INSERT INTO attendance
+                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (
+                    """,
+                    (
                         member_id,
                         member['name'],
-                        member['end_date'] or '',
-                        member['membership_status'] or '',
+                        member['end_date'],
+                        member['membership_status'],
                         now.strftime("%H:%M:%S"),
                         today,
                         now.strftime("%A")
-                    ), commit=True)
+                    ),
+                    commit=True)
 
                     flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
-        data = query_db("SELECT * FROM attendance ORDER BY num DESC")
-        return render_template("attendance_table.html", attendance_data=data)
-
+    # جلب بيانات الحضور لعرضها في الجدول
     data = query_db("SELECT * FROM attendance ORDER BY num DESC")
-    return render_template("attendance_table.html", attendance_data=data)
+
+    # اسم المتغير لازم يكون members_data مطابق للـ HTML
+    return render_template("attendance_table.html", members_data=data)
+
 
 
 @app.route('/delete_all_data', methods=['POST'])
