@@ -1,7 +1,6 @@
-# queries.py
+# queries.py - النسخة النهائية المضمونة على Railway
 import os
 import psycopg2
-from flask import g
 from psycopg2.extras import RealDictCursor
 from psycopg2 import IntegrityError
 from datetime import date
@@ -11,24 +10,11 @@ DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGURL")
 if not DATABASE_URL:
     raise Exception("DATABASE_URL not found. Make sure it's set in Railway Variables.")
 
-# === إنشاء وإغلاق الاتصال ===
-def get_db():
-    if 'db' not in g:
-        g.db = psycopg2.connect(DATABASE_URL, sslmode='require')
-        g.db.autocommit = True
-    return g.db
-
-def close_db(e=None):
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
-
-# === إنشاء الجداول ===
+# === إنشاء الجداول (مرة واحدة عند التشغيل) ===
 def create_table():
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cr = conn.cursor()
     try:
-        # جدول الأعضاء
         cr.execute('''
             CREATE TABLE IF NOT EXISTS members (
                 id SERIAL PRIMARY KEY,
@@ -47,7 +33,6 @@ def create_table():
             )
         ''')
 
-        # جدول الحضور
         cr.execute('''
             CREATE TABLE IF NOT EXISTS attendance (
                 num SERIAL PRIMARY KEY,
@@ -61,7 +46,6 @@ def create_table():
             )
         ''')
 
-        # جدول المستخدمين
         cr.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -71,7 +55,6 @@ def create_table():
             )
         ''')
 
-        # جدول النسخ الاحتياطي
         cr.execute('''
             CREATE TABLE IF NOT EXISTS attendance_backup (
                 id SERIAL PRIMARY KEY,
@@ -91,47 +74,52 @@ def create_table():
         print(f"Error creating tables: {e}")
         conn.rollback()
     finally:
+        cr.close()
         conn.close()
 
-# === تنفيذ الاستعلامات (آمن + يرجع dict) ===
+
+# === تنفيذ الاستعلامات - الحل النهائي: connection جديد كل مرة ===
 def query_db(query, args=(), one=False, commit=False):
-    db = get_db()
+    conn = None
     cur = None
     try:
-        cur = db.cursor(cursor_factory=RealDictCursor)
+        # كل استعلام = connection جديد → مفيش stale connection أبدًا
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(query, args)
+
         if commit:
-            db.commit()
-            # الحل السحري: نقفل الاتصال بعد أي commit
-            cur.close()
-            db.close()
-            g.pop('db', None)  # نجبر إنشاء connection جديد
-            cur = None  # عشان الـ finally ما يحاولش يقفله تاني
+            conn.commit()
+
         rv = cur.fetchall()
         return (rv[0] if rv else None) if one else rv
+
     except IntegrityError as e:
         print(f"DB Integrity Error: {e}")
-        if commit:
-            db.rollback()
+        if commit and conn:
+            conn.rollback()
         raise ValueError("Duplicate entry (email or username already exists)")
+
     except Exception as e:
         print(f"Query Error: {e}")
-        if commit:
-            db.rollback()
+        if commit and conn:
+            conn.rollback()
         raise e
-    finally:
-        if cur and not cur.closed:
-            cur.close()
 
-# === دوال الأعضاء (Members) ===
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+
+# === باقي الدوال (كما هي، لأنها ممتازة) ===
 def add_member(name, email, phone, age, gender, birthdate,
-                actual_starting_date, starting_date, end_date,
-                membership_packages, membership_fees, membership_status,
-                custom_id=None):
-    """إضافة عضو جديد مع دعم تخصيص الـ ID"""
+            actual_starting_date, starting_date, end_date,
+            membership_packages, membership_fees, membership_status,
+            custom_id=None):
     try:
         if custom_id is not None:
-            # لو في custom_id → نستخدمه
             result = query_db('''
                 INSERT INTO members 
                 (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
@@ -144,7 +132,6 @@ def add_member(name, email, phone, age, gender, birthdate,
             ), one=True, commit=True)
             return result['id']
         else:
-            # لو مفيش → نستخدم الـ auto-increment
             result = query_db('''
                 INSERT INTO members 
                 (name, email, phone, age, gender, birthdate, actual_starting_date, 
@@ -160,12 +147,12 @@ def add_member(name, email, phone, age, gender, birthdate,
         print(f"DB Error in add_member: {e}")
         raise e
 
+
 def get_member(member_id):
-    """جلب عضو بالـ ID"""
     return query_db('SELECT * FROM members WHERE id = %s', (member_id,), one=True)
 
+
 def update_member(member_id, **kwargs):
-    """تحديث عضو (أي حقل)"""
     if not kwargs:
         return
     fields = [f"{k} = %s" for k in kwargs.keys()]
@@ -173,12 +160,12 @@ def update_member(member_id, **kwargs):
     query = f"UPDATE members SET {', '.join(fields)} WHERE id = %s"
     query_db(query, tuple(values), commit=True)
 
+
 def delete_member(member_id):
-    """حذف عضو"""
     query_db('DELETE FROM members WHERE id = %s', (member_id,), commit=True)
 
+
 def search_members(name=None, phone=None, email=None):
-    """بحث في الأعضاء"""
     conditions = []
     args = []
     if name:
@@ -197,12 +184,12 @@ def search_members(name=None, phone=None, email=None):
     query += " ORDER BY id DESC"
     return query_db(query, tuple(args))
 
-# === دوال الحضور (Attendance) ===
+
+# === دوال الحضور ===
 def add_attendance(member_id, name, end_date, membership_status):
-    """تسجيل حضور"""
     from datetime import datetime
     now = datetime.now()
-    attendance_time = now.strftime("%H:%M")
+    attendance_time = now.strftime("%H:%M:%S")
     attendance_date = now.strftime("%Y-%m-%d")
     day = now.strftime("%A")
     
@@ -212,31 +199,31 @@ def add_attendance(member_id, name, end_date, membership_status):
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     ''', (member_id, name, end_date, membership_status, attendance_time, attendance_date, day), commit=True)
 
-def get_today_attendance():
-    """جلب حضور اليوم"""
-    today = date.today().isoformat()
-    return query_db('SELECT * FROM attendance WHERE attendance_date = %s ORDER BY attendance_time DESC', (today,))
 
-# === دوال المستخدمين (Users) ===
+def get_today_attendance():
+    today = date.today().isoformat()
+    return query_db('SELECT * FROM attendance WHERE attendance_date = %s ORDER BY num DESC', (today,))
+
+
+# === دوال المستخدمين ===
 def add_user(username, email, password_hash):
-    """إضافة مستخدم (للـ Signup)"""
     try:
-        query_db('''
-            INSERT INTO users (username, email, password)
-            VALUES (%s, %s, %s)
-        ''', (username, email, password_hash), commit=True)
+        query_db('INSERT INTO users (username, email, password) VALUES (%s, %s, %s)',
+                (username, email, password_hash), commit=True)
     except IntegrityError:
         raise ValueError("Username or email already exists")
 
+
 def get_user_by_username(username):
-    """جلب مستخدم للـ Login"""
     return query_db('SELECT * FROM users WHERE username = %s', (username,), one=True)
+
 
 # === دوال التحقق ===
 def check_name_exists(name):
     result = query_db('SELECT 1 FROM members WHERE name = %s LIMIT 1', (name,), one=True)
     return result is not None
 
+
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
-    return result is not None
+    return result is not None          # ← صح كده
