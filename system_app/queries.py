@@ -102,6 +102,11 @@ def query_db(query, args=(), one=False, commit=False):
         cur.execute(query, args)
         if commit:
             db.commit()
+            # الحل السحري: نقفل الاتصال بعد أي commit
+            cur.close()
+            db.close()
+            g.pop('db', None)  # نجبر إنشاء connection جديد
+            cur = None  # عشان الـ finally ما يحاولش يقفله تاني
         rv = cur.fetchall()
         return (rv[0] if rv else None) if one else rv
     except IntegrityError as e:
@@ -115,7 +120,7 @@ def query_db(query, args=(), one=False, commit=False):
             db.rollback()
         raise e
     finally:
-        if cur:
+        if cur and not cur.closed:
             cur.close()
 
 # === دوال الأعضاء (Members) ===
