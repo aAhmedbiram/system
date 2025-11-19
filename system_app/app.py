@@ -296,62 +296,49 @@ from flask import g
 def attendance_table():
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
-
-        # لو ال id مش رقم
         if not member_id_str.isdigit():
             flash("ادخل رقم عضو صحيح!", "error")
-
         else:
             member_id = int(member_id_str)
-
-            # احضار بيانات العضو من members
             member = query_db(
-                "SELECT name, end_date, membership_status FROM members WHERE id = %s",
-                (member_id,),
-                one=True
+                "SELECT name, end_date, membership_status FROM members WHERE id = %s", 
+                (member_id,), one=True
             )
 
             if not member:
                 flash(f"العضو رقم {member_id} غير موجود!", "error")
-
             else:
-                today = datetime.now().strftime("%Y-%m-%d")
+                # نحاول نسجل الحضور ضمن try-except
+                try:
+                    # نتأكد أن العضو لم يتم تسجيل حضوره اليوم بالفعل
+                    today = datetime.now().strftime("%Y-%m-%d")
+                    already = query_db(
+                        "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", 
+                        (member_id, today), one=True
+                    )
 
-                # هل العضو حضر اليوم بالفعل؟
-                already = query_db(
-                    "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s",
-                    (member_id, today),
-                    one=True
-                )
+                    if already:
+                        flash(f"{member['name']} جه النهاردة بالفعل!", "success")
+                    else:
+                        add_attendance(
+                            member_id,
+                            member['name'],
+                            member['end_date'],
+                            member['membership_status']
+                        )
+                        flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
-                if already:
-                    flash(f"{member['name']} جه النهاردة بالفعل!", "success")
+                except Exception as e:
+                    print("Error adding attendance:", e)
+                    flash(f"حصل خطأ أثناء تسجيل الحضور: {str(e)}", "error")
 
-                else:
-                    now = datetime.now()
-                    query_db("""
-                        INSERT INTO attendance
-                        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        member_id,
-                        member['name'],
-                        member['end_date'],
-                        member['membership_status'],
-                        now.strftime("%H:%M:%S"),
-                        today,
-                        now.strftime("%A")
-                    ),
-                    commit=True)
+        data = query_db("SELECT * FROM attendance ORDER BY num DESC")
+        return render_template("attendance_table.html", members_data=data)
 
-                    flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
-
-    # جلب بيانات الحضور لعرضها في الجدول
     data = query_db("SELECT * FROM attendance ORDER BY num DESC")
-
-    # اسم المتغير لازم يكون members_data مطابق للـ HTML
     return render_template("attendance_table.html", members_data=data)
+
+
 
 
 
@@ -374,5 +361,5 @@ def success():
 # === تشغيل التطبيق ===
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
 
