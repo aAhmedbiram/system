@@ -320,14 +320,9 @@ def attendance_table():
                             str(member['membership_status'] or ''),
                             now.strftime("%H:%M:%S"), today, now.strftime("%A")),
                             commit=True)
-
-                    # السطر السحري اللي بيحل كل المشكلة
-                    if hasattr(g, 'db'):
-                        g.db.close()  # نقفل الـ connection القديم
-
                     flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
-        # نعرض الصفحة مباشرة (مع connection جديد)
+        # نعرض الصفحة مباشرة
         data = query_db("SELECT * FROM attendance ORDER BY num DESC")
         return render_template("attendance_table.html", members_data=data)
 
