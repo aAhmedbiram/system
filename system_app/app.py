@@ -330,7 +330,7 @@ def attendance_table():
 
                 except Exception as e:
                     print("Error adding attendance:", e)
-                    flash(f"حصل خطأ أثناء تسجيل الحضور: {str(e)}", "error")
+                    # flash(f"حصل خطأ أثناء تسجيل الحضور: {str(e)}", "error")
 
         data = query_db("SELECT * FROM attendance ORDER BY num ASC")
         return render_template("attendance_table.html", members_data=data)
