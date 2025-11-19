@@ -122,9 +122,9 @@
 <!-- Add ID Form -->
 <div class="add-id-form-container">
     <form class="add-id-form"
-          action="{{ url_for('attendance_table') }}"
-          method="post"
-          onsubmit="return this.member_id.value.trim() !== '' || (alert('ادخل رقم العضو أولاً!'), false);">
+        action="{{ url_for('attendance_table') }}"
+        method="post"
+        onsubmit="return this.member_id.value.trim() !== '' || (alert('ادخل رقم العضو أولاً!'), false);">
 
         <label for="member_id">Enter Member ID:</label>
         <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus>
