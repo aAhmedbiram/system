@@ -292,37 +292,40 @@ from datetime import datetime
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 def attendance_table():
+    # لو POST
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
         if not member_id_str.isdigit():
             flash("ادخل رقم عضو صحيح!", "error")
-            return redirect(url_for('attendance_table'))
-
-        member_id = int(member_id_str)
-        member = query_db("SELECT name, end_date, membership_status FROM members WHERE id = %s", (member_id,), one=True)
-
-        if not member:
-            flash(f"العضو رقم {member_id} غير موجود!", "error")
-            return redirect(url_for('attendance_table'))
-
-        today = datetime.now().strftime("%Y-%m-%d")
-        already = query_db("SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", (member_id, today), one=True)
-
-        if already:
-            flash(f"{member['name']} جه النهاردة بالفعل!", "success")
         else:
-            now = datetime.now()
-            query_db("""INSERT INTO attendance (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                    (member_id, member['name'], 
-                    str(member['end_date'] or ''), 
-                    str(member['membership_status'] or ''), 
-                    now.strftime("%H:%M:%S"), today, now.strftime("%A")), 
-                    commit=True)
-            flash(f"تم تسجيل  {member['name']} بنجاح!", "success")
+            member_id = int(member_id_str)
+            member = query_db("SELECT name, end_date, membership_status FROM members WHERE id = %s", (member_id,), one=True)
 
-        return redirect(url_for('attendance_table'))
+            if not member:
+                flash(f"العضو رقم {member_id} غير موجود!", "error")
+            else:
+                today = datetime.now().strftime("%Y-%m-%d")
+                already = query_db("SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", (member_id, today), one=True)
 
+                if already:
+                    flash(f"{member['name']} جه النهاردة بالفعل!", "success")
+                else:
+                    now = datetime.now()
+                    query_db("""INSERT INTO attendance 
+                                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                             (member_id, member['name'],
+                              str(member['end_date'] or ''),
+                              str(member['membership_status'] or ''),
+                              now.strftime("%H:%M:%S"), today, now.strftime("%A")),
+                             commit=True)
+                    flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
+
+        # الحل السحري: نرجع نعرض الصفحة مباشرة بدون redirect
+        data = query_db("SELECT * FROM attendance ORDER BY num DESC")
+        return render_template("attendance_table.html", members_data=data)
+
+    # لو GET عادي
     data = query_db("SELECT * FROM attendance ORDER BY num DESC")
     return render_template("attendance_table.html", members_data=data)
 
