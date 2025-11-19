@@ -11,7 +11,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates
 from .queries import (
     create_table, query_db, check_name_exists, check_id_exists,
-    get_db, close_db, add_member, get_member, update_member,
+    add_member, get_member, update_member,
     add_attendance
 )
 
@@ -19,9 +19,9 @@ with app.app_context():
     create_table()
 
 
-@app.teardown_appcontext
-def teardown_db(exception):
-    close_db()
+# @app.teardown_appcontext
+# def teardown_db(exception):
+#     close_db()
 
 @app.route('/')
 @app.route('/home')
