@@ -195,10 +195,10 @@ def add_attendance(member_id, name, end_date, membership_status):
     
     query_db('''
         INSERT INTO attendance 
-        (member_id, name, end_date, membership_status, attendance_time, attendance_date, att_day
-)
+        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     ''', (member_id, name, end_date, membership_status, attendance_time, attendance_date, day), commit=True)
+
 
 
 def get_today_attendance():
