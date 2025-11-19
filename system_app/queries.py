@@ -188,16 +188,22 @@ def search_members(name=None, phone=None, email=None):
 # === دوال الحضور ===
 def add_attendance(member_id, name, end_date, membership_status):
     from datetime import datetime
-    now = datetime.now()
-    attendance_time = now.strftime("%H:%M:%S")
-    attendance_date = now.strftime("%Y-%m-%d")
-    day = now.strftime("%A")
-    
-    query_db('''
-        INSERT INTO attendance 
-        (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    ''', (member_id, name, end_date, membership_status, attendance_time, attendance_date, day), commit=True)
+    try:
+        now = datetime.now()
+        attendance_time = now.strftime("%H:%M:%S")
+        attendance_date = now.strftime("%Y-%m-%d")
+        day = now.strftime("%A")
+        
+        query_db('''
+            INSERT INTO attendance 
+            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (member_id, name, end_date, membership_status, attendance_time, attendance_date, day), commit=True)
+        
+    except Exception as e:
+        print("Error in add_attendance:", e)
+        raise e
+
 
 
 
