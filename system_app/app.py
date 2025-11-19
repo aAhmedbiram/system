@@ -314,11 +314,11 @@ def attendance_table():
                     query_db("""INSERT INTO attendance 
                                 (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                             (member_id, member['name'],
-                              str(member['end_date'] or ''),
-                              str(member['membership_status'] or ''),
-                              now.strftime("%H:%M:%S"), today, now.strftime("%A")),
-                             commit=True)
+                            (member_id, member['name'],
+                            str(member['end_date'] or ''),
+                            str(member['membership_status'] or ''),
+                            now.strftime("%H:%M:%S"), today, now.strftime("%A")),
+                            commit=True)
                     flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
 
         # الحل السحري: نرجع نعرض الصفحة مباشرة بدون redirect
