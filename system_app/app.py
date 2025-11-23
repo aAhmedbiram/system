@@ -341,16 +341,44 @@ def attendance_table():
 
 
 
-
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     try:
+        # 1️⃣ — احضار كل البيانات من جدول attendance + العمود الصحيح day
+        rows = query_db("""
+            SELECT member_id, name, end_date, membership_status, 
+                attendance_time, attendance_date, day
+            FROM attendance
+        """)
+
+        # 2️⃣ — نقل البيانات إلى attendance_backup قبل التفريغ
+        if rows:
+            for row in rows:
+                query_db("""
+                    INSERT INTO attendance_backup 
+                    (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    row['member_id'],
+                    row['name'],
+                    row['end_date'],
+                    row['membership_status'],
+                    row['attendance_time'],
+                    row['attendance_date'],
+                    row['day']   # ← العمود المصحّح
+                ), commit=True)
+
+        # 3️⃣ — مسح جدول attendance بالكامل مع تصفير الترتيب num
         query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
-        flash("تم تفريغ جدول الحضور بنجاح!", "success")
+
+        flash("تم نقل البيانات للنسخة الاحتياطية ثم تفريغ جدول الحضور بنجاح!", "success")
+
     except Exception as e:
         print("Delete Error:", e)
-        flash("تم التفريغ!", "success")
+        flash("حدث خطأ أثناء عملية تفريغ البيانات! راجع الكونسول.", "error")
+
     return redirect(url_for('attendance_table'))
+
 
 
 
