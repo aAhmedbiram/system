@@ -2,7 +2,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from datetime import datetime
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
+# وكمان أضف السطر ده عشان نستخدم DATABASE_URL
+from system_app.queries import DATABASE_URL
 from flask import session
 
 app = Flask(__name__)
@@ -344,42 +348,50 @@ def attendance_table():
 @app.route('/delete_all_data', methods=['POST'])
 def delete_all_data():
     try:
-        print("\n--- DEBUG: بدء عملية النسخ ---")
+        print("\n--- DEBUG: بدء عملية النقل والتفريغ ---")
 
-        # 1) نسخ البيانات من attendance إلى attendance_backup
-        query = """
-            INSERT INTO attendance_backup 
-            (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-            SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
-            FROM attendance
-        """
-        print("DEBUG: تشغيل Query النسخ:")
-        print(query)
-        query_db(query, commit=True)
+        # نستخدم connection واحد لكل العمليات عشان TRUNCATE يشتغل
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        cur = conn.cursor()
+        
+        try:
+            # 1) نسخ البيانات إلى النسخ الاحتياطي
+            print("DEBUG: نسخ البيانات إلى attendance_backup...")
+            cur.execute("""
+                INSERT INTO attendance_backup 
+                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
+                FROM attendance
+            """)
+            
+            # 2) تفريغ الجدول وإعادة الترقيم
+            print("DEBUG: تفريغ جدول attendance وإعادة الترقيم...")
+            cur.execute("TRUNCATE TABLE attendance RESTART IDENTITY")
+            
+            # تأكيد العمليات
+            conn.commit()
+            print("--- تم النقل والتفريغ بنجاح! ---")
+            
+            flash("تم نقل جميع بيانات الحضور إلى النسخ الاحتياطي وتفريغ الجدول بنجاح!", "success")
 
-        print("--- DEBUG: النسخ تم بنجاح ---")
-
-        # 2) تفريغ attendance وإعادة ترقيمه
-        truncate_query = "TRUNCATE TABLE attendance RESTART IDENTITY"
-        print("DEBUG: تشغيل Query التفريغ:")
-        print(truncate_query)
-        query_db(truncate_query, commit=True)
-
-        print("--- DEBUG: التفريغ تم بنجاح ---")
-
-        flash("تم نقل البيانات للنسخة الاحتياطية ثم تفريغ جدول الحضور بنجاح!", "success")
+        except Exception as e:
+            conn.rollback()
+            print("===== خطأ أثناء النقل أو التفريغ =====")
+            import traceback
+            traceback.print_exc()
+            print("Error:", e)
+            flash("حدث خطأ أثناء تفريغ البيانات! راجع الكونسول.", "error")
+        
+        finally:
+            cur.close()
+            conn.close()
 
     except Exception as e:
-        print("\n===== ERROR START =====")
-        import traceback
-        traceback.print_exc()
-        print("Delete Error:", e)
-        print("===== ERROR END =====\n")
-
-        flash("حدث خطأ أثناء عملية تفريغ البيانات! راجع الكونسول.", "error")
+        print("===== فشل في الاتصال بالداتابيز =====")
+        print(e)
+        flash("فشل في الاتصال بقاعدة البيانات!", "error")
 
     return redirect(url_for('attendance_table'))
-
 
 
 
