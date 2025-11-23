@@ -354,7 +354,7 @@ def delete_all_data():
         """, commit=True)
 
         # 2) تفريغ الجدول وإعادة ترقيم num
-        query_db("TRUNCATE TABLE attendance RESTART IDENTITY", commit=True)
+        query_db("TRUNCATE TABLE attendance RESTART IDENTITY")
 
         flash("تم نقل البيانات للنسخة الاحتياطية ثم تفريغ جدول الحضور بنجاح!", "success")
 
