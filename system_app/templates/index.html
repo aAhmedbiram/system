@@ -201,6 +201,24 @@
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        .attendance-backup-btn {
+            display: inline-block;
+            background-color: #555;
+            color: #fff;
+            padding: 12px 18px;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 4px;
+            transition: background-color 0.3s, transform 0.15s;
+            margin-top: 10px;
+        }
+        
+        .attendance-backup-btn:hover {
+            background-color: #000;
+            transform: scale(1.05);
+        }
+        
     </style>
 </head>
 <body>
@@ -296,7 +314,8 @@
         <button class="logout" type="submit">Logout</button>
     </form>
     <br>
-    <a href="/attendance_backup">Attendance Backup</a>
+    <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
+
 
 </body>
 </html>
