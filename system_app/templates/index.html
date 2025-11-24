@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rival Gym System</title>
     <style>
-        /* نفس الستايل بتاع all_members.html بالظبط */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -82,9 +81,10 @@
         }
 
         button,
-        .all-members-btn,
-        .attendance-btn,
-        .attendance-backup-btn {
+        .add-new-member-button,
+        .search-member-id-button,
+        .search-member-name-button,
+        .search-member-phone-button {
             background-color: #4caf50;
             color: white;
             padding: 14px;
@@ -99,9 +99,10 @@
         }
 
         button:hover,
-        .all-members-btn:hover,
-        .attendance-btn:hover,
-        .attendance-backup-btn:hover {
+        .add-new-member-button:hover,
+        .search-member-id-button:hover,
+        .search-member-name-button:hover,
+        .search-member-phone-button:hover {
             background-color: #66d66a;
             transform: scale(1.03);
         }
@@ -131,81 +132,67 @@
             border-color: #e53935;
         }
 
+        /* زر View All Members - متوسط وفي المنتصف */
+        .center-box .all-members-btn {
+            display: block !important;
+            background: #4caf50 !important;
+            color: white !important;
+            padding: 11px 20px !important;
+            margin: 25px auto 0 auto !important;
+            width: 240px !important;
+            text-align: center !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            font-weight: bold !important;
+            text-decoration: none !important;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4) !important;
+            transition: all 0.3s !important;
+        }
+
+        .center-box .all-members-btn:hover {
+            background: #66d66a !important;
+            transform: translateY(-3px) !important;
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.5) !important;
+        }
+
+        /* الأزرار اللي تحت - صغيرة ومرتبة */
+        .attendance-btn,
+        .attendance-backup-btn,
         .logout {
-            background-color: #555 !important;
+            display: inline-block !important;
+            background: #4caf50 !important;
+            color: white !important;
+            padding: 9px 16px !important;
+            margin: 8px 10px !important;
+            border: none !important;
+            border-radius: 7px !important;
+            font-size: 15px !important;
+            font-weight: bold !important;
+            text-decoration: none !important;
+            cursor: pointer !important;
+            min-width: 160px !important;
+            text-align: center !important;
+            box-shadow: 0 3px 10px rgba(76, 175, 80, 0.4) !important;
+            transition: all 0.3s ease !important;
         }
 
+        .attendance-btn:hover,
+        .attendance-backup-btn:hover,
         .logout:hover {
-            background-color: #777 !important;
+            background: #66d66a !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5) !important;
         }
 
-        .center-box a {
-            display: block;
-            width: 100%;
+        /* ترتيب الأزرار اللي تحت في السطر */
+        .bottom-buttons {
             text-align: center;
-            background: #2196F3;
-            padding: 14px;
-            border-radius: 8px;
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-            margin-top: 20px;
+            margin: 30px 0;
         }
-
-        .center-box a:hover {
-            background: #42a5f5;
-        }
-        /* الأزرار التلاتة اللي تحت: حجم متوسط، أزرق/أخضر، شكل موحد وأنيق */
-.attendance-btn,
-.all-members-btn,
-.attendance-backup-btn,
-.logout {
-    display: inline-block !important;
-    background: #2196F3 !important;          /* أزرق حلو */
-    color: white !important;
-    padding: 12px 28px !important;
-    margin: 12px 8px !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-size: 17px !important;
-    font-weight: bold !important;
-    text-decoration: none !important;
-    cursor: pointer !important;
-    min-width: 220px !important;
-    text-align: center !important;
-    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4) !important;
-    transition: all 0.3s ease !important;
-}
-
-.attendance-btn:hover,
-.all-members-btn:hover,
-.attendance-backup-btn:hover,
-.logout:hover {
-    background: #42a5f5 !important;
-    transform: translateY(-3px) !important;
-    box-shadow: 0 8px 20px rgba(33, 150, 243, 0.5) !important;
-}
-
-/* لو عايز لون أخضر بدل الأزرق (اختار واحد بس من الاتنين) */
-.attendance-btn,
-.all-members-btn,
-.attendance-backup-btn,
-.logout {
-    background: #4caf50 !important;           /* أخضر */
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4) !important;
-}
-.attendance-btn:hover,
-.all-members-btn:hover,
-.attendance-backup-btn:hover,
-.logout:hover {
-    background: #66d66a !important;
-    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.5) !important;
-}
     </style>
 </head>
 <body>
 
-    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -290,13 +277,14 @@
         </section>
     </div>
 
-    <br>
-    <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance table</a>
-    <form action="{{ url_for('logout') }}" method="get">
-        <button class="logout" type="submit">Logout</button>
-    </form>
-    <br>
-    <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
+    <!-- الأزرار اللي تحت - صغيرة ومرتبة -->
+    <div class="bottom-buttons">
+        <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance Table</a>
+        <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
+        <form action="{{ url_for('logout') }}" method="get" style="display: inline;">
+            <button class="logout" type="submit">Logout</button>
+        </form>
+    </div>
 
 </body>
 </html>
