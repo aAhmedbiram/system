@@ -247,6 +247,20 @@
 
     <script>
         document.getElementById('member_id').focus();
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const table = document.querySelector("table");
+            if (table) {
+                table.parentElement.scrollTop = table.parentElement.scrollHeight;
+    
+                document.querySelector(".add-id-form").addEventListener("submit", function () {
+                    setTimeout(() => {
+                        table.parentElement.scrollTop = table.parentElement.scrollHeight;
+                    }, 400);
+                });
+            }
+            document.getElementById("member_id")?.focus();
+        });
     </script>
 
 </body>
