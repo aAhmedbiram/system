@@ -5,79 +5,113 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Member Added - Rival Gym System</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background-image: url("/static/signup.jpg");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
             color: #fff;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
+
         header {
-            background-color: #333;
-            color: #fff;
-            padding: 1em;
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
             text-align: center;
-            width: 100%;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
         }
-        h1 { color: white; font-size: 1.8em; }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
+        }
+
         .container {
-            background: #f9f9f9;
+            background: rgba(34, 34, 34, 0.95);
             padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
             text-align: center;
             max-width: 500px;
             width: 90%;
             margin: 30px auto;
-            color: #333;
+            transition: all 0.3s;
         }
+
+        .container:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(76, 175, 80, 0.4);
+        }
+
         .success-title {
             font-size: 2em;
             margin-bottom: 10px;
-            color: #333;
+            color: #4caf50;
         }
+
         .id-box {
             font-size: 1.8em;
             font-weight: bold;
-            color: #555;
-            background: #eee;
+            color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
             padding: 12px 25px;
             border-radius: 6px;
             display: inline-block;
             margin: 15px 0;
+            border: 1px solid #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
         }
+
         .date-info {
             font-size: 1.1em;
             margin: 10px 0;
-            color: #555;
-        }
-        .home-btn {
-            background-color: #555;
             color: #fff;
-            padding: 12px 30px;
+        }
+
+        .date-info strong {
+            color: #4caf50;
+        }
+
+        .home-btn {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px 30px;
             text-decoration: none;
             font-weight: bold;
-            border-radius: 4px;
+            border-radius: 8px;
             display: inline-block;
             margin-top: 20px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
         }
+
         .home-btn:hover {
-            background-color: #000;
+            background-color: #66d66a;
+            transform: scale(1.03);
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.5);
         }
+
+        .footer-links {
+            margin-top: 25px;
+        }
+
         .footer-links a {
-            color: #555;
+            color: #4caf50;
             text-decoration: none;
             margin: 0 10px;
             font-size: 0.9em;
+            transition: all 0.3s;
+            padding: 5px 10px;
+            border-radius: 4px;
         }
+
         .footer-links a:hover {
-            text-decoration: underline;
+            color: #66d66a;
+            background: rgba(76, 175, 80, 0.1);
         }
     </style>
 </head>
