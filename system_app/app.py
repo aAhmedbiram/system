@@ -522,108 +522,146 @@ def success():
 @app.route('/send_email', methods=['GET', 'POST'])
 @rino_required
 def send_email():
-    if request.method == 'POST':
-        message = request.form.get('message', '').strip()
-        
-        if not message:
-            flash('Message cannot be empty!', 'error')
-            return render_template('send_email.html')
-        
-        try:
-            # Get all member emails from database
-            members = query_db('SELECT email, name FROM members WHERE email IS NOT NULL AND email != \'\'')
+    try:
+        if request.method == 'POST':
+            message = request.form.get('message', '').strip()
             
-            # Debug: Check what we got
-            print(f"DEBUG: Found {len(members) if members else 0} members with emails")
-            if members:
-                print(f"DEBUG: First member: {members[0]}")
-            
-            if not members or len(members) == 0:
-                flash('No member emails found in the database!', 'error')
+            if not message:
+                flash('Message cannot be empty!', 'error')
                 return render_template('send_email.html')
             
-            # Email configuration
-            sender_email = 'rival.gym1@gmail.com'
-            sender_password = os.environ.get('GMAIL_APP_PASSWORD', '01147216302')
-            
-            # Setup SMTP server
-            smtp_server = 'smtp.gmail.com'
-            smtp_port = 587
-            
-            # Send email to each member
-            sent_count = 0
-            failed_emails = []
-            
             try:
-                server = smtplib.SMTP(smtp_server, smtp_port)
-                server.starttls()
-                server.login(sender_email, sender_password)
+                # Get all member emails from database
+                print("DEBUG: Querying database for member emails...")
+                members = query_db('SELECT email, name FROM members WHERE email IS NOT NULL AND email != \'\'')
                 
-                for member in members:
-                    recipient_email = None
-                    try:
-                        recipient_email = member.get('email') or member.get('Email')
-                        if not recipient_email:
-                            print(f"DEBUG: Member {member} has no email field")
-                            continue
-                        
-                        recipient_email = recipient_email.strip()
-                        if not recipient_email:
-                            continue
-                            
-                        print(f"DEBUG: Sending email to {recipient_email}")
-                        
-                        # Create a new message for each recipient
-                        msg = MIMEMultipart()
-                        msg['From'] = sender_email
-                        msg['To'] = recipient_email
-                        msg['Subject'] = 'Message from Rival Gym'
-                        msg.attach(MIMEText(message, 'plain'))
-                        
-                        server.sendmail(sender_email, recipient_email, msg.as_string())
-                        sent_count += 1
-                        print(f"DEBUG: Successfully sent to {recipient_email}")
-                    except Exception as e:
-                        email_addr = recipient_email if recipient_email else 'unknown'
-                        print(f"Failed to send email to {email_addr}: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        if recipient_email:
-                            failed_emails.append(recipient_email)
+                # Debug: Check what we got
+                print(f"DEBUG: Query returned: {type(members)}")
+                print(f"DEBUG: Found {len(members) if members else 0} members with emails")
+                if members and len(members) > 0:
+                    print(f"DEBUG: First member: {members[0]}")
+                    print(f"DEBUG: First member type: {type(members[0])}")
+                    print(f"DEBUG: First member keys: {members[0].keys() if hasattr(members[0], 'keys') else 'N/A'}")
                 
-                server.quit()
+                if not members or len(members) == 0:
+                    flash('No member emails found in the database!', 'error')
+                    return render_template('send_email.html')
                 
-                if sent_count > 0:
-                    success_msg = f'Message sent successfully to {sent_count} member(s)!'
-                    if failed_emails:
-                        success_msg += f' Failed to send to {len(failed_emails)} email(s).'
-                    flash(success_msg, 'success')
-                else:
-                    flash('Failed to send emails to all recipients!', 'error')
+                # Email configuration
+                sender_email = 'rival.gym1@gmail.com'
+                sender_password = os.environ.get('GMAIL_APP_PASSWORD', '01147216302')
+                
+                if not sender_password:
+                    flash('Email password not configured!', 'error')
+                    return render_template('send_email.html')
+                
+                # Setup SMTP server
+                smtp_server = 'smtp.gmail.com'
+                smtp_port = 587
+                
+                # Send email to each member
+                sent_count = 0
+                failed_emails = []
+                server = None
+                
+                try:
+                    print("DEBUG: Connecting to SMTP server...")
+                    server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+                    server.starttls()
+                    print("DEBUG: Logging in to SMTP server...")
+                    server.login(sender_email, sender_password)
+                    print("DEBUG: Successfully logged in")
                     
-            except smtplib.SMTPAuthenticationError as e:
-                error_msg = f'Email authentication failed: {str(e)}. Please check GMAIL_APP_PASSWORD.'
-                print(f"SMTP Auth Error: {e}")
-                flash(error_msg, 'error')
-            except smtplib.SMTPException as e:
-                error_msg = f'SMTP error occurred: {str(e)}'
-                print(f"SMTP Error: {e}")
-                flash(error_msg, 'error')
+                    for idx, member in enumerate(members):
+                        recipient_email = None
+                        try:
+                            # Handle both dict and object access
+                            if isinstance(member, dict):
+                                recipient_email = member.get('email') or member.get('Email')
+                            else:
+                                recipient_email = getattr(member, 'email', None) or getattr(member, 'Email', None)
+                            
+                            if not recipient_email:
+                                print(f"DEBUG: Member {idx} has no email field: {member}")
+                                continue
+                            
+                            recipient_email = str(recipient_email).strip()
+                            if not recipient_email:
+                                continue
+                                
+                            print(f"DEBUG: Sending email {idx+1}/{len(members)} to {recipient_email}")
+                            
+                            # Create a new message for each recipient
+                            msg = MIMEMultipart()
+                            msg['From'] = sender_email
+                            msg['To'] = recipient_email
+                            msg['Subject'] = 'Message from Rival Gym'
+                            msg.attach(MIMEText(message, 'plain'))
+                            
+                            server.sendmail(sender_email, recipient_email, msg.as_string())
+                            sent_count += 1
+                            print(f"DEBUG: Successfully sent to {recipient_email}")
+                        except Exception as e:
+                            email_addr = recipient_email if recipient_email else 'unknown'
+                            print(f"ERROR: Failed to send email to {email_addr}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            if recipient_email:
+                                failed_emails.append(recipient_email)
+                    
+                    if server:
+                        server.quit()
+                    
+                    if sent_count > 0:
+                        success_msg = f'Message sent successfully to {sent_count} member(s)!'
+                        if failed_emails:
+                            success_msg += f' Failed to send to {len(failed_emails)} email(s).'
+                        flash(success_msg, 'success')
+                    else:
+                        flash('Failed to send emails to all recipients!', 'error')
+                        
+                except smtplib.SMTPAuthenticationError as e:
+                    error_msg = f'Email authentication failed: {str(e)}. Please check GMAIL_APP_PASSWORD.'
+                    print(f"SMTP Auth Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    flash(error_msg, 'error')
+                except smtplib.SMTPException as e:
+                    error_msg = f'SMTP error occurred: {str(e)}'
+                    print(f"SMTP Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    flash(error_msg, 'error')
+                except Exception as e:
+                    error_msg = f'Error sending emails: {str(e)}'
+                    print(f"General SMTP Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    flash(error_msg, 'error')
+                finally:
+                    if server:
+                        try:
+                            server.quit()
+                        except:
+                            pass
+                    
             except Exception as e:
-                error_msg = f'Error sending emails: {str(e)}'
-                print(f"General Error: {e}")
+                error_msg = f'Database error: {str(e)}'
+                print(f"Database Error: {e}")
                 import traceback
                 traceback.print_exc()
                 flash(error_msg, 'error')
-                
-        except Exception as e:
-            error_msg = f'Database or general error: {str(e)}'
-            print(f"Database/General Error: {e}")
-            import traceback
-            traceback.print_exc()
-            flash(error_msg, 'error')
-    
-    return render_template('send_email.html')
+        
+        return render_template('send_email.html')
+        
+    except Exception as e:
+        # Catch absolutely everything to prevent internal server error
+        error_msg = f'Unexpected error: {str(e)}'
+        print(f"CRITICAL ERROR in send_email: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(error_msg, 'error')
+        return render_template('send_email.html')
 
 # === Run application ===
 if __name__ == '__main__':
