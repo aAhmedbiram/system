@@ -1,224 +1,185 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rival Gym System</title>
     <style>
-        /* Reset styles */
-        h1, h2, p, form, label, button {
-            margin: 0;
-            padding: 0;
-            border: 0;
-            box-sizing: border-box;
-        }
         body {
-            background-image: url("/static/signup.jpg");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
             font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
-            line-height: 1.6;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        header {
-            background-color: #333;
+            background: #111;
             color: #fff;
-            padding: 1em;
+            min-height: 100vh;
+            background-image: url("/static/signup.jpg");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 1.5em;
             text-align: center;
-            width: 100%;
+            font-size: 28px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
         }
-        h1 {
-            color: white;
-            margin-bottom: 10px;
-            font-size: 1.8em;
-        }
-        h2, h3 {
-            color: #333;
-            margin-top: 20px;
-        }
-        .main-content {
+
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 20px;
             display: flex;
             flex-wrap: wrap;
-            justify-content: space-between;
-            max-width: 900px;
-            width: 100%;
-            padding: 20px;
+            gap: 30px;
+            justify-content: center;
         }
-        section {
-            width: 45%;
-            margin: 20px;
+
+        .card {
+            background: rgba(34, 34, 34, 0.95);
+            border-radius: 12px;
+            padding: 25px;
+            width: 420px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+            border: 1px solid #444;
+            transition: transform 0.3s, box-shadow 0.3s;
         }
-        form {
-            margin-top: 20px;
-            max-width: 300px;
-            margin-left: auto;
-            margin-right: auto;
-            display: flex;
-            flex-direction: column;
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(76, 175, 80, 0.3);
         }
-        label {
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #555;
-        }
-        button {
-            background-color: #555;
-            color: #fff;
-            padding: 12px;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 16px;
-            border-radius: 4px;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #000;
-        }
-        .all-members-btn {
-            background-color: #555;
-            color: #fff;
-            padding: 12px;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 16px;
-            border-radius: 4px;
-            display: inline-block;
-            transition: background-color 0.3s;
-        }
-        .all-members-btn:hover {
-            background-color: #000;
-        }
-        .logo {
-            margin: 20px auto;
-            max-width: 100%;
-            height: auto;
-            display: block;
-        }
-        .center-box {
-            text-align: center;
-            width: 100%;
-        }
-        .add-new-member-section,
-        .search-section {
-            flex: 1;
-            max-width: 400px;
-            margin: 20px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
+
         h2 {
-            color: #333;
+            color: #4caf50;
             margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
         }
-        .search-id-form,
-        .search-name-form,
-        .add-new-member-form {
-            display: flex;
-            flex-direction: column;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 16px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        .search-member-id-button,
-        .search-member-name-button,
-        .add-new-member-button,
-        .search-member-phone-button,
-        .logout,
-        .attendance-btn {
-            background-color: #555;
-            color: #fff;
-            padding: 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: background-color 0.3s;
-        }
-        .search-member-id-button:hover,
-        .search-member-name-button:hover,
-        .add-new-member-button:hover,
-        .search-member-phone-button:hover,
-        .logout:hover,
-        .attendance-btn:hover {
-            background-color: #000;
-        }
-        .label_gender {
-            margin-bottom: 8px;
+
+        label {
+            display: block;
+            margin: 12px 0 6px;
+            color: #aaa;
             font-weight: bold;
-            color: #555;
         }
-        .gender-radio-group {
+
+        input, select, datalist {
+            width: 100%;
+            padding: 12px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+        }
+
+        button, .btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 15px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover, .btn:hover {
+            background: #66d66a;
+            transform: scale(1.03);
+        }
+
+        .btn-secondary {
+            background: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #555;
+        }
+
+        .btn-danger {
+            background: #c62828;
+        }
+
+        .btn-danger:hover {
+            background: #e53935;
+        }
+
+        .btn-logout {
+            background: #555;
+        }
+
+        .btn-logout:hover {
+            background: #777;
+        }
+
+        .gender-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .gender-group label {
             display: flex;
             align-items: center;
-            gap: 15px;
-        }
-        .label_male,
-        .label_female {
-            margin-right: 8px;
-        }
-        .male-radio,
-        .female-radio {
-            margin-bottom: 16px;
+            gap: 8px;
+            font-size: 16px;
         }
 
         /* Flash Messages */
         .flash-message {
             padding: 15px;
             margin: 20px auto;
-            max-width: 600px;
-            border-radius: 8px;
+            max-width: 800px;
+            border-radius: 10px;
             font-weight: bold;
             text-align: center;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            font-size: 1.1em;
-            animation: fadeIn 0.5s ease;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            animation: fadeIn 0.6s ease;
         }
-        .flash-message.error {
-            background-color: #ffebee;
-            color: #c62828;
-            border: 1px solid #ef9a9a;
-        }
+
         .flash-message.success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            border: 1px solid #a5d6a7;
+            background: rgba(46, 125, 50, 0.9);
+            color: white;
+            border: 1px solid #4caf50;
         }
+
+        .flash-message.error {
+            background: rgba(198, 40, 40, 0.9);
+            color: white;
+            border: 1px solid #e53935;
+        }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
+            from { opacity: 0; transform: translateY(-20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .attendance-backup-btn {
+        .bottom-buttons {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .bottom-buttons a, .bottom-buttons button {
             display: inline-block;
-            background-color: #555;
-            color: #fff;
-            padding: 12px 18px;
-            text-decoration: none;
-            font-size: 16px;
-            border-radius: 4px;
-            transition: background-color 0.3s, transform 0.15s;
-            margin-top: 10px;
+            margin: 10px;
+            min-width: 220px;
         }
-        
-        .attendance-backup-btn:hover {
-            background-color: #000;
-            transform: scale(1.05);
-        }
-        
     </style>
 </head>
 <body>
@@ -235,66 +196,69 @@
     {% endwith %}
 
     <header>
-        <h1>Rival Gym System</h1>
-        <div class="logo"></div>
+        Rival Gym System
     </header>
 
-    <div class="main-content">
-        <section class="search-section">
-            <h2>Search</h2>
-            <form class="search-id-form" action="{{ url_for('show_member_data') }}" method="post">
-                <label class="search-member-id" for="member_id">Enter Member ID:</label>
-                <input class="search-id" type="text" id="member_id" name="member_id" required>
-                <button class="search-member-id-button" type="submit">Search</button>
+    <div class="container">
+
+        <!-- البحث -->
+        <div class="card">
+            <h2>البحث عن عضو</h2>
+            
+            <form action="{{ url_for('show_member_data') }}" method="post">
+                <label>رقم العضوية</label>
+                <input type="text" name="member_id" required placeholder="أدخل رقم العضوية">
+                <button type="submit">بحث بالرقم</button>
             </form>
-            <form class="search-name-form" method="post" action="{{ url_for('result') }}">
-                <label class="search-member-name" for="member_name">Enter member name:</label>
-                <input class="search-name" type="text" id="member_name" name="member_name" required>
-                <button class="search-member-name-button" type="submit">Search</button>
+
+            <form action="{{ url_for('result') }}" method="post">
+                <label>اسم العضو</label>
+                <input type="text" name="member_name" required placeholder="أدخل الاسم">
+                <button type="submit" class="btn-secondary">بحث بالاسم</button>
             </form>
-            <form class="search-phone-form" method="post" action="{{ url_for('search_by_mobile_number') }}">
-                <label class="search-member-phone" for="member_phone">Enter member mobile number:</label>
-                <input class="search-phone" type="number" id="member_phone" name="member_phone" required>
-                <button class="search-member-phone-button" type="submit">Search</button>
+
+            <form action="{{ url_for('search_by_mobile_number') }}" method="post">
+                <label>رقم الجوال</label>
+                <input type="text" name="member_phone" required placeholder="أدخل رقم الجوال">
+                <button type="submit" class="btn-secondary">بحث بالجوال</button>
             </form>
-            <br><br><br><br><br><br><br><br><br>
-            <div class="center-box">
-                <a class="all-members-btn" href="{{ url_for('all_members') }}">View All Members</a>
-            </div>
-        </section>
 
-        <section class="add-new-member-section">
-            <h2 class="add-new-member-h2">Add New Member</h2>
-            <form class="add-new-member-form" action="{{ url_for('add_member_route') }}" method="post">
-                <label class="label_name" for="member_name">Name:</label>
-                <input class="name-input" type="text" id="member_name" name="member_name" required>
+            <a href="{{ url_for('all_members') }}" class="btn" style="margin-top: 20px; background:#2196F3;">
+                عرض كل الأعضاء
+            </a>
+        </div>
 
-                <label class="label_email" for="member_email">Email:</label>
-                <input class="email-input" type="email" id="member_email" name="member_email" required>
+        <!-- إضافة عضو جديد -->
+        <div class="card">
+            <h2>إضافة عضو جديد</h2>
+            <form action="{{ url_for('add_member_route') }}" method="post">
+                <label>الاسم</label>
+                <input type="text" name="member_name" required>
 
-                <label class="label_phone" for="member_phone">Phone:</label>
-                <input class="phone-input" type="text" id="member_phone" name="member_phone" required>
+                <label>الإيميل</label>
+                <input type="email" name="member_email" required>
 
-                <label for="member_birthdate">Birthdate:</label>
-                <input type="date" id="member_birthdate" name="member_birthdate" required>
+                <label>رقم الجوال</label>
+                <input type="text" name="member_phone" required>
 
-                <div class="label_gender">Gender:</div>
-                <div class="gender-radio-group">
-                    <label class="label_male" for="male">Male:</label>
-                    <input class="male-radio" type="radio" id="male" name="choice" value="Male">
-                    <label class="label_female" for="female">Female:</label>
-                    <input class="female-radio" type="radio" id="female" name="choice" value="Female">
+                <label>تاريخ الميلاد</label>
+                <input type="date" name="member_birthdate" required>
+
+                <label>الجنس</label>
+                <div class="gender-group">
+                    <label><input type="radio" name="choice" value="Male" required> ذكر</label>
+                    <label><input type="radio" name="choice" value="Female"> أنثى</label>
                 </div>
 
-                <label for="member_actual_starting_date">Actual starting date:</label>
-                <input type="date" id="member_actual_starting_date" name="member_actual_starting_date" required>
+                <label>تاريخ بدء الاشتراك الفعلي</label>
+                <input type="date" name="member_actual_starting_date" required>
 
-                <label for="member_starting_date">Starting date:</label>
-                <input type="date" id="member_starting_date" name="member_starting_date" required>
+                <label>تاريخ بدء الحساب</label>
+                <input type="date" name="member_starting_date" required>
 
-                <label for="member_membership_packages">Membership packages:</label>
-                <input list="membership_packages" id="member_membership_packages" name="member_membership_packages" required>
-                <datalist class="packages" id="membership_packages">
+                <label>الباقة</label>
+                <input list="packages" name="member_membership_packages" required placeholder="اختر الباقة">
+                <datalist id="packages">
                     <option value="1 Month">
                     <option value="2 Months">
                     <option value="3 Months">
@@ -303,19 +267,23 @@
                     <option value="12 Months">
                 </datalist>
 
-                <button class="add-new-member-button" type="submit">Add Member</button>
+                <button type="submit">إضافة العضو</button>
             </form>
-        </section>
+        </div>
+
     </div>
 
-    <br>
-    <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance table</a>
-    <form action="{{ url_for('logout') }}" method="get">
-        <button class="logout" type="submit">Logout</button>
-    </form>
-    <br>
-    <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
-
+    <div class="bottom-buttons">
+        <a href="{{ url_for('attendance_table') }}" class="btn" style="background:#ff9800;">جدول الحضور</a>
+        <a href="#" class="btn btn-danger" onclick="if(confirm('هل أنت متأكد؟ سيتم نقل الحضور للنسخ الاحتياطي وتفريغ الجدول!')) document.getElementById('deleteForm').submit();">
+            نقل الحضور للنسخ الاحتياطي وتفريغ الجدول
+        </a>
+        <form id="deleteForm" action="{{ url_for('delete_all_data') }}" method="POST" style="display:inline;"></form>
+        
+        <form action="{{ url_for('logout') }}" method="get" style="display:inline;">
+            <button type="submit" class="btn btn-logout">تسجيل الخروج</button>
+        </form>
+    </div>
 
 </body>
 </html>
