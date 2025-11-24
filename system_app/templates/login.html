@@ -8,141 +8,165 @@
     
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 80px 20px 20px 20px;
+            background: #111;
+            color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        header h1 {
             margin: 0;
+            padding: 0;
+            font-size: 22px;
         }
         
         form {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background: rgba(34, 34, 34, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
             text-align: center;
+            width: 100%;
+            max-width: 400px;
+            transition: all 0.3s;
+        }
+        
+        form:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(76, 175, 80, 0.4);
         }
         
         h2 {
-            color: #333;
+            color: #4caf50;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 24px;
         }
         
         label {
             display: block;
             margin: 10px 0 5px;
             font-weight: bold;
+            color: #fff;
+            text-align: left;
         }
         
         input {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 16px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
             box-sizing: border-box;
         }
         
+        input:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
         button {
-            background-color: #333;
-            color: #fff;
-            padding: 12px;
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
             border: none;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            border-radius: 4px;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
         }
         
         button:hover {
-            background-color: #000;
+            background-color: #66d66a;
+            transform: scale(1.03);
         }
         
-        a {
-            color: #333;
-            text-decoration: none;
-            margin-top: 10px;
-            display: inline-block;
+        .flash-message {
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 700px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(46, 125, 50, 0.95);
+            color: white;
+            border: 1px solid #4caf50;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
-        
-        .change_password{
-            background-color: #333;
-            color: #fff;
-            padding: 12px;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 16px;
-            border-radius: 4px;
-            display: inline-block;
+
+        .flash-message.error {
+            background: rgba(198, 40, 40, 0.95);
+            border-color: #e53935;
         }
-        .change_password:hover{
-            background-color: #000;
-        }
-        
         
         .signup {
-            background-color: #333;
-            color: #fff;
-            padding: 12px;
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
             border: none;
+            border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             font-size: 16px;
-            border-radius: 4px;
+            font-weight: bold;
             display: inline-block;
-        }
-        .signup:hover{
-            background-color: black;
-        }
-        
-        .flashes {
-            list-style: none;
-            padding: 0;
-            margin-bottom: 15px;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.3s;
+            text-align: center;
         }
         
-        .flashes li {
-            color: #fff;
-            background-color: #e44d26;
-            padding: 10px;
-            margin-bottom: 5px;
-            border-radius: 4px;
-        }
-        
-        .flashes li.success {
-            background-color: #4caf50;
-        }
-        
-        body {
-            background-image: url("/static/background.jpg");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Arial', sans-serif;
+        .signup:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
         }
         
     </style>
 </head>
 
 <body>
+    <header>
+        <h1>Rival Gym System - Login</h1>
+    </header>
 
     <form action="/login" method="post">
         
         <h2>Login</h2>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <ul class="flashes">
-                    {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
-                    {% endfor %}
-                </ul>
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">
+                        {{ message | safe }}
+                    </div>
+                {% endfor %}
             {% endif %}
         {% endwith %}
         <label for="username">Username:</label>
