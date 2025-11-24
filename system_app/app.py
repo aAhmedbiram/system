@@ -533,7 +533,12 @@ def send_email():
             # Get all member emails from database
             members = query_db('SELECT email, name FROM members WHERE email IS NOT NULL AND email != \'\'')
             
-            if not members:
+            # Debug: Check what we got
+            print(f"DEBUG: Found {len(members) if members else 0} members with emails")
+            if members:
+                print(f"DEBUG: First member: {members[0]}")
+            
+            if not members or len(members) == 0:
                 flash('No member emails found in the database!', 'error')
                 return render_template('send_email.html')
             
@@ -555,8 +560,19 @@ def send_email():
                 server.login(sender_email, sender_password)
                 
                 for member in members:
-                    recipient_email = member['email']
+                    recipient_email = None
                     try:
+                        recipient_email = member.get('email') or member.get('Email')
+                        if not recipient_email:
+                            print(f"DEBUG: Member {member} has no email field")
+                            continue
+                        
+                        recipient_email = recipient_email.strip()
+                        if not recipient_email:
+                            continue
+                            
+                        print(f"DEBUG: Sending email to {recipient_email}")
+                        
                         # Create a new message for each recipient
                         msg = MIMEMultipart()
                         msg['From'] = sender_email
@@ -566,9 +582,14 @@ def send_email():
                         
                         server.sendmail(sender_email, recipient_email, msg.as_string())
                         sent_count += 1
+                        print(f"DEBUG: Successfully sent to {recipient_email}")
                     except Exception as e:
-                        print(f"Failed to send email to {recipient_email}: {e}")
-                        failed_emails.append(recipient_email)
+                        email_addr = recipient_email if recipient_email else 'unknown'
+                        print(f"Failed to send email to {email_addr}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        if recipient_email:
+                            failed_emails.append(recipient_email)
                 
                 server.quit()
                 
