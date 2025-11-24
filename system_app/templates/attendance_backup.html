@@ -19,6 +19,12 @@
             color: #4caf50;
         }
 
+        .table-container {
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #444;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -34,6 +40,10 @@
         th {
             background: #333;
             color: #4caf50;
+            cursor: pointer;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         tr:hover {
@@ -41,6 +51,13 @@
         }
 
         /* filter row */
+        .filter-row {
+            position: sticky;
+            top: 42px;
+            background: #222;
+            z-index: 9;
+        }
+
         .filter-row input {
             width: 95%;
             padding: 6px;
@@ -64,19 +81,20 @@
 
 <h1>النسخة الاحتياطية من الحضور</h1>
 
+<div class="table-container">
 <table id="attendanceTable">
 
-    <!-- عنوان الأعمدة -->
+    <!-- العناوين -->
     <thead>
     <tr>
-        <th>الترتيب</th>
-        <th>ID</th>
-        <th>الاسم</th>
-        <th>تاريخ الانتهاء</th>
-        <th>حالة الاشتراك</th>
-        <th>وقت الحضور</th>
-        <th>تاريخ الحضور</th>
-        <th>اليوم</th>
+        <th onclick="sortTable(0)">الترتيب ▲▼</th>
+        <th onclick="sortTable(1)">ID ▲▼</th>
+        <th onclick="sortTable(2)">الاسم ▲▼</th>
+        <th onclick="sortTable(3)">تاريخ الانتهاء ▲▼</th>
+        <th onclick="sortTable(4)">حالة الاشتراك ▲▼</th>
+        <th onclick="sortTable(5)">وقت الحضور ▲▼</th>
+        <th onclick="sortTable(6)">تاريخ الحضور ▲▼</th>
+        <th onclick="sortTable(7)">اليوم ▲▼</th>
     </tr>
 
     <!-- صف الفلترة -->
@@ -107,28 +125,63 @@
     {% endfor %}
     </tbody>
 </table>
-
+</div>
 
 <a href="/">Home</a>
 
 <script>
-    function filterTable(columnIndex) {
-        let input = document.querySelectorAll(".filter-row input")[columnIndex];
+    /* -----------------------------
+       فلترة الأعمدة
+    ------------------------------ */
+    function filterTable(colIndex) {
+        let input = document.querySelectorAll(".filter-row input")[colIndex];
         let filter = input.value.toLowerCase();
         let table = document.getElementById("attendanceTable");
         let rows = table.getElementsByTagName("tr");
 
-        for (let i = 2; i < rows.length; i++) {  // تخطي العنوان + صف الفلتر
-            let cell = rows[i].getElementsByTagName("td")[columnIndex];
+        for (let i = 2; i < rows.length; i++) { 
+            let cell = rows[i].getElementsByTagName("td")[colIndex];
             if (cell) {
-                let text = cell.textContent || cell.innerText;
-                if (text.toLowerCase().indexOf(filter) > -1) {
-                    rows[i].style.display = "";
+                let text = cell.textContent.toLowerCase();
+                rows[i].style.display = text.includes(filter) ? "" : "none";
+            }
+        }
+    }
+
+    /* -----------------------------
+       Sorting like Excel
+    ------------------------------ */
+    let sortDirection = true;
+
+    function sortTable(colIndex) {
+        let table = document.getElementById("attendanceTable");
+        let switching = true;
+
+        while (switching) {
+            switching = false;
+            let rows = table.rows;
+
+            for (let i = 2; i < rows.length - 1; i++) {
+                let x = rows[i].getElementsByTagName("td")[colIndex];
+                let y = rows[i + 1].getElementsByTagName("td")[colIndex];
+
+                if (sortDirection) {
+                    if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                        switching = true;
+                        break;
+                    }
                 } else {
-                    rows[i].style.display = "none";
+                    if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                        switching = true;
+                        break;
+                    }
                 }
             }
         }
+
+        sortDirection = !sortDirection;
     }
 </script>
 
