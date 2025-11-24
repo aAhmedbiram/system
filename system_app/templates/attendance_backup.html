@@ -15,14 +15,16 @@
 
         h1 {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             color: #4caf50;
+            font-size: 26px;
         }
 
         .table-container {
             max-height: 80vh;
             overflow-y: auto;
             border: 1px solid #444;
+            border-radius: 6px;
         }
 
         table {
@@ -44,6 +46,7 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            font-size: 15px;
         }
 
         tr:hover {
@@ -68,12 +71,36 @@
             text-align: center;
         }
 
-        a {
-            color: #4caf50;
-            text-decoration: none;
-            font-size: 18px;
+        /* Buttons */
+        .btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
             display: inline-block;
-            margin-top: 20px;
+            margin: 20px 10px 0 10px;
+            transition: 0.25s;
+        }
+
+        .btn-download {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #45a049;
+        }
+
+        .btn-home {
+            background: #333;
+            color: #4caf50;
+            border: 1px solid #4caf50;
+        }
+
+        .btn-home:hover {
+            background: #4caf50;
+            color: black;
         }
     </style>
 </head>
@@ -84,7 +111,6 @@
 <div class="table-container">
 <table id="attendanceTable">
 
-    <!-- العناوين -->
     <thead>
     <tr>
         <th onclick="sortTable(0)">الترتيب ▲▼</th>
@@ -97,7 +123,6 @@
         <th onclick="sortTable(7)">اليوم ▲▼</th>
     </tr>
 
-    <!-- صف الفلترة -->
     <tr class="filter-row">
         <th><input type="text" onkeyup="filterTable(0)" placeholder="بحث"></th>
         <th><input type="text" onkeyup="filterTable(1)" placeholder="بحث"></th>
@@ -127,62 +152,76 @@
 </table>
 </div>
 
-<a href="/">Home</a>
+<button class="btn btn-download" onclick="downloadCSV()">Download CSV</button>
+<a href="/" class="btn btn-home">Home</a>
 
+<!-- ========================= JS ========================== -->
 <script>
-    /* -----------------------------
-       فلترة الأعمدة
-    ------------------------------ */
-    function filterTable(colIndex) {
-        let input = document.querySelectorAll(".filter-row input")[colIndex];
-        let filter = input.value.toLowerCase();
-        let table = document.getElementById("attendanceTable");
-        let rows = table.getElementsByTagName("tr");
 
-        for (let i = 2; i < rows.length; i++) { 
-            let cell = rows[i].getElementsByTagName("td")[colIndex];
-            if (cell) {
-                let text = cell.textContent.toLowerCase();
-                rows[i].style.display = text.includes(filter) ? "" : "none";
+function downloadCSV() {
+    let table = document.getElementById("attendanceTable");
+    let rows = table.querySelectorAll("tr");
+    let csvContent = "";
+
+    rows.forEach(row => {
+        let cols = row.querySelectorAll("th, td");
+        let rowData = [];
+        cols.forEach(col => {
+            let text = col.innerText.replace(/,/g, " "); 
+            rowData.push(text);
+        });
+        csvContent += rowData.join(",") + "\n";
+    });
+
+    let blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    let downloadLink = document.createElement("a");
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.download = "attendance_backup.csv";
+    downloadLink.click();
+}
+
+
+/* فلترة */
+function filterTable(colIndex) {
+    let filter = document.querySelectorAll(".filter-row input")[colIndex].value.toLowerCase();
+    let rows = document.querySelectorAll("#attendanceTable tbody tr");
+
+    rows.forEach(row => {
+        let cell = row.getElementsByTagName("td")[colIndex];
+        let text = cell.textContent.toLowerCase();
+        row.style.display = text.includes(filter) ? "" : "none";
+    });
+}
+
+
+/* Sorting */
+let sortDirection = true;
+
+function sortTable(colIndex) {
+    let table = document.getElementById("attendanceTable");
+    let switching = true;
+
+    while (switching) {
+        switching = false;
+        let rows = table.rows;
+
+        for (let i = 2; i < rows.length - 1; i++) {
+            let x = rows[i].getElementsByTagName("td")[colIndex];
+            let y = rows[i + 1].getElementsByTagName("td")[colIndex];
+
+            if (
+                (sortDirection && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) ||
+                (!sortDirection && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase())
+            ) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+                break;
             }
         }
     }
+    sortDirection = !sortDirection;
+}
 
-    /* -----------------------------
-       Sorting like Excel
-    ------------------------------ */
-    let sortDirection = true;
-
-    function sortTable(colIndex) {
-        let table = document.getElementById("attendanceTable");
-        let switching = true;
-
-        while (switching) {
-            switching = false;
-            let rows = table.rows;
-
-            for (let i = 2; i < rows.length - 1; i++) {
-                let x = rows[i].getElementsByTagName("td")[colIndex];
-                let y = rows[i + 1].getElementsByTagName("td")[colIndex];
-
-                if (sortDirection) {
-                    if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                        switching = true;
-                        break;
-                    }
-                } else {
-                    if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                        switching = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        sortDirection = !sortDirection;
-    }
 </script>
 
 </body>
