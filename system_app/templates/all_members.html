@@ -5,23 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All Members - Rival Gym System</title>
-    <style>
-        h1 {
-            color: white;
-        }
 
+    <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            background: #111;
+            color: #fff;
         }
 
         header {
-            background-color: #333;
-            color: #fff;
+            background-color: #222;
+            color: #4caf50;
             padding: 1em;
             text-align: center;
+            font-size: 24px;
+            font-weight: bold;
         }
 
         section {
@@ -29,112 +29,227 @@
         }
 
         h2 {
-            color: #333;
+            color: #4caf50;
+            margin-bottom: 10px;
+        }
+
+        .index-btn {
+            background-color: #4caf50;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        .index-btn:hover {
+            background-color: #66d66a;
+        }
+
+        .download-btn{
+            background-color: #2196F3;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .download-btn:hover{
+            background-color:#42a5f5;
+        }
+
+        .table-container {
+            max-height: 80vh;
+            border: 1px solid #444;
+            overflow-y: auto;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            background: #222;
         }
 
         th,
         td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
+            padding: 10px;
+            border: 1px solid #444;
+            text-align: center;
+            color: #fff;
         }
 
         th {
             background-color: #333;
-            color: #fff;
-        }
-
-        thead {
+            color: #4caf50;
+            cursor: pointer;
             position: sticky;
             top: 0;
-            background-color: #333;
-            color: #fff;
-            z-index: 1;
+            z-index: 10;
+        }
+
+        .filter-row {
+            position: sticky;
+            top: 42px;
+            background: #222;
+            z-index: 9;
+        }
+
+        .filter-row input {
+            width: 90%;
+            padding: 6px;
+            border: 1px solid #4caf50;
+            border-radius: 4px;
+            background: #111;
+            color: white;
+            text-align: center;
         }
 
         .edit-link {
-            color: #007BFF;
-            text-decoration: none;
+            color: #2196F3;
         }
 
         .edit-link:hover {
             text-decoration: underline;
         }
-
-        .index-btn {
-            background-color: #333;
-            color: #fff;
-            padding: 12px;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 16px;
-            border-radius: 4px;
-            display: inline-block;
-            
-        }
-        .index-btn:hover{
-            background-color: #555;
-        }
-        
     </style>
 </head>
 
 <body>
-    <header>
-        <h1>Rival Gym System</h1>
-    </header>
 
-    <section>
-        <h2><a class="index-btn" href="{{ url_for('index') }}">Home </a>    All Members</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Member ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Age</th>
-                    <th>Gender</th>
-                    <th>actual starting_date</th>
-                    <th>starting date</th>
-                    <th>End date</th>
-                    <th>Membership packages</th>
-                    <th>Membership fees</th>
-                    <th>Membership status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for member in members_data %}
-                    <tr>
-                        <td>{{ member.id }}</td>
-                        <td>{{ member.name }}</td>
-                        <td>{{ member.email }}</td>
-                        <td>{{ member.phone }}</td>
-                        <td>{{ member.age }}</td>
-                        <td>{{ "Male" if member.gender == "Male" else "Female" }}</td>
-                        <td>{{ member.actual_starting_date }}</td>
-                        <td>{{ member.starting_date }}</td>
-                        <td>{{ member.end_date }}</td>
-                        <td>{{ member.membership_packages }}</td>
-                        <td>{{ member.membership_fees }}</td>
-                        <td>{{ member.membership_status }}</td>
-                        <td>
-                            <a class="edit-link" href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
+<header>Rival Gym System - All Members</header>
+
+<section>
+    <a class="index-btn" href="{{ url_for('index') }}">Home</a>
+    <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
+
+<div class="table-container">
+<table id="membersTable">
+
+    <thead>
+    <tr>
+        <th onclick="sortTable(0)">Member ID ▲▼</th>
+        <th onclick="sortTable(1)">Name ▲▼</th>
+        <th onclick="sortTable(2)">Email ▲▼</th>
+        <th onclick="sortTable(3)">Phone ▲▼</th>
+        <th onclick="sortTable(4)">Age ▲▼</th>
+        <th onclick="sortTable(5)">Gender ▲▼</th>
+        <th onclick="sortTable(6)">Actual start ▲▼</th>
+        <th onclick="sortTable(7)">Start date ▲▼</th>
+        <th onclick="sortTable(8)">End date ▲▼</th>
+        <th onclick="sortTable(9)">Package ▲▼</th>
+        <th onclick="sortTable(10)">Fees ▲▼</th>
+        <th onclick="sortTable(11)">Status ▲▼</th>
+        <th>Action</th>
+    </tr>
+
+    <!-- filter row -->
+    <tr class="filter-row">
+        {% for i in range(12) %}
+            <th><input type="text" onkeyup="filterTable({{i}})" placeholder="Search"></th>
+        {% endfor %}
+        <th></th>
+    </tr>
+    </thead>
+
+    <tbody>
+    {% for member in members_data %}
+    <tr>
+        <td>{{ member.id }}</td>
+        <td>{{ member.name }}</td>
+        <td>{{ member.email }}</td>
+        <td>{{ member.phone }}</td>
+        <td>{{ member.age }}</td>
+        <td>{{ "Male" if member.gender == "Male" else "Female" }}</td>
+        <td>{{ member.actual_starting_date }}</td>
+        <td>{{ member.starting_date }}</td>
+        <td>{{ member.end_date }}</td>
+        <td>{{ member.membership_packages }}</td>
+        <td>{{ member.membership_fees }}</td>
+        <td>{{ member.membership_status }}</td>
+        <td><a class="edit-link"
+                href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+
+</section>
+
+<script>
+
+    /* FILTER */
+    function filterTable(colIndex) {
+        let input = document.querySelectorAll(".filter-row input")[colIndex];
+        let filter = input.value.toLowerCase();
+        let rows = document.querySelectorAll("#membersTable tbody tr");
+
+        rows.forEach(row => {
+            let cell = row.getElementsByTagName("td")[colIndex];
+            let txt = cell.textContent.toLowerCase();
+            row.style.display = txt.includes(filter) ? "" : "none";
+        });
+    }
+
+    /* SORT */
+    let sortDirection = true;
+
+    function sortTable(colIndex) {
+        let table = document.getElementById("membersTable");
+        let switching = true;
+
+        while (switching) {
+            switching = false;
+            let rows = table.rows;
+
+            for (let i = 2; i < rows.length - 1; i++) {
+                let x = rows[i].getElementsByTagName("td")[colIndex];
+                let y = rows[i + 1].getElementsByTagName("td")[colIndex];
+
+                if (
+                    (sortDirection && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) ||
+                    (!sortDirection && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase())
+                ) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    break;
+                }
+            }
+        }
+        sortDirection = !sortDirection;
+    }
+
+    /* DOWNLOAD CSV */
+    function downloadCSV() {
+        let table = document.getElementById("membersTable");
+        let rows = table.querySelectorAll("tr");
+        let csv = "";
+
+        rows.forEach((row) => {
+            let cols = row.querySelectorAll("th, td");
+            let rowData = [];
+            cols.forEach((col) => {
+                rowData.push(col.innerText.replace(/,/g, " "));
+            });
+            csv += rowData.join(",") + "\n";
+        });
+
+        let blob = new Blob([csv], { type: "text/csv" });
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "all_members.csv";
+        link.click();
+    }
+
+</script>
+
 </body>
-
 </html>
-
