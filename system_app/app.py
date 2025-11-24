@@ -35,6 +35,20 @@ def login_required(f):
     return decorated_function
 
 
+# === Rino Only Decorator ===
+def rino_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('يجب تسجيل الدخول أولاً!', 'error')
+            return redirect(url_for('login'))
+        if session.get('username') != 'rino':
+            flash('ليس لديك صلاحية للوصول إلى هذه الصفحة!', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # @app.teardown_appcontext
 # def teardown_db(exception):
 #     close_db()
@@ -478,7 +492,7 @@ def delete_all_data():
 
 
 @app.route('/attendance_backup', methods=['GET'])
-@login_required
+@rino_required
 def attendance_backup_table():
     try:
         # هنسحب كل الداتا من جدول النسخة الاحتياطية
