@@ -160,6 +160,7 @@
         /* Bottom buttons - small and organized */
         .attendance-btn,
         .attendance-backup-btn,
+        .send-email-btn,
         .logout {
             display: inline-block !important;
             background: #4caf50 !important;
@@ -180,6 +181,7 @@
 
         .attendance-btn:hover,
         .attendance-backup-btn:hover,
+        .send-email-btn:hover,
         .logout:hover {
             background: #66d66a !important;
             transform: translateY(-2px) !important;
@@ -291,6 +293,9 @@
     <div class="bottom-buttons">
         <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance Table</a>
         <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
+        {% if session.username == 'rino' %}
+        <a class="send-email-btn" href="{{ url_for('send_email') }}">Send Email to Members</a>
+        {% endif %}
         <form action="{{ url_for('logout') }}" method="get" style="display: inline;">
             <button class="logout" type="submit">Logout</button>
         </form>
