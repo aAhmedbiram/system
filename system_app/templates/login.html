@@ -95,6 +95,25 @@
         .signup:hover{
             background-color: black;
         }
+        
+        .flashes {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 15px;
+        }
+        
+        .flashes li {
+            color: #fff;
+            background-color: #e44d26;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
+        
+        .flashes li.success {
+            background-color: #4caf50;
+        }
+        
         body {
             background-image: url("/static/background.jpg");
             background-size: cover;
@@ -114,27 +133,27 @@
 
 <body>
 
-    <form action="/login" method="post" action="/signup" method="post">
+    <form action="/login" method="post">
         
         <h2>Login</h2>
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <p class="{{ messages[0].split(' ')[0] }}">{{ messages[0] }}</p>
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
             {% endif %}
         {% endwith %}
         <label for="username">Username:</label>
-        <input type="text" id="username" name="username" value="rino" required>
+        <input type="text" id="username" name="username" required>
 
         <label for="password">Password:</label>
         <input type="password" id="password" name="password" required>
 
-        <button type="submit" href="index" >Login</button>
+        <button type="submit">Login</button>
         
-        
-        <a class="change_password" href="change_password" role="button">Change password</a>
-        
-        
-        <a class="signup" href="signup" role="button">signup</a>
+        <a class="signup" href="signup" role="button">Sign Up</a>
 
         
     </form>

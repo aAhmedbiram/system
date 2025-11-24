@@ -210,7 +210,15 @@
     {% endwith %}
 
     <header>
-        <h1>Rival Gym System</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 style="margin: 0;">Rival Gym System</h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                {% if session.username %}
+                    <span style="color: #4caf50; font-size: 16px;">Welcome, {{ session.username }}</span>
+                {% endif %}
+                <a href="{{ url_for('change_password') }}" style="color: #4caf50; text-decoration: none; font-size: 14px; padding: 5px 10px; border: 1px solid #4caf50; border-radius: 4px;">Change Password</a>
+            </div>
+        </div>
         <div class="logo"></div>
     </header>
 

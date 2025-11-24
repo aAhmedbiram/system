@@ -4,6 +4,7 @@ import os
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from functools import wraps
 
 # وكمان أضف السطر ده عشان نستخدم DATABASE_URL
 from system_app.queries import DATABASE_URL
@@ -23,12 +24,24 @@ with app.app_context():
     create_table()
 
 
+# === Authentication Decorator ===
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('يجب تسجيل الدخول أولاً!', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # @app.teardown_appcontext
 # def teardown_db(exception):
 #     close_db()
 
 @app.route('/')
 @app.route('/home')
+@login_required
 def index():
     # ما تعملش أي flash هنا أبدًا
     attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
@@ -40,9 +53,18 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # If already logged in, redirect to index
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or not password:
+            flash('جميع الحقول مطلوبة!', 'error')
+            return render_template('login.html')
+        
         try:
             user = query_db(
                 'SELECT id, username, password FROM users WHERE username = %s',
@@ -60,27 +82,59 @@ def login():
     return render_template('login.html')
 
 @app.route('/logout')
+@login_required
 def logout():
     session.clear()
     flash('تم تسجيل الخروج بنجاح', 'success')
-    return render_template('logout.html')
+    return redirect(url_for('login'))
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    # If already logged in, redirect to index
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
+        
+        # Validate all fields
         if not all([username, email, password]):
             flash('جميع الحقول مطلوبة!', 'error')
             return render_template('signup.html')
+        
+        # Validate password length
+        if len(password) < 6:
+            flash('كلمة المرور يجب أن تكون 6 أحرف على الأقل!', 'error')
+            return render_template('signup.html')
+        
+        # Check if username already exists
+        existing_username = query_db(
+            'SELECT id FROM users WHERE username = %s',
+            (username,), one=True
+        )
+        if existing_username:
+            flash('اسم المستخدم موجود بالفعل!', 'error')
+            return render_template('signup.html')
+        
+        # Check if email already exists
+        existing_email = query_db(
+            'SELECT id FROM users WHERE email = %s',
+            (email,), one=True
+        )
+        if existing_email:
+            flash('البريد الإلكتروني مستخدم بالفعل!', 'error')
+            return render_template('signup.html')
+        
+        # Hash password and create user
         hashed_password = generate_password_hash(password)
         try:
             query_db(
                 'INSERT INTO users (username, email, password) VALUES (%s, %s, %s)',
                 (username, email, hashed_password), commit=True
             )
-            flash('تم إنشاء الحساب بنجاح!', 'success')
+            flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             flash(f'خطأ: {str(e)}', 'error')
@@ -93,6 +147,7 @@ def signup():
 #     return render_template("index.html", attendance_data=attendance_data, members_data=members_data)
 
 @app.route('/search', methods=['GET', 'POST'])
+@login_required
 def search_by_name():
     if request.method == 'POST':
         name = request.form['name'].strip().capitalize()
@@ -103,6 +158,7 @@ def search_by_name():
 
 
 @app.route("/add_member", methods=["POST"])
+@login_required
 def add_member_route():
     if request.method != "POST":
         return redirect(url_for("index"))
@@ -185,6 +241,7 @@ def add_member_route():
     
     
 @app.route("/add_member_done")
+@login_required
 def add_member_done():
     new_member_id = request.args.get('new_member_id')
     formatted_date = request.args.get('formatted_date')
@@ -197,12 +254,14 @@ def add_member_done():
     
 
 @app.route("/all_members")
+@login_required
 def all_members():
     members_data = query_db('SELECT * FROM members ORDER BY id ASC')
     return render_template("all_members.html", members_data=members_data)
 
 # === تعديل عضو ===
 @app.route("/edit_member/<int:member_id>", methods=["GET", "POST"])
+@login_required
 def edit_member(member_id):
     if request.method == "GET":
         member = get_member(member_id)
@@ -247,6 +306,7 @@ def edit_member(member_id):
         return redirect(url_for("index"))
 
 @app.route("/show_member_data", methods=["POST"])
+@login_required
 def show_member_data():
     member_id = request.form.get("member_id", "")
     try:
@@ -258,37 +318,57 @@ def show_member_data():
     return render_template("show_member_data.html", member_data=member_data)
 
 @app.route("/search_by_mobile_number", methods=["POST"])
+@login_required
 def search_by_mobile_number():
     phone = request.form.get("member_phone", "").strip()
     member_data = query_db('SELECT * FROM members WHERE phone = %s', (phone,), one=True)
     return render_template("result_phone.html", member_data=member_data)
 
 @app.route("/result_phone", methods=["POST"])
+@login_required
 def result_phone():
     return search_by_mobile_number()
 
 @app.route("/result", methods=["POST"])
+@login_required
 def result():
     name = request.form.get("member_name", "").strip().capitalize()
     member_data = query_db('SELECT * FROM members WHERE name = %s', (name,), one=True)
     return render_template("result.html", member_data=member_data)
 
 @app.route('/change_password', methods=['GET', 'POST'])
+@login_required
 def change_password():
     if request.method == 'POST':
-        username = request.form['username']
-        old_password = request.form['old_password']
-        new_password = request.form['new_password']
-        user = query_db('SELECT * FROM users WHERE username = %s', (username,), one=True)
+        old_password = request.form.get('old_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not all([old_password, new_password, confirm_password]):
+            flash('جميع الحقول مطلوبة!', 'error')
+            return render_template('change_password.html')
+        
+        if new_password != confirm_password:
+            flash('كلمة المرور الجديدة غير متطابقة!', 'error')
+            return render_template('change_password.html')
+        
+        if len(new_password) < 6:
+            flash('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل!', 'error')
+            return render_template('change_password.html')
+        
+        # Get user from session
+        user_id = session.get('user_id')
+        user = query_db('SELECT * FROM users WHERE id = %s', (user_id,), one=True)
+        
         if user and check_password_hash(user['password'], old_password):
             query_db(
-                'UPDATE users SET password = %s WHERE username = %s',
-                (generate_password_hash(new_password), username), commit=True
+                'UPDATE users SET password = %s WHERE id = %s',
+                (generate_password_hash(new_password), user_id), commit=True
             )
             flash('تم تغيير كلمة المرور بنجاح!', 'success')
             return redirect(url_for('success'))
         else:
-            flash('اسم المستخدم أو كلمة المرور القديمة غير صحيحة!', 'error')
+            flash('كلمة المرور القديمة غير صحيحة!', 'error')
     return render_template('change_password.html')
 
 
@@ -297,6 +377,7 @@ from datetime import datetime
 from flask import g
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
+@login_required
 def attendance_table():
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
@@ -346,6 +427,7 @@ def attendance_table():
 
 
 @app.route('/delete_all_data', methods=['POST'])
+@login_required
 def delete_all_data():
     try:
         print("\n--- DEBUG: بدء عملية النقل والتفريغ ---")
@@ -396,6 +478,7 @@ def delete_all_data():
 
 
 @app.route('/attendance_backup', methods=['GET'])
+@login_required
 def attendance_backup_table():
     try:
         # هنسحب كل الداتا من جدول النسخة الاحتياطية
@@ -415,6 +498,7 @@ def attendance_backup_table():
 
 
 @app.route('/success')
+@login_required
 def success():
     return render_template('success.html')
 

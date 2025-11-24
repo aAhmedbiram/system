@@ -80,8 +80,12 @@
             background-color: #4caf50;
         }
         
-        .flashes.error li {
+        .flashes li.error {
             background-color: #e44d26;
+        }
+        
+        .flashes li.success {
+            background-color: #4caf50;
         }
         
         .back-login {
@@ -107,11 +111,11 @@
 </head>
 
 <body>
-    {% with messages = get_flashed_messages() %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
         <ul class="flashes">
-            {% for message in messages %}
-                <li>{{ message }}</li>
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
             {% endfor %}
         </ul>
     {% endif %}
