@@ -248,19 +248,31 @@
     <script>
         document.getElementById('member_id').focus();
 
-        document.addEventListener("DOMContentLoaded", function () {
-            const table = document.querySelector("table");
-            if (table) {
-                table.parentElement.scrollTop = table.parentElement.scrollHeight;
-    
-                document.querySelector(".add-id-form").addEventListener("submit", function () {
-                    setTimeout(() => {
-                        table.parentElement.scrollTop = table.parentElement.scrollHeight;
-                    }, 400);
-                });
-            }
-            document.getElementById("member_id")?.focus();
+// السكرول التلقائي لآخر عضو مضاف - الطريقة اللي شغالة فعلاً
+document.addEventListener("DOMContentLoaded", function () {
+    // نعمل سكرول لتحت أول ما الصفحة تتحمل
+    scrollToBottom();
+
+    // كل ما نضغط Submit على الفورم → نستنى 500 مللي ثانية وبعدين نسكرول تاني
+    const form = document.querySelector(".add-id-form");
+    if (form) {
+        form.addEventListener("submit", function () {
+            setTimeout(scrollToBottom, 500);
         });
+    }
+
+    // نرجع الفوكس على الإنبوت تاني عشان السرعة
+    const input = document.getElementById("member_id");
+    if (input) input.focus();
+});
+
+function scrollToBottom() {
+    // الطريقة دي شغالة حتى لو الجدول داخل div أو body مباشرة
+    window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth"   // ناعم وسريع
+    });
+}
     </script>
 
 </body>
