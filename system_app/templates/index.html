@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rival Gym System</title>
     <style>
+        /* نفس الستايل بتاع all_members.html بالظبط */
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
             background: #111;
             color: #fff;
-            min-height: 100vh;
             background-image: url("/static/signup.jpg");
             background-size: cover;
             background-position: center;
@@ -25,52 +25,49 @@
             text-align: center;
             font-size: 28px;
             font-weight: bold;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
         }
 
-        .container {
-            max-width: 1100px;
-            margin: 30px auto;
-            padding: 20px;
+        .main-content {
             display: flex;
             flex-wrap: wrap;
-            gap: 30px;
             justify-content: center;
+            gap: 30px;
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
-        .card {
+        .add-new-member-section,
+        .search-section {
             background: rgba(34, 34, 34, 0.95);
+            padding: 30px;
             border-radius: 12px;
-            padding: 25px;
-            width: 420px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
             border: 1px solid #444;
-            transition: transform 0.3s, box-shadow 0.3s;
+            flex: 1;
+            min-width: 380px;
+            max-width: 480px;
+            transition: all 0.3s;
         }
 
-        .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 35px rgba(76, 175, 80, 0.3);
+        .add-new-member-section:hover,
+        .search-section:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(76, 175, 80, 0.4);
         }
 
         h2 {
             color: #4caf50;
-            margin-bottom: 20px;
             text-align: center;
+            margin-bottom: 25px;
             font-size: 24px;
         }
 
-        label {
-            display: block;
-            margin: 12px 0 6px;
-            color: #aaa;
-            font-weight: bold;
-        }
-
-        input, select, datalist {
+        input {
             width: 100%;
             padding: 12px;
+            margin-bottom: 16px;
             background: #222;
             border: 1px solid #444;
             border-radius: 6px;
@@ -81,104 +78,82 @@
         input:focus {
             outline: none;
             border-color: #4caf50;
-            box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
         }
 
-        button, .btn {
-            width: 100%;
-            padding: 14px;
-            margin-top: 15px;
-            background: #4caf50;
+        button,
+        .all-members-btn,
+        .attendance-btn,
+        .attendance-backup-btn {
+            background-color: #4caf50;
             color: white;
+            padding: 14px;
             border: none;
             border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
             cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
             transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
         }
 
-        button:hover, .btn:hover {
-            background: #66d66a;
+        button:hover,
+        .all-members-btn:hover,
+        .attendance-btn:hover,
+        .attendance-backup-btn:hover {
+            background-color: #66d66a;
             transform: scale(1.03);
         }
 
-        .btn-secondary {
-            background: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #555;
-        }
-
-        .btn-danger {
-            background: #c62828;
-        }
-
-        .btn-danger:hover {
-            background: #e53935;
-        }
-
-        .btn-logout {
-            background: #555;
-        }
-
-        .btn-logout:hover {
-            background: #777;
-        }
-
-        .gender-group {
+        .gender-radio-group {
             display: flex;
-            gap: 20px;
             justify-content: center;
+            gap: 30px;
             margin: 15px 0;
         }
 
-        .gender-group label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 16px;
-        }
-
-        /* Flash Messages */
         .flash-message {
             padding: 15px;
             margin: 20px auto;
-            max-width: 800px;
+            max-width: 700px;
             border-radius: 10px;
             font-weight: bold;
             text-align: center;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            animation: fadeIn 0.6s ease;
-        }
-
-        .flash-message.success {
-            background: rgba(46, 125, 50, 0.9);
+            background: rgba(46, 125, 50, 0.95);
             color: white;
             border: 1px solid #4caf50;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
 
         .flash-message.error {
-            background: rgba(198, 40, 40, 0.9);
-            color: white;
-            border: 1px solid #e53935;
+            background: rgba(198, 40, 40, 0.95);
+            border-color: #e53935;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .logout {
+            background-color: #555 !important;
         }
 
-        .bottom-buttons {
+        .logout:hover {
+            background-color: #777 !important;
+        }
+
+        .center-box a {
+            display: block;
+            width: 100%;
             text-align: center;
-            margin: 40px 0;
+            background: #2196F3;
+            padding: 14px;
+            border-radius: 8px;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 20px;
         }
 
-        .bottom-buttons a, .bottom-buttons button {
-            display: inline-block;
-            margin: 10px;
-            min-width: 220px;
+        .center-box a:hover {
+            background: #42a5f5;
         }
     </style>
 </head>
@@ -196,69 +171,66 @@
     {% endwith %}
 
     <header>
-        Rival Gym System
+        <h1>Rival Gym System</h1>
+        <div class="logo"></div>
     </header>
 
-    <div class="container">
-
-        <!-- البحث -->
-        <div class="card">
-            <h2>البحث عن عضو</h2>
-            
-            <form action="{{ url_for('show_member_data') }}" method="post">
-                <label>رقم العضوية</label>
-                <input type="text" name="member_id" required placeholder="أدخل رقم العضوية">
-                <button type="submit">بحث بالرقم</button>
+    <div class="main-content">
+        <section class="search-section">
+            <h2>Search</h2>
+            <form class="search-id-form" action="{{ url_for('show_member_data') }}" method="post">
+                <label class="search-member-id" for="member_id">Enter Member ID:</label>
+                <input class="search-id" type="text" id="member_id" name="member_id" required>
+                <button class="search-member-id-button" type="submit">Search</button>
             </form>
-
-            <form action="{{ url_for('result') }}" method="post">
-                <label>اسم العضو</label>
-                <input type="text" name="member_name" required placeholder="أدخل الاسم">
-                <button type="submit" class="btn-secondary">بحث بالاسم</button>
+            <form class="search-name-form" method="post" action="{{ url_for('result') }}">
+                <label class="search-member-name" for="member_name">Enter member name:</label>
+                <input class="search-name" type="text" id="member_name" name="member_name" required>
+                <button class="search-member-name-button" type="submit">Search</button>
             </form>
-
-            <form action="{{ url_for('search_by_mobile_number') }}" method="post">
-                <label>رقم الجوال</label>
-                <input type="text" name="member_phone" required placeholder="أدخل رقم الجوال">
-                <button type="submit" class="btn-secondary">بحث بالجوال</button>
+            <form class="search-phone-form" method="post" action="{{ url_for('search_by_mobile_number') }}">
+                <label class="search-member-phone" for="member_phone">Enter member mobile number:</label>
+                <input class="search-phone" type="number" id="member_phone" name="member_phone" required>
+                <button class="search-member-phone-button" type="submit">Search</button>
             </form>
+            <br><br><br><br><br><br><br><br><br>
+            <div class="center-box">
+                <a class="all-members-btn" href="{{ url_for('all_members') }}">View All Members</a>
+            </div>
+        </section>
 
-            <a href="{{ url_for('all_members') }}" class="btn" style="margin-top: 20px; background:#2196F3;">
-                عرض كل الأعضاء
-            </a>
-        </div>
+        <section class="add-new-member-section">
+            <h2 class="add-new-member-h2">Add New Member</h2>
+            <form class="add-new-member-form" action="{{ url_for('add_member_route') }}" method="post">
+                <label class="label_name" for="member_name">Name:</label>
+                <input class="name-input" type="text" id="member_name" name="member_name" required>
 
-        <!-- إضافة عضو جديد -->
-        <div class="card">
-            <h2>إضافة عضو جديد</h2>
-            <form action="{{ url_for('add_member_route') }}" method="post">
-                <label>الاسم</label>
-                <input type="text" name="member_name" required>
+                <label class="label_email" for="member_email">Email:</label>
+                <input class="email-input" type="email" id="member_email" name="member_email" required>
 
-                <label>الإيميل</label>
-                <input type="email" name="member_email" required>
+                <label class="label_phone" for="member_phone">Phone:</label>
+                <input class="phone-input" type="text" id="member_phone" name="member_phone" required>
 
-                <label>رقم الجوال</label>
-                <input type="text" name="member_phone" required>
+                <label for="member_birthdate">Birthdate:</label>
+                <input type="date" id="member_birthdate" name="member_birthdate" required>
 
-                <label>تاريخ الميلاد</label>
-                <input type="date" name="member_birthdate" required>
-
-                <label>الجنس</label>
-                <div class="gender-group">
-                    <label><input type="radio" name="choice" value="Male" required> ذكر</label>
-                    <label><input type="radio" name="choice" value="Female"> أنثى</label>
+                <div class="label_gender">Gender:</div>
+                <div class="gender-radio-group">
+                    <label class="label_male" for="male">Male:</label>
+                    <input class="male-radio" type="radio" id="male" name="choice" value="Male">
+                    <label class="label_female" for="female">Female:</label>
+                    <input class="female-radio" type="radio" id="female" name="choice" value="Female">
                 </div>
 
-                <label>تاريخ بدء الاشتراك الفعلي</label>
-                <input type="date" name="member_actual_starting_date" required>
+                <label for="member_actual_starting_date">Actual starting date:</label>
+                <input type="date" id="member_actual_starting_date" name="member_actual_starting_date" required>
 
-                <label>تاريخ بدء الحساب</label>
-                <input type="date" name="member_starting_date" required>
+                <label for="member_starting_date">Starting date:</label>
+                <input type="date" id="member_starting_date" name="member_starting_date" required>
 
-                <label>الباقة</label>
-                <input list="packages" name="member_membership_packages" required placeholder="اختر الباقة">
-                <datalist id="packages">
+                <label for="member_membership_packages">Membership packages:</label>
+                <input list="membership_packages" id="member_membership_packages" name="member_membership_packages" required>
+                <datalist class="packages" id="membership_packages">
                     <option value="1 Month">
                     <option value="2 Months">
                     <option value="3 Months">
@@ -267,23 +239,18 @@
                     <option value="12 Months">
                 </datalist>
 
-                <button type="submit">إضافة العضو</button>
+                <button class="add-new-member-button" type="submit">Add Member</button>
             </form>
-        </div>
-
+        </section>
     </div>
 
-    <div class="bottom-buttons">
-        <a href="{{ url_for('attendance_table') }}" class="btn" style="background:#ff9800;">جدول الحضور</a>
-        <a href="#" class="btn btn-danger" onclick="if(confirm('هل أنت متأكد؟ سيتم نقل الحضور للنسخ الاحتياطي وتفريغ الجدول!')) document.getElementById('deleteForm').submit();">
-            نقل الحضور للنسخ الاحتياطي وتفريغ الجدول
-        </a>
-        <form id="deleteForm" action="{{ url_for('delete_all_data') }}" method="POST" style="display:inline;"></form>
-        
-        <form action="{{ url_for('logout') }}" method="get" style="display:inline;">
-            <button type="submit" class="btn btn-logout">تسجيل الخروج</button>
-        </form>
-    </div>
+    <br>
+    <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance table</a>
+    <form action="{{ url_for('logout') }}" method="get">
+        <button class="logout" type="submit">Logout</button>
+    </form>
+    <br>
+    <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
 
 </body>
 </html>
