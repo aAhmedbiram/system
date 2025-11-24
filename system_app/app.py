@@ -555,9 +555,8 @@ def send_email():
                     flash('Email password not configured!', 'error')
                     return render_template('send_email.html')
                 
-                # Setup SMTP server
+                # Setup SMTP server - try both ports
                 smtp_server = 'smtp.gmail.com'
-                smtp_port = 587
                 
                 # Send email to each member
                 sent_count = 0
@@ -565,12 +564,37 @@ def send_email():
                 server = None
                 
                 try:
-                    print("DEBUG: Connecting to SMTP server...")
-                    server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
-                    server.starttls()
-                    print("DEBUG: Logging in to SMTP server...")
-                    server.login(sender_email, sender_password)
-                    print("DEBUG: Successfully logged in")
+                    print("DEBUG: Attempting to connect to SMTP server...")
+                    # Try port 587 with STARTTLS first
+                    try:
+                        print("DEBUG: Trying port 587 with STARTTLS...")
+                        server = smtplib.SMTP(smtp_server, 587, timeout=30)
+                        server.starttls()
+                        print("DEBUG: STARTTLS successful, logging in...")
+                        server.login(sender_email, sender_password)
+                        print("DEBUG: Successfully logged in via port 587")
+                    except (smtplib.SMTPException, OSError, ConnectionError, Exception) as e:
+                        print(f"DEBUG: Port 587 failed: {e}, trying port 465 with SSL...")
+                        if server:
+                            try:
+                                server.quit()
+                            except:
+                                pass
+                        # Fallback to port 465 with SSL
+                        try:
+                            import ssl
+                            context = ssl.create_default_context()
+                            server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30, context=context)
+                            print("DEBUG: SSL connection successful, logging in...")
+                            server.login(sender_email, sender_password)
+                            print("DEBUG: Successfully logged in via port 465")
+                        except (OSError, ConnectionError) as ssl_error:
+                            # Network is completely unreachable
+                            error_msg = f'Cannot connect to Gmail SMTP server. Network error: {str(ssl_error)}. '
+                            error_msg += 'This might be due to firewall restrictions or network configuration. '
+                            error_msg += 'Please check your server\'s network settings or contact your hosting provider.'
+                            print(f"CRITICAL: Both ports failed. Last error: {ssl_error}")
+                            raise Exception(error_msg)
                     
                     for idx, member in enumerate(members):
                         recipient_email = None
@@ -623,6 +647,16 @@ def send_email():
                 except smtplib.SMTPAuthenticationError as e:
                     error_msg = f'Email authentication failed: {str(e)}. Please check GMAIL_APP_PASSWORD.'
                     print(f"SMTP Auth Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    flash(error_msg, 'error')
+                except (OSError, ConnectionError) as e:
+                    error_msg = f'Network connection error: {str(e)}. '
+                    error_msg += 'The server cannot reach Gmail\'s SMTP server. This might be due to: '
+                    error_msg += '1) Firewall blocking outbound SMTP connections, '
+                    error_msg += '2) Network configuration issues, or '
+                    error_msg += '3) Server restrictions. Please contact your hosting provider or check firewall settings.'
+                    print(f"Network Error: {e}")
                     import traceback
                     traceback.print_exc()
                     flash(error_msg, 'error')
