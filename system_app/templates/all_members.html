@@ -11,13 +11,13 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
-            color: #000;
+            background: #111;
+            color: #fff;
         }
 
         header {
-            background-color: #333;
-            color: white;
+            background-color: #222;
+            color: #4caf50;
             padding: 1em;
             text-align: center;
             font-size: 24px;
@@ -29,96 +29,91 @@
         }
 
         h2 {
-            color: #333;
+            color: #4caf50;
             margin-bottom: 10px;
         }
 
-        /* Home Button */
         .index-btn {
-            background-color: #333;
+            background-color: #4caf50;
             color: #fff;
             padding: 10px 20px;
             border: none;
             cursor: pointer;
             text-decoration: none;
             font-size: 16px;
-            border-radius: 4px;
+            border-radius: 6px;
             margin-bottom: 10px;
             display: inline-block;
         }
 
         .index-btn:hover {
-            background-color: #555;
+            background-color: #66d66a;
         }
 
-        /* Download Button */
-        .download-btn {
-            background-color: #007BFF;
+        .download-btn{
+            background-color: #2196F3;
             color: #fff;
             padding: 10px 20px;
             border: none;
             cursor: pointer;
+            text-decoration: none;
             font-size: 16px;
-            border-radius: 4px;
+            border-radius: 6px;
             margin-bottom: 10px;
         }
 
-        .download-btn:hover {
-            background-color: #0a84ff;
+        .download-btn:hover{
+            background-color:#42a5f5;
         }
 
         .table-container {
             max-height: 80vh;
+            border: 1px solid #444;
             overflow-y: auto;
-            border: 1px solid #ccc;
-            background: white;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            background: white;
+            background: #222;
         }
 
         th,
         td {
             padding: 10px;
-            border: 1px solid #ddd;
+            border: 1px solid #444;
             text-align: center;
-            color: #000;
+            color: #fff;
         }
 
         th {
             background-color: #333;
-            color: #fff;
+            color: #4caf50;
             cursor: pointer;
             position: sticky;
             top: 0;
             z-index: 10;
         }
 
-        /* Filter row */
         .filter-row {
             position: sticky;
-            top: 44px;
-            background: #f4f4f4;
+            top: 42px;
+            background: #222;
             z-index: 9;
         }
 
         .filter-row input {
             width: 90%;
             padding: 6px;
-            border: 1px solid #333;
+            border: 1px solid #4caf50;
             border-radius: 4px;
+            background: #111;
+            color: white;
             text-align: center;
-            background: white;
-            color: black;
         }
 
-        /* Edit link */
         .edit-link {
-            color: #007BFF;
-            text-decoration: none;
+            color: #2196F3;
         }
 
         .edit-link:hover {
@@ -136,7 +131,6 @@
     <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
 
 <div class="table-container">
-
 <table id="membersTable">
 
     <thead>
@@ -180,18 +174,15 @@
         <td>{{ member.membership_packages }}</td>
         <td>{{ member.membership_fees }}</td>
         <td>{{ member.membership_status }}</td>
-        <td>
-            <a class="edit-link" href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a>
-        </td>
+        <td><a class="edit-link"
+                href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a></td>
     </tr>
     {% endfor %}
     </tbody>
-
 </table>
-
 </div>
-</section>
 
+</section>
 
 <script>
 
