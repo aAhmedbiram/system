@@ -4,61 +4,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Changed Successfully</title>
+    <title>Password Changed Successfully - Rival Gym System</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
+            background: #111;
+            color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
         }
         
         div {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
+            background: rgba(34, 34, 34, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            width: 100%;
+            max-width: 400px;
             text-align: center;
+            transition: all 0.3s;
+            margin-top: 80px;
+        }
+
+        div:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(76, 175, 80, 0.4);
         }
         
         h2 {
-            color: #333;
+            color: #4caf50;
             margin-bottom: 10px;
+            font-size: 24px;
         }
         
         p {
-            color: #555;
+            color: #fff;
             margin-bottom: 20px;
         }
         
         a {
-            background-color: #555;
-            color: #fff;
-            padding: 12px;
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             width: 100%;
             font-size: 16px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+            box-sizing: border-box;
         }
         
         a:hover {
-            background-color: black;
+            background-color: #66d66a;
+            transform: scale(1.03);
         }
         
     </style>
 </head>
 
 <body>
+    <header>
+        <h1>Rival Gym System</h1>
+    </header>
     <div>
         <h2>Password Changed Successfully</h2>
         <p>Your password has been changed successfully.</p>
-        <p>If you wish to log in again, click <a href="{{ url_for('login') }}">here</a></p>
+        <a href="{{ url_for('login') }}">Login</a>
     </div>
 </body>
 

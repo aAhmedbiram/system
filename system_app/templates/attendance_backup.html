@@ -1,23 +1,40 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>جدول النسخة الاحتياطية - Attendance Backup</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Backup - Rival Gym System</title>
 
     <style>
         body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
             background: #111;
             color: #fff;
-            font-family: Tahoma, sans-serif;
-            direction: rtl;
-            padding: 20px;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
         }
 
         h1 {
             text-align: center;
             margin-bottom: 25px;
             color: #4caf50;
-            font-size: 26px;
+            font-size: 24px;
         }
 
         .table-container {
@@ -63,24 +80,33 @@
 
         .filter-row input {
             width: 95%;
-            padding: 6px;
-            border: 1px solid #4caf50;
-            border-radius: 4px;
-            background: #111;
+            padding: 12px;
+            border: 1px solid #444;
+            border-radius: 6px;
+            background: #222;
             color: white;
             text-align: center;
+            font-size: 16px;
+        }
+
+        .filter-row input:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
         }
 
         /* Buttons */
         .btn {
-            padding: 10px 22px;
+            padding: 14px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
+            font-weight: bold;
             display: inline-block;
             margin: 20px 10px 0 10px;
-            transition: 0.25s;
+            transition: all 0.3s;
+            text-decoration: none;
         }
 
         .btn-download {
@@ -89,49 +115,53 @@
         }
 
         .btn-download:hover {
-            background: #45a049;
+            background: #66d66a;
+            transform: scale(1.03);
         }
 
         .btn-home {
-            background: #333;
-            color: #4caf50;
-            border: 1px solid #4caf50;
+            background: #4caf50;
+            color: white;
         }
 
         .btn-home:hover {
-            background: #4caf50;
-            color: black;
+            background: #66d66a;
+            transform: scale(1.03);
         }
     </style>
 </head>
 <body>
+    <header>
+        <h1>Rival Gym System - Attendance Backup</h1>
+    </header>
 
-<h1>النسخة الاحتياطية من الحضور</h1>
+    <div style="padding: 20px;">
+        <h1>Attendance Backup</h1>
 
 <div class="table-container">
 <table id="attendanceTable">
 
     <thead>
     <tr>
-        <th onclick="sortTable(0)">الترتيب ▲▼</th>
+        <th onclick="sortTable(0)"># ▲▼</th>
         <th onclick="sortTable(1)">ID ▲▼</th>
-        <th onclick="sortTable(2)">الاسم ▲▼</th>
-        <th onclick="sortTable(3)">تاريخ الانتهاء ▲▼</th>
-        <th onclick="sortTable(4)">حالة الاشتراك ▲▼</th>
-        <th onclick="sortTable(5)">وقت الحضور ▲▼</th>
-        <th onclick="sortTable(6)">تاريخ الحضور ▲▼</th>
-        <th onclick="sortTable(7)">اليوم ▲▼</th>
+        <th onclick="sortTable(2)">Name ▲▼</th>
+        <th onclick="sortTable(3)">End Date ▲▼</th>
+        <th onclick="sortTable(4)">Status ▲▼</th>
+        <th onclick="sortTable(5)">Time ▲▼</th>
+        <th onclick="sortTable(6)">Date ▲▼</th>
+        <th onclick="sortTable(7)">Day ▲▼</th>
     </tr>
 
     <tr class="filter-row">
-        <th><input type="text" onkeyup="filterTable(0)" placeholder="بحث"></th>
-        <th><input type="text" onkeyup="filterTable(1)" placeholder="بحث"></th>
-        <th><input type="text" onkeyup="filterTable(2)" placeholder="بحث"></th>
-        <th><input type="text" onkeyup="filterTable(3)" placeholder="بحث"></th>
-        <th><input type="text" onkeyup="filterTable(4)" placeholder="بحث"></th>
-        <th><input type="text" onkeyup="filterTable(5)" placeholder="بحث"></th>
-        <th><input type="text" onkeyup="filterTable(6)" placeholder="بحث"></th>
-        <th><input type="text" onkeyup="filterTable(7)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(0)" placeholder="Search"></th>
+        <th><input type="text" onkeyup="filterTable(1)" placeholder="Search"></th>
+        <th><input type="text" onkeyup="filterTable(2)" placeholder="Search"></th>
+        <th><input type="text" onkeyup="filterTable(3)" placeholder="Search"></th>
+        <th><input type="text" onkeyup="filterTable(4)" placeholder="Search"></th>
+        <th><input type="text" onkeyup="filterTable(5)" placeholder="Search"></th>
+        <th><input type="text" onkeyup="filterTable(6)" placeholder="Search"></th>
+        <th><input type="text" onkeyup="filterTable(7)" placeholder="Search"></th>
     </tr>
     </thead>
 
@@ -152,8 +182,11 @@
 </table>
 </div>
 
-<button class="btn btn-download" onclick="downloadCSV()">Download CSV</button>
-<a href="/" class="btn btn-home">Home</a>
+<div style="text-align: center; margin-top: 20px;">
+    <button class="btn btn-download" onclick="downloadCSV()">Download CSV</button>
+    <a href="/" class="btn btn-home">Home</a>
+</div>
+    </div>
 
 <!-- ========================= JS ========================== -->
 <script>
