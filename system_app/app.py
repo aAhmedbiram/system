@@ -395,6 +395,22 @@ def delete_all_data():
 
 
 
+@app.route('/attendance_backup', methods=['GET'])
+def attendance_backup_table():
+    try:
+        # هنسحب كل الداتا من جدول النسخة الاحتياطية
+        data = query_db("SELECT * FROM attendance_backup ORDER BY id ASC")
+        return render_template("attendance_backup.html", backup_data=data)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        flash("حدث خطأ أثناء تحميل النسخة الاحتياطية!", "error")
+        return redirect(url_for('attendance_table'))
+
+
+
+
 
 
 
