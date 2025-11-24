@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance Table - Rival Gym System</title>
     <style>
+        /* خلفية داكنة نظيفة بدون صورة = سرعة رهيبة */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -26,43 +27,34 @@
             backdrop-filter: blur(8px);
         }
 
-        /* الفورم في الزاوية - متوسطة تمامًا وثابتة */
+        /* الفورم الثابتة - أسرع وأخف */
         .add-id-form-container {
             position: fixed;
-            top: 50%;                    /* في منتصف الشاشة عموديًا */
+            top: 20px;
             right: 20px;
-            transform: translateY(-50%); /* يخليها في النص بالظبط */
             width: 280px;
             background: rgba(27, 38, 59, 0.98);
-            padding: 20px;
+            padding: 18px;
             border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
-            border: 2px solid #4caf50;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            border: 1px solid #4caf50;
             z-index: 1000;
-            text-align: center;
-        }
-
-        .add-id-form-container h3 {
-            margin: 0 0 15px 0;
-            color: #4caf50;
-            font-size: 18px;
         }
 
         .add-id-form-container input {
             width: 100%;
-            padding: 14px;
+            padding: 12px;
             background: #112240;
             border: 1px solid #4caf50;
-            border-radius: 8px;
+            border-radius: 6px;
             color: #fff;
-            font-size: 18px;
-            text-align: center;
-            margin-bottom: 12px;
+            font-size: 16px;
+            margin-bottom: 10px;
         }
 
         .add-id-form-container input:focus {
             outline: none;
-            box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.7);
         }
 
         .add-id-form-container button {
@@ -73,24 +65,38 @@
             border-radius: 8px;
             color: white;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 17px;
             cursor: pointer;
-            transition: 0.3s;
         }
 
         .add-id-form-container button:hover {
             background: #66d66a;
-            transform: scale(1.05);
         }
 
-        /* باقي الستايل زي ما هو */
-        .flash-message { /* ... نفس اللي فوق ... */ }
-        .flash-message.error { background: rgba(198, 40, 40, 0.95); border-color: #e53935; }
+        /* الرسايل */
+        .flash-message {
+            padding: 16px;
+            margin: 20px auto;
+            max-width: 800px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(46, 125, 50, 0.95);
+            color: white;
+            border: 1px solid #4caf50;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
 
+        .flash-message.error {
+            background: rgba(198, 40, 40, 0.95);
+            border-color: #e53935;
+        }
+
+        /* الجدول - أسرع وأنظف */
         .table-container {
             max-width: 1400px;
             margin: 30px auto;
-            padding: 0 20px 100px 20px; /* مساحة تحت عشان الـ scroll */
+            padding: 0 20px;
         }
 
         table {
@@ -123,38 +129,41 @@
             background: rgba(76, 175, 80, 0.2);
         }
 
+        /* الأزرار تحت */
         .bottom-actions {
             text-align: center;
-            margin: 60px 0;
+            margin: 50px 0;
+        }
+
+        .bottom-actions button,
+        .bottom-actions a {
+            display: inline-block;
+            padding: 14px 40px;
+            margin: 0 15px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+            min-width: 260px;
+            transition: all 0.3s;
         }
 
         .delete-all-btn {
             background: #c62828;
             color: white;
-            padding: 14px 40px;
             border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: bold;
             cursor: pointer;
-            min-width: 260px;
         }
 
         .delete-all-btn:hover {
             background: #e53935;
             transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(198, 40, 40, 0.5);
         }
 
         .home-btn {
             background: #555;
             color: white;
-            padding: 14px 40px;
-            text-decoration: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: bold;
-            min-width: 260px;
-            display: inline-block;
         }
 
         .home-btn:hover {
@@ -164,9 +173,9 @@
 
         .no-data {
             text-align: center;
-            padding: 100px;
-            font-size: 26px;
-            color: #666;
+            padding: 80px;
+            font-size: 24px;
+            color: #aaa;
         }
     </style>
 </head>
@@ -182,22 +191,15 @@
 
     <header>Attendance Table</header>
 
-    <!-- الفورم في منتصف الشاشة من اليمين -->
+    <!-- فورم الإضافة -->
     <div class="add-id-form-container">
-        <h3>Add Attendance</h3>
         <form action="{{ url_for('attendance_table') }}" method="post">
-            <input type="text" 
-                   id="member_id" 
-                   name="member_id" 
-                   required 
-                   autocomplete="off" 
-                   autofocus 
-                   placeholder="Enter Member ID">
-            <button type="submit">Add Now</button>
+            <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus placeholder="Enter Member ID">
+            <button type="submit">Add Attendance</button>
         </form>
     </div>
 
-    <div class="table-container" id="tableContainer">
+    <div class="table-container">
         {% if members_data %}
         <table>
             <thead>
@@ -235,31 +237,16 @@
     <div class="bottom-actions">
         <form action="{{ url_for('delete_all_data') }}" method="post" style="display:inline;">
             <button type="submit" class="delete-all-btn"
-                    onclick="return confirm('Are you 100% sure?\nAll attendance will be moved to backup!');">
+                    onclick="return confirm('Are you 100% sure?\nAll attendance will be moved to backup and table cleared!');">
                 Move to Backup & Clear
             </button>
         </form>
+
         <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
     </div>
 
-    <!-- السحر الحقيقي: الصفحة تنزل لوحدها لما نضيف عضو جديد -->
     <script>
-        // لما نضيف عضو جديد → ننزل لآخر الجدول تلقائي
-        document.addEventListener("DOMContentLoaded", function () {
-            const tableContainer = document.getElementById("tableContainer");
-            if (tableContainer) {
-                tableContainer.scrollTop = tableContainer.scrollHeight;
-            }
-            document.getElementById('member_id').focus();
-        });
-
-        // كل ما نضيف عضو → ننزل لتحت تاني
-        document.querySelector('form').addEventListener('submit', function() {
-            setTimeout(() => {
-                const tableContainer = document.getElementById("tableContainer");
-                tableContainer.scrollTop = tableContainer.scrollHeight;
-            }, 300);
-        });
+        document.getElementById('member_id').focus();
     </script>
 
 </body>
