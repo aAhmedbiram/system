@@ -1,197 +1,280 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance Table</title>
-
+    <title>Attendance Table - Rival Gym System</title>
     <style>
-        form { display: block !important; margin: 20px 0; }
-        #delete-form { display: inline-block; margin-top: 30px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #fff;
+            min-height: 100vh;
+            background-image: url("/static/signup.jpg");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
 
-        .flash-message {
-            padding: 15px;
-            margin: 20px auto;
-            max-width: 600px;
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 1.5em;
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+        }
+
+        /* الفورم الثابتة في الزاوية */
+        .add-id-form-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 280px;
+            background: rgba(34, 34, 34, 0.97);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .add-id-form-container label {
+            color: #aaa;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .add-id-form-container input {
+            width: 100%;
+            padding: 12px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .add-id-form-container input:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+        }
+
+        .add-id-form-container button {
+            width: 100%;
+            padding: 14px;
+            background: #4caf50;
+            color: white;
+            border: none;
             border-radius: 8px;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .add-id-form-container button:hover {
+            background: #66d66a;
+            transform: scale(1.03);
+        }
+
+        /* الرسايل */
+        .flash-message {
+            padding: 16px;
+            margin: 20px auto;
+            max-width: 800px;
+            border-radius: 10px;
             font-weight: bold;
             text-align: center;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            font-size: 1.1em;
-            animation: fadeIn 0.5s ease;
+            background: rgba(46, 125, 50, 0.95);
+            color: white;
+            border: 1px solid #4caf50;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            animation: fadeIn 0.6s ease;
         }
+
         .flash-message.error {
-            background-color: #ffebee;
-            color: #c62828;
-            border: 1px solid #ef9a9a;
-        }
-        .flash-message.success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            border: 1px solid #a5d6a7;
+            background: rgba(198, 40, 40, 0.95);
+            border-color: #e53935;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
+            from { opacity: 0; transform: translateY(-20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            text-align: center;
+        /* الجدول */
+        .table-container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+            overflow-x: auto;
         }
-
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-
-        .add-id-form-container {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 200px;
-            padding: 10px;
-            background-color: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            z-index: 1000;
-        }
-
-        input {
-            width: calc(100% - 20px);
-            padding: 10px;
-            margin-bottom: 16px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        button {
-            background-color: #555;
-            color: #fff;
-            padding: 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            font-size: 16px;
-        }
-        button:hover { background-color: black; }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border: 1px solid #ddd;
+            background: rgba(34, 34, 34, 0.95);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
         }
 
         th {
-            background-color: #555;
-            color: #fff;
+            background: #333;
+            color: #4caf50;
+            padding: 16px;
+            text-align: center;
+            font-weight: bold;
             position: sticky;
             top: 0;
+            z-index: 10;
+            border-bottom: 2px solid #4caf50;
         }
 
-        tr:hover { background-color: #f5f5f5; }
+        td {
+            padding: 14px;
+            text-align: center;
+            border-bottom: 1px solid #444;
+        }
+
+        tr:hover {
+            background: rgba(76, 175, 80, 0.15);
+        }
+
+        /* الأزرار تحت */
+        .bottom-actions {
+            text-align: center;
+            margin: 50px 0;
+        }
+
+        .bottom-actions button,
+        .bottom-actions a {
+            display: inline-block;
+            padding: 14px 40px;
+            margin: 0 15px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+            min-width: 240px;
+            transition: all 0.3s;
+        }
+
+        .delete-all-btn {
+            background: #c62828;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .delete-all-btn:hover {
+            background: #e53935;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(198, 40, 40, 0.5);
+        }
+
+        .home-btn {
+            background: #555;
+            color: white;
+        }
+
+        .home-btn:hover {
+            background: #777;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+        }
+
+        /* لما الجدول فاضي */
+        .no-data {
+            text-align: center;
+            padding: 60px;
+            font-size: 22px;
+            color: #aaa;
+        }
     </style>
 </head>
-
 <body>
 
-<!-- Flash Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-{% for category, message in messages %}
-<div class="flash-message {{ category }}">{{ message }}</div>
-{% endfor %}
-{% endif %}
-{% endwith %}
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ category }}">{{ message | safe }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-<!-- Add ID Form -->
-<div class="add-id-form-container">
-    <form class="add-id-form"
-        action="{{ url_for('attendance_table') }}"
-        method="post"
-        onsubmit="return this.member_id.value.trim() !== '' || (alert('ادخل رقم العضو أولاً!'), false);">
+    <header>Attendance Table</header>
 
-        <label for="member_id">Enter Member ID:</label>
-        <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus>
-        <button type="submit">Add</button>
-    </form>
-</div>
+    <!-- Add ID Form (ثابتة في الزاوية) -->
+    <div class="add-id-form-container">
+        <form class="add-id-form" action="{{ url_for('attendance_table') }}" method="post">
+            <label for="member_id">Enter Member ID:</label>
+            <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus placeholder="Type ID and press Enter">
+            <button type="submit">Add Attendance</button>
+        </form>
+    </div>
 
-<section class="member-data">
-    <h2>Attendance Table</h2>
+    <div class="table-container">
+        {% if members_data %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                    <th>Date</th>
+                    <th>Day</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in members_data %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ member.member_id }}</td>
+                    <td>{{ member.name }}</td>
+                    <td>{{ member.end_date or '-' }}</td>
+                    <td>{{ member.membership_status or 'Active' }}</td>
+                    <td>{{ member.attendance_time }}</td>
+                    <td>{{ member.attendance_date }}</td>
+                    <td>{{ member.day }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="no-data">No attendance records yet today</div>
+        {% endif %}
+    </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>number</th>
-                <th>ID</th>
-                <th>Name</th>
-                <th>End date</th>
-                <th>Membership status</th>
-                <th>Attendance time</th>
-                <th>Attendance date</th>
-                <th>Day</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for member in members_data %}
-            <tr>
-                <td>{{ member['num'] }}</td>
-                <td>{{ member['member_id'] }}</td>
-                <td>{{ member['name'] }}</td>
-                <td>{{ member['end_date'] }}</td>
-                <td>{{ member['membership_status'] }}</td>
-                <td>{{ member['attendance_time'] }}</td>
-                <td>{{ member['attendance_date'] }}</td>
-                <td>{{ member['day'] }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    {% if not members_data %}
-    <p>No members found</p>
-    {% endif %}
-
-    <!-- Delete All + Home Button -->
-    <div style="text-align: center; margin-top: 50px;">
-        <form action="{{ url_for('delete_all_data') }}" method="post" style="display:inline-block;">
-            <button type="submit"
-                    onclick="return confirm('متأكد 100%؟ كل بيانات الحضور هتتمسح وتتنقل للـ Backup!');"
-                    style="background:#c62828; color:white; padding:15px 50px; font-size:18px; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">
-                Delete All Data
+    <!-- الأزرار تحت -->
+    <div class="bottom-actions">
+        <form action="{{ url_for('delete_all_data') }}" method="post" style="display:inline;">
+            <button type="submit" class="delete-all-btn"
+                    onclick="return confirm('Are you 100% sure?\nAll today\'s attendance will be moved to backup and table will be cleared!');">
+                Move to Backup & Clear Table
             </button>
         </form>
 
-        <a href="{{ url_for('index') }}"
-           style="background:#555; color:white; padding:15px 50px; text-decoration:none; border-radius:8px; font-size:18px;">
-            Home
-        </a>
+        <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
     </div>
-</section>
 
-<!-- Auto Focus -->
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
+    <!-- Auto Focus -->
+    <script>
         document.getElementById('member_id').focus();
-    });
-</script>
+    </script>
 
 </body>
 </html>
