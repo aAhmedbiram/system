@@ -1,16 +1,16 @@
-# queries.py - النسخة النهائية المضمونة على Railway
+# queries.py - Final guaranteed version on Railway
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import IntegrityError
 from datetime import date
 
-# === قراءة الـ DATABASE_URL ===
+# === Read DATABASE_URL ===
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGURL")
 if not DATABASE_URL:
     raise Exception("DATABASE_URL not found. Make sure it's set in Railway Variables.")
 
-# === إنشاء الجداول (مرة واحدة عند التشغيل) ===
+# === Create tables (once on startup) ===
 def create_table():
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cr = conn.cursor()
@@ -78,12 +78,12 @@ def create_table():
         conn.close()
 
 
-# === تنفيذ الاستعلامات - الحل النهائي: connection جديد كل مرة ===
+# === Execute queries - Final solution: new connection every time ===
 def query_db(query, args=(), one=False, commit=False):
     conn = None
     cur = None
     try:
-        # كل استعلام = connection جديد → مفيش stale connection أبدًا
+        # Every query = new connection → no stale connection ever
         conn = psycopg2.connect(DATABASE_URL, sslmode='require')
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(query, args)
@@ -113,7 +113,7 @@ def query_db(query, args=(), one=False, commit=False):
             conn.close()
 
 
-# === باقي الدوال (كما هي، لأنها ممتازة) ===
+# === Rest of functions (as they are, because they're excellent) ===
 def add_member(name, email, phone, age, gender, birthdate,
             actual_starting_date, starting_date, end_date,
             membership_packages, membership_fees, membership_status,
@@ -185,7 +185,7 @@ def search_members(name=None, phone=None, email=None):
     return query_db(query, tuple(args))
 
 
-# === دوال الحضور ===
+# === Attendance functions ===
 def add_attendance(member_id, name, end_date, membership_status):
     from datetime import datetime
     try:
@@ -212,7 +212,7 @@ def get_today_attendance():
     return query_db('SELECT * FROM attendance WHERE attendance_date = %s ORDER BY num DESC', (today,))
 
 
-# === دوال المستخدمين ===
+# === User functions ===
 def add_user(username, email, password_hash):
     try:
         query_db('INSERT INTO users (username, email, password) VALUES (%s, %s, %s)',
@@ -225,7 +225,7 @@ def get_user_by_username(username):
     return query_db('SELECT * FROM users WHERE username = %s', (username,), one=True)
 
 
-# === دوال التحقق ===
+# === Verification functions ===
 def check_name_exists(name):
     result = query_db('SELECT 1 FROM members WHERE name = %s LIMIT 1', (name,), one=True)
     return result is not None
@@ -233,4 +233,4 @@ def check_name_exists(name):
 
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
-    return result is not None          # ← صح كده
+    return result is not None          # ← correct like this

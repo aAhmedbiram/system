@@ -2,9 +2,9 @@
 from datetime import datetime, timedelta
 
 def calculate_age(birthdate_str):
-    """يرجّع العمر كـ int دايمًا، حتى لو التاريخ فاضي أو غلط"""
+    """Returns age as int always, even if date is empty or wrong"""
     if not birthdate_str or birthdate_str.strip() == "":
-        return 0  # أو return None لو عايز NULL، بس أفضل 0
+        return 0  # or return None if you want NULL, but I prefer 0
     
     try:
         birthdate = datetime.strptime(birthdate_str.strip(), "%Y-%m-%d").date()
@@ -13,11 +13,11 @@ def calculate_age(birthdate_str):
         return int(age) if age >= 0 else 0
     except Exception as e:
         print(f"Error in calculate_age: {e}")
-        return 0  # بدل None
+        return 0  # instead of None
 
 
 def calculate_end_date(start_date, duration_str):
-    """يرجّع تاريخ الانتهاء YYYY-MM-DD أو None"""
+    """Returns end date YYYY-MM-DD or None"""
     if not start_date or not duration_str:
         return None
     try:
@@ -30,7 +30,7 @@ def calculate_end_date(start_date, duration_str):
 
 
 def membership_fees(package_name):
-    """يرجّع السعر كـ float دايمًا"""
+    """Returns price as float always"""
     fees_map = {
         "1 Month": 350.0,
         "2 Months": 600.0,
@@ -39,18 +39,18 @@ def membership_fees(package_name):
         "6 Months": 1400.0,
         "12 Months": 2400.0
     }
-    return fees_map.get(package_name.strip(), 0.0)  # 0.0 لو مش موجود
+    return fees_map.get(package_name.strip(), 0.0)  # 0.0 if not found
 
 
 def compare_dates(end_date_str):
-    """VAL أو EX أو 'غير معروف'"""
+    """VAL or EX or 'Unknown'"""
     if not end_date_str:
-        return "غير معروف"
+        return "Unknown"
     try:
         end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
         today = datetime.now().date()
         return "VAL" if end_date >= today else "EX"
     except ValueError:
-        return "غير معروف"
+        return "Unknown"
 
 

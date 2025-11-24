@@ -29,7 +29,7 @@
             font-size: 22px;
         }
 
-        /* الفورم الثابتة في الزاوية */
+        /* Fixed form in the corner */
         .add-id-form-container {
             position: fixed;
             top: 20px;
@@ -50,7 +50,7 @@
             box-shadow: 0 15px 40px rgba(76, 175, 80, 0.4);
         }
 
-        /* الـ input دلوقتي في النص تمامًا */
+        /* Input now centered in the text */
         .add-id-form-container input {
             width: 100%;
             padding: 12px;
@@ -93,7 +93,7 @@
             transform: scale(1.03);
         }
 
-        /* باقي الستايل زي ما هو */
+        /* Rest of the style as is */
         .flash-message {
             padding: 16px;
             margin: 20px auto;
@@ -214,7 +214,7 @@
         <h1>Rival Gym System - Attendance Table</h1>
     </header>
 
-    <!-- فورم الإضافة - input في النص تمامًا -->
+    <!-- Add form - input centered in the text -->
     <div class="add-id-form-container">
         <form action="{{ url_for('attendance_table') }}" method="post">
             <input type="text" 
@@ -273,7 +273,7 @@
         <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
     </div>
 
-    <!-- السكرول التلقائي + الفوكس -->
+    <!-- Auto scroll + focus -->
     <script>
         function scrollToBottom() {
             window.scrollTo({

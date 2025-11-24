@@ -6,7 +6,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
 
-# وكمان أضف السطر ده عشان نستخدم DATABASE_URL
+# Also add this line to use DATABASE_URL
 from system_app.queries import DATABASE_URL
 from flask import session
 
@@ -29,7 +29,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            flash('يجب تسجيل الدخول أولاً!', 'error')
+            flash('You must log in first!', 'error')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -40,10 +40,10 @@ def rino_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            flash('يجب تسجيل الدخول أولاً!', 'error')
+            flash('You must log in first!', 'error')
             return redirect(url_for('login'))
         if session.get('username') != 'rino':
-            flash('ليس لديك صلاحية للوصول إلى هذه الصفحة!', 'error')
+            flash('You do not have permission to access this page!', 'error')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -57,7 +57,7 @@ def rino_required(f):
 @app.route('/home')
 @login_required
 def index():
-    # ما تعملش أي flash هنا أبدًا
+    # Don't do any flash here ever
     attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
     members_data = query_db('SELECT * FROM members ORDER BY id DESC')
     return render_template("index.html", 
@@ -76,7 +76,7 @@ def login():
         password = request.form.get('password', '')
         
         if not username or not password:
-            flash('جميع الحقول مطلوبة!', 'error')
+            flash('All fields are required!', 'error')
             return render_template('login.html')
         
         try:
@@ -87,19 +87,19 @@ def login():
             if user and check_password_hash(user['password'], password):
                 session['user_id'] = user['id']
                 session['username'] = user['username']
-                flash('تم تسجيل الدخول بنجاح!', 'success')
+                flash('Login successful!', 'success')
                 return redirect(url_for('index'))
             else:
-                flash('اسم المستخدم أو كلمة المرور غير صحيحة!', 'error')
+                flash('Username or password is incorrect!', 'error')
         except Exception as e:
-            flash(f'خطأ في الداتابيز: {str(e)}', 'error')
+            flash(f'Database error: {str(e)}', 'error')
     return render_template('login.html')
 
 @app.route('/logout')
 @login_required
 def logout():
     session.clear()
-    flash('تم تسجيل الخروج بنجاح', 'success')
+    flash('Logout successful', 'success')
     return redirect(url_for('login'))
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -115,12 +115,12 @@ def signup():
         
         # Validate all fields
         if not all([username, email, password]):
-            flash('جميع الحقول مطلوبة!', 'error')
+            flash('All fields are required!', 'error')
             return render_template('signup.html')
         
         # Validate password length
         if len(password) < 6:
-            flash('كلمة المرور يجب أن تكون 6 أحرف على الأقل!', 'error')
+            flash('Password must be at least 6 characters!', 'error')
             return render_template('signup.html')
         
         # Check if username already exists
@@ -129,7 +129,7 @@ def signup():
             (username,), one=True
         )
         if existing_username:
-            flash('اسم المستخدم موجود بالفعل!', 'error')
+            flash('Username already exists!', 'error')
             return render_template('signup.html')
         
         # Check if email already exists
@@ -138,7 +138,7 @@ def signup():
             (email,), one=True
         )
         if existing_email:
-            flash('البريد الإلكتروني مستخدم بالفعل!', 'error')
+            flash('Email already in use!', 'error')
             return render_template('signup.html')
         
         # Hash password and create user
@@ -148,10 +148,10 @@ def signup():
                 'INSERT INTO users (username, email, password) VALUES (%s, %s, %s)',
                 (username, email, hashed_password), commit=True
             )
-            flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول.', 'success')
+            flash('Account created successfully! Please log in.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
-            flash(f'خطأ: {str(e)}', 'error')
+            flash(f'Error: {str(e)}', 'error')
     return render_template('signup.html')
 
 # @app.route("/home")
@@ -178,7 +178,7 @@ def add_member_route():
         return redirect(url_for("index"))
 
     try:
-        # --- جلب البيانات ---
+        # --- Get data ---
         member_name = request.form.get("member_name", "").strip().capitalize()
         if not member_name:
             flash("Member name is required!", "error")
@@ -200,12 +200,12 @@ def add_member_route():
             numeric_value = parts[0]
             unit = parts[1] if len(parts) > 1 else ""
 
-        # --- الحسابات ---
+        # --- Calculations ---
         member_end_date = calculate_end_date(member_starting_date, numeric_value) or ""
         member_membership_fees = membership_fees(user_input)
-        member_membership_status = compare_dates(member_end_date) or "غير معروف"
+        member_membership_status = compare_dates(member_end_date) or "Unknown"
 
-        # --- 1. فحص التكرار ---
+        # --- 1. Check for duplicates ---
         existing = query_db('''
             SELECT id FROM members 
             WHERE email = %s OR phone = %s
@@ -219,11 +219,11 @@ def add_member_route():
             )
             return redirect(url_for("index"))
 
-        # --- 2. جلب آخر ID ---
+        # --- 2. Get last ID ---
         last_member = query_db('SELECT id FROM members ORDER BY id DESC LIMIT 1', one=True)
         new_member_id = (last_member['id'] + 1) if last_member else 1
 
-        # --- 3. إضافة العضو الجديد ---
+        # --- 3. Add new member ---
         add_member(
             member_name, member_email, member_phone, member_age, member_gender,
             member_birthdate, member_actual_starting_date, member_starting_date,
@@ -232,7 +232,7 @@ def add_member_route():
             custom_id=new_member_id
         )
 
-        # --- تنسيق التاريخ ---
+        # --- Format date ---
         formatted_date = ""
         if member_actual_starting_date:
             try:
@@ -241,7 +241,7 @@ def add_member_route():
             except:
                 formatted_date = member_actual_starting_date
 
-        # --- نجاح ---
+        # --- Success ---
         flash("Member added successfully!", "success")
         return redirect(url_for("add_member_done", 
                                 new_member_id=new_member_id, 
@@ -273,14 +273,14 @@ def all_members():
     members_data = query_db('SELECT * FROM members ORDER BY id ASC')
     return render_template("all_members.html", members_data=members_data)
 
-# === تعديل عضو ===
+# === Edit member ===
 @app.route("/edit_member/<int:member_id>", methods=["GET", "POST"])
 @login_required
 def edit_member(member_id):
     if request.method == "GET":
         member = get_member(member_id)
         if not member:
-            flash("العضو غير موجود!", "error")
+            flash("Member not found!", "error")
             return redirect(url_for("index"))
         return render_template("edit_member.html", member=member)
 
@@ -290,7 +290,7 @@ def edit_member(member_id):
             email = request.form.get("edit_member_email", "")
             phone = request.form.get("edit_member_phone", "")
             birthdate = request.form.get("edit_member_birthdate", "")
-            age = calculate_age(birthdate)  # ← int دايمًا
+            age = calculate_age(birthdate)  # ← int always
             gender = request.form.get("edit_member_gender", "")
             actual_starting_date = request.form.get("edit_actual_starting_date", "")
             starting_date = request.form.get("edit_starting_date", "")
@@ -305,7 +305,7 @@ def edit_member(member_id):
                     pass
             end_date = calculate_end_date(starting_date, numeric_value) or ""
             fees = membership_fees(user_input)
-            status = compare_dates(end_date) or "غير معروف"
+            status = compare_dates(end_date) or "Unknown"
 
             update_member(member_id,
                 name=name, email=email, phone=phone, age=age, gender=gender,
@@ -314,9 +314,9 @@ def edit_member(member_id):
                 membership_packages=f"{numeric_value} {unit}",
                 membership_fees=fees, membership_status=status
             )
-            flash("تم تعديل العضو بنجاح!", "success")
+            flash("Member updated successfully!", "success")
         except Exception as e:
-            flash(f"خطأ في التعديل: {str(e)}", "error")
+            flash(f"Error updating member: {str(e)}", "error")
         return redirect(url_for("index"))
 
 @app.route("/show_member_data", methods=["POST"])
@@ -326,7 +326,7 @@ def show_member_data():
     try:
         member_id = int(member_id)
     except:
-        flash("رقم العضو غير صحيح!", "error")
+        flash("Invalid member ID!", "error")
         return redirect(url_for("index"))
     member_data = get_member(member_id)
     return render_template("show_member_data.html", member_data=member_data)
@@ -359,15 +359,15 @@ def change_password():
         confirm_password = request.form.get('confirm_password', '')
         
         if not all([old_password, new_password, confirm_password]):
-            flash('جميع الحقول مطلوبة!', 'error')
+            flash('All fields are required!', 'error')
             return render_template('change_password.html')
         
         if new_password != confirm_password:
-            flash('كلمة المرور الجديدة غير متطابقة!', 'error')
+            flash('New passwords do not match!', 'error')
             return render_template('change_password.html')
         
         if len(new_password) < 6:
-            flash('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل!', 'error')
+            flash('New password must be at least 6 characters!', 'error')
             return render_template('change_password.html')
         
         # Get user from session
@@ -379,10 +379,10 @@ def change_password():
                 'UPDATE users SET password = %s WHERE id = %s',
                 (generate_password_hash(new_password), user_id), commit=True
             )
-            flash('تم تغيير كلمة المرور بنجاح!', 'success')
+            flash('Password changed successfully!', 'success')
             return redirect(url_for('success'))
         else:
-            flash('كلمة المرور القديمة غير صحيحة!', 'error')
+            flash('Old password is incorrect!', 'error')
     return render_template('change_password.html')
 
 
@@ -396,7 +396,7 @@ def attendance_table():
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
         if not member_id_str.isdigit():
-            flash("ادخل رقم عضو صحيح!", "error")
+            flash("Enter a valid member ID!", "error")
         else:
             member_id = int(member_id_str)
             member = query_db(
@@ -405,11 +405,11 @@ def attendance_table():
             )
 
             if not member:
-                flash(f"العضو رقم {member_id} غير موجود!", "error")
+                flash(f"Member ID {member_id} not found!", "error")
             else:
-                # نحاول نسجل الحضور ضمن try-except
+                # Try to record attendance within try-except
                 try:
-                    # نتأكد أن العضو لم يتم تسجيل حضوره اليوم بالفعل
+                    # Make sure the member hasn't already been recorded today
                     today = datetime.now().strftime("%Y-%m-%d")
                     already = query_db(
                         "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", 
@@ -417,7 +417,7 @@ def attendance_table():
                     )
 
                     if already:
-                        flash(f"{member['name']} جه النهاردة بالفعل!", "success")
+                        flash(f"{member['name']} already came today!", "success")
                     else:
                         add_attendance(
                             member_id,
@@ -425,11 +425,11 @@ def attendance_table():
                             member['end_date'],
                             member['membership_status']
                         )
-                        flash(f"تم تسجيل حضور {member['name']} بنجاح!", "success")
+                        flash(f"Attendance for {member['name']} recorded successfully!", "success")
 
                 except Exception as e:
                     print("Error adding attendance:", e)
-                    # flash(f"حصل خطأ أثناء تسجيل الحضور: {str(e)}", "error")
+                    # flash(f"Error recording attendance: {str(e)}", "error")
 
         data = query_db("SELECT * FROM attendance ORDER BY num ASC")
         return render_template("attendance_table.html", members_data=data)
@@ -444,15 +444,15 @@ def attendance_table():
 @login_required
 def delete_all_data():
     try:
-        print("\n--- DEBUG: بدء عملية النقل والتفريغ ---")
+        print("\n--- DEBUG: Starting transfer and clear process ---")
 
-        # نستخدم connection واحد لكل العمليات عشان TRUNCATE يشتغل
+        # Use one connection for all operations so TRUNCATE works
         conn = psycopg2.connect(DATABASE_URL, sslmode='require')
         cur = conn.cursor()
         
         try:
-            # 1) نسخ البيانات إلى النسخ الاحتياطي
-            print("DEBUG: نسخ البيانات إلى attendance_backup...")
+            # 1) Copy data to backup
+            print("DEBUG: Copying data to attendance_backup...")
             cur.execute("""
                 INSERT INTO attendance_backup 
                 (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
@@ -460,32 +460,32 @@ def delete_all_data():
                 FROM attendance
             """)
             
-            # 2) تفريغ الجدول وإعادة الترقيم
-            print("DEBUG: تفريغ جدول attendance وإعادة الترقيم...")
+            # 2) Clear table and reset numbering
+            print("DEBUG: Clearing attendance table and resetting numbering...")
             cur.execute("TRUNCATE TABLE attendance RESTART IDENTITY")
             
-            # تأكيد العمليات
+            # Confirm operations
             conn.commit()
-            print("--- تم النقل والتفريغ بنجاح! ---")
+            print("--- Transfer and clear completed successfully! ---")
             
-            flash("تم نقل جميع بيانات الحضور إلى النسخ الاحتياطي وتفريغ الجدول بنجاح!", "success")
+            flash("All attendance data moved to backup and table cleared successfully!", "success")
 
         except Exception as e:
             conn.rollback()
-            print("===== خطأ أثناء النقل أو التفريغ =====")
+            print("===== Error during transfer or clear =====")
             import traceback
             traceback.print_exc()
             print("Error:", e)
-            flash("حدث خطأ أثناء تفريغ البيانات! راجع الكونسول.", "error")
+            flash("An error occurred while clearing data! Check the console.", "error")
         
         finally:
             cur.close()
             conn.close()
 
     except Exception as e:
-        print("===== فشل في الاتصال بالداتابيز =====")
+        print("===== Failed to connect to database =====")
         print(e)
-        flash("فشل في الاتصال بقاعدة البيانات!", "error")
+        flash("Failed to connect to database!", "error")
 
     return redirect(url_for('attendance_table'))
 
@@ -495,14 +495,14 @@ def delete_all_data():
 @rino_required
 def attendance_backup_table():
     try:
-        # هنسحب كل الداتا من جدول النسخة الاحتياطية
+        # Pull all data from the backup table
         data = query_db("SELECT * FROM attendance_backup ORDER BY id ASC")
         return render_template("attendance_backup.html", backup_data=data)
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        flash("حدث خطأ أثناء تحميل النسخة الاحتياطية!", "error")
+        flash("An error occurred while loading the backup!", "error")
         return redirect(url_for('attendance_table'))
 
 
@@ -516,7 +516,7 @@ def attendance_backup_table():
 def success():
     return render_template('success.html')
 
-# === تشغيل التطبيق ===
+# === Run application ===
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
