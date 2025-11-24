@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Email to Members</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 80px 20px 20px 20px;
+            background: #111;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        div {
+            background: rgba(34, 34, 34, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            width: 100%;
+            max-width: 600px;
+            transition: all 0.3s;
+        }
+        
+        div:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(76, 175, 80, 0.4);
+        }
+        
+        h2 {
+            color: #4caf50;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            resize: vertical;
+            min-height: 200px;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        button {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+        
+        a {
+            background-color: #4caf50;
+            padding: 14px;
+            display: block;
+            border: none;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 10px;
+            text-decoration: none;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        a:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+        
+        .flash-message {
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 700px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(46, 125, 50, 0.95);
+            color: white;
+            border: 1px solid #4caf50;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        .flash-message.error {
+            background: rgba(198, 40, 40, 0.95);
+            border-color: #e53935;
+        }
+        
+        .info-text {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-style: italic;
+        }
+        
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1 style="margin: 0;">Rival Gym System - Send Email to Members</h1>
+    </header>
+    
+    <div>
+        <h2>Send Message to All Members</h2>
+        <p class="info-text">This message will be sent to all members who have an email address in the system.</p>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">
+                        {{ message | safe }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form action="{{ url_for('send_email') }}" method="post">
+            <label for="message">Message:</label>
+            <textarea id="message" name="message" placeholder="Enter your message here..." required></textarea>
+
+            <button type="submit">Send Message</button>
+            <a href="{{ url_for('index') }}">Back to Home</a>
+        </form>
+    </div>
+</body>
+
+</html>
+

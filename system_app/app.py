@@ -5,6 +5,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Also add this line to use DATABASE_URL
 from system_app.queries import DATABASE_URL
@@ -515,6 +518,83 @@ def attendance_backup_table():
 @login_required
 def success():
     return render_template('success.html')
+
+@app.route('/send_email', methods=['GET', 'POST'])
+@rino_required
+def send_email():
+    if request.method == 'POST':
+        message = request.form.get('message', '').strip()
+        
+        if not message:
+            flash('Message cannot be empty!', 'error')
+            return render_template('send_email.html')
+        
+        try:
+            # Get all member emails from database
+            members = query_db('SELECT email, name FROM members WHERE email IS NOT NULL AND email != \'\'')
+            
+            if not members:
+                flash('No member emails found in the database!', 'error')
+                return render_template('send_email.html')
+            
+            # Email configuration
+            sender_email = 'rival.gym1@gmail.com'
+            sender_password = os.environ.get('GMAIL_APP_PASSWORD', '')
+            
+            if not sender_password:
+                flash('Email password not configured. Please set GMAIL_APP_PASSWORD environment variable.', 'error')
+                return render_template('send_email.html')
+            
+            # Setup SMTP server
+            smtp_server = 'smtp.gmail.com'
+            smtp_port = 587
+            
+            # Create message
+            msg = MIMEMultipart()
+            msg['From'] = sender_email
+            msg['Subject'] = 'Message from Rival Gym'
+            
+            # Add message body
+            msg.attach(MIMEText(message, 'plain'))
+            
+            # Send email to each member
+            sent_count = 0
+            failed_emails = []
+            
+            try:
+                server = smtplib.SMTP(smtp_server, smtp_port)
+                server.starttls()
+                server.login(sender_email, sender_password)
+                
+                for member in members:
+                    recipient_email = member['email']
+                    try:
+                        msg['To'] = recipient_email
+                        server.sendmail(sender_email, recipient_email, msg.as_string())
+                        sent_count += 1
+                    except Exception as e:
+                        print(f"Failed to send email to {recipient_email}: {e}")
+                        failed_emails.append(recipient_email)
+                
+                server.quit()
+                
+                if sent_count > 0:
+                    success_msg = f'Message sent successfully to {sent_count} member(s)!'
+                    if failed_emails:
+                        success_msg += f' Failed to send to {len(failed_emails)} email(s).'
+                    flash(success_msg, 'success')
+                else:
+                    flash('Failed to send emails to all recipients!', 'error')
+                    
+            except smtplib.SMTPAuthenticationError:
+                flash('Email authentication failed. Please check GMAIL_APP_PASSWORD.', 'error')
+            except Exception as e:
+                flash(f'Error sending emails: {str(e)}', 'error')
+                
+        except Exception as e:
+            flash(f'Error: {str(e)}', 'error')
+    
+    return render_template('send_email.html')
 
 # === Run application ===
 if __name__ == '__main__':
