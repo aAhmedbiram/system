@@ -6,6 +6,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -588,12 +589,14 @@ def send_email():
                             print("DEBUG: SSL connection successful, logging in...")
                             server.login(sender_email, sender_password)
                             print("DEBUG: Successfully logged in via port 465")
-                        except (OSError, ConnectionError) as ssl_error:
+                        except (OSError, ConnectionError, Exception) as ssl_error:
                             # Network is completely unreachable
                             error_msg = f'Cannot connect to Gmail SMTP server. Network error: {str(ssl_error)}. '
                             error_msg += 'This might be due to firewall restrictions or network configuration. '
                             error_msg += 'Please check your server\'s network settings or contact your hosting provider.'
                             print(f"CRITICAL: Both ports failed. Last error: {ssl_error}")
+                            import traceback
+                            traceback.print_exc()
                             raise Exception(error_msg)
                     
                     for idx, member in enumerate(members):
