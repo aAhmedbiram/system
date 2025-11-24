@@ -539,11 +539,7 @@ def send_email():
             
             # Email configuration
             sender_email = 'rival.gym1@gmail.com'
-            sender_password = os.environ.get('GMAIL_APP_PASSWORD', '')
-            
-            if not sender_password:
-                flash('Email password not configured. Please set GMAIL_APP_PASSWORD environment variable.', 'error')
-                return render_template('send_email.html')
+            sender_password = os.environ.get('GMAIL_APP_PASSWORD', '01147216302')
             
             # Setup SMTP server
             smtp_server = 'smtp.gmail.com'
