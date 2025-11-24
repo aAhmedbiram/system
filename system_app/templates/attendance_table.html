@@ -5,85 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance Table - Rival Gym System</title>
     <style>
+        /* خلفية داكنة نظيفة بدون صورة = سرعة رهيبة */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background: #111;
+            background: linear-gradient(135deg, #0d1b2a, #1b263b) !important;
+            background-attachment: fixed;
             color: #fff;
             min-height: 100vh;
-            background-image: url("/static/signup.jpg");
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
         }
 
         header {
-            background-color: rgba(34, 34, 34, 0.95);
+            background: rgba(20, 30, 48, 0.98);
             color: #4caf50;
             padding: 1.5em;
             text-align: center;
             font-size: 28px;
             font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
         }
 
-        /* الفورم الثابتة في الزاوية */
+        /* الفورم الثابتة - أسرع وأخف */
         .add-id-form-container {
             position: fixed;
             top: 20px;
             right: 20px;
             width: 280px;
-            background: rgba(34, 34, 34, 0.97);
-            padding: 20px;
+            background: rgba(27, 38, 59, 0.98);
+            padding: 18px;
             border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
-            border: 1px solid #444;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            border: 1px solid #4caf50;
             z-index: 1000;
-            backdrop-filter: blur(10px);
-        }
-
-        .add-id-form-container label {
-            color: #aaa;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 8px;
         }
 
         .add-id-form-container input {
             width: 100%;
             padding: 12px;
-            background: #222;
-            border: 1px solid #444;
+            background: #112240;
+            border: 1px solid #4caf50;
             border-radius: 6px;
-            color: white;
+            color: #fff;
             font-size: 16px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .add-id-form-container input:focus {
             outline: none;
-            border-color: #4caf50;
-            box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.7);
         }
 
         .add-id-form-container button {
             width: 100%;
             padding: 14px;
             background: #4caf50;
-            color: white;
             border: none;
             border-radius: 8px;
-            font-size: 17px;
+            color: white;
             font-weight: bold;
+            font-size: 17px;
             cursor: pointer;
-            transition: all 0.3s;
         }
 
         .add-id-form-container button:hover {
             background: #66d66a;
-            transform: scale(1.03);
         }
 
         /* الرسايل */
@@ -98,7 +85,6 @@
             color: white;
             border: 1px solid #4caf50;
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            animation: fadeIn 0.6s ease;
         }
 
         .flash-message.error {
@@ -106,48 +92,41 @@
             border-color: #e53935;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* الجدول */
+        /* الجدول - أسرع وأنظف */
         .table-container {
             max-width: 1400px;
             margin: 30px auto;
             padding: 0 20px;
-            overflow-x: auto;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            background: rgba(34, 34, 34, 0.95);
+            background: rgba(27, 38, 59, 0.98);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
         }
 
         th {
-            background: #333;
-            color: #4caf50;
+            background: #4caf50;
+            color: white;
             padding: 16px;
             text-align: center;
             font-weight: bold;
             position: sticky;
             top: 0;
             z-index: 10;
-            border-bottom: 2px solid #4caf50;
         }
 
         td {
             padding: 14px;
             text-align: center;
-            border-bottom: 1px solid #444;
+            border-bottom: 1px solid #334466;
         }
 
         tr:hover {
-            background: rgba(76, 175, 80, 0.15);
+            background: rgba(76, 175, 80, 0.2);
         }
 
         /* الأزرار تحت */
@@ -165,7 +144,7 @@
             font-size: 18px;
             font-weight: bold;
             text-decoration: none;
-            min-width: 240px;
+            min-width: 260px;
             transition: all 0.3s;
         }
 
@@ -178,8 +157,8 @@
 
         .delete-all-btn:hover {
             background: #e53935;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(198, 40, 40, 0.5);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(198, 40, 40, 0.5);
         }
 
         .home-btn {
@@ -189,22 +168,19 @@
 
         .home-btn:hover {
             background: #777;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            transform: translateY(-4px);
         }
 
-        /* لما الجدول فاضي */
         .no-data {
             text-align: center;
-            padding: 60px;
-            font-size: 22px;
+            padding: 80px;
+            font-size: 24px;
             color: #aaa;
         }
     </style>
 </head>
 <body>
 
-    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -215,11 +191,10 @@
 
     <header>Attendance Table</header>
 
-    <!-- Add ID Form (ثابتة في الزاوية) -->
+    <!-- فورم الإضافة -->
     <div class="add-id-form-container">
-        <form class="add-id-form" action="{{ url_for('attendance_table') }}" method="post">
-            <label for="member_id">Enter Member ID:</label>
-            <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus placeholder="Type ID and press Enter">
+        <form action="{{ url_for('attendance_table') }}" method="post">
+            <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus placeholder="Enter Member ID">
             <button type="submit">Add Attendance</button>
         </form>
     </div>
@@ -255,23 +230,21 @@
             </tbody>
         </table>
         {% else %}
-        <div class="no-data">No attendance records yet today</div>
+        <div class="no-data">No attendance records yet</div>
         {% endif %}
     </div>
 
-    <!-- الأزرار تحت -->
     <div class="bottom-actions">
         <form action="{{ url_for('delete_all_data') }}" method="post" style="display:inline;">
             <button type="submit" class="delete-all-btn"
-                    onclick="return confirm('Are you 100% sure?\nAll today\'s attendance will be moved to backup and table will be cleared!');">
-                Move to Backup & Clear Table
+                    onclick="return confirm('Are you 100% sure?\nAll attendance will be moved to backup and table cleared!');">
+                Move to Backup & Clear
             </button>
         </form>
 
         <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
     </div>
 
-    <!-- Auto Focus -->
     <script>
         document.getElementById('member_id').focus();
     </script>
