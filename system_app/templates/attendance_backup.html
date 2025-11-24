@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>جدول النسخة الاحتياطية - Attendance Backup</title>
+
     <style>
         body {
             background: #111;
@@ -39,9 +40,23 @@
             background: #333;
         }
 
+        /* filter row */
+        .filter-row input {
+            width: 95%;
+            padding: 6px;
+            border: 1px solid #4caf50;
+            border-radius: 4px;
+            background: #111;
+            color: white;
+            text-align: center;
+        }
+
         a {
             color: #4caf50;
             text-decoration: none;
+            font-size: 18px;
+            display: inline-block;
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -49,7 +64,10 @@
 
 <h1>النسخة الاحتياطية من الحضور</h1>
 
-<table>
+<table id="attendanceTable">
+
+    <!-- عنوان الأعمدة -->
+    <thead>
     <tr>
         <th>الترتيب</th>
         <th>ID</th>
@@ -61,6 +79,20 @@
         <th>اليوم</th>
     </tr>
 
+    <!-- صف الفلترة -->
+    <tr class="filter-row">
+        <th><input type="text" onkeyup="filterTable(0)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(1)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(2)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(3)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(4)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(5)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(6)" placeholder="بحث"></th>
+        <th><input type="text" onkeyup="filterTable(7)" placeholder="بحث"></th>
+    </tr>
+    </thead>
+
+    <tbody>
     {% for row in backup_data %}
     <tr>
         <td>{{ row.id }}</td>
@@ -73,8 +105,32 @@
         <td>{{ row.day }}</td>
     </tr>
     {% endfor %}
+    </tbody>
 </table>
+
+
 <a href="/">Home</a>
+
+<script>
+    function filterTable(columnIndex) {
+        let input = document.querySelectorAll(".filter-row input")[columnIndex];
+        let filter = input.value.toLowerCase();
+        let table = document.getElementById("attendanceTable");
+        let rows = table.getElementsByTagName("tr");
+
+        for (let i = 2; i < rows.length; i++) {  // تخطي العنوان + صف الفلتر
+            let cell = rows[i].getElementsByTagName("td")[columnIndex];
+            if (cell) {
+                let text = cell.textContent || cell.innerText;
+                if (text.toLowerCase().indexOf(filter) > -1) {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+    }
+</script>
 
 </body>
 </html>
