@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance Table - Rival Gym System</title>
     <style>
-        /* خلفية داكنة نظيفة بدون صورة = سرعة رهيبة */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -27,53 +26,67 @@
             backdrop-filter: blur(8px);
         }
 
-        /* الفورم الثابتة - أسرع وأخف */
+        /* الفورم الثابتة في الزاوية */
         .add-id-form-container {
             position: fixed;
             top: 20px;
             right: 20px;
-            width: 280px;
+            width: 320px;
             background: rgba(27, 38, 59, 0.98);
-            padding: 18px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-            border: 1px solid #4caf50;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+            border: 2px solid #4caf50;
             z-index: 1000;
+            text-align: center; /* مهم جدًا */
         }
 
+        /* الـ input دلوقتي في النص تمامًا */
         .add-id-form-container input {
             width: 100%;
-            padding: 12px;
+            padding: 16px;
             background: #112240;
-            border: 1px solid #4caf50;
-            border-radius: 6px;
+            border: 2px solid #4caf50;
+            border-radius: 10px;
             color: #fff;
-            font-size: 16px;
-            margin-bottom: 10px;
+            font-size: 20px;
+            text-align: center;           /* الكتابة في النص */
+            margin: 0 auto 20px auto;     /* تمركيز الإنبوت أفقيًا */
+            display: block;               /* ضروري عشان margin: auto يشتغل */
+            box-sizing: border-box;
+            font-weight: bold;
+        }
+
+        .add-id-form-container input::placeholder {
+            color: #888;
+            font-weight: normal;
         }
 
         .add-id-form-container input:focus {
             outline: none;
-            box-shadow: 0 0 12px rgba(76, 175, 80, 0.7);
+            box-shadow: 0 0 18px rgba(76, 175, 80, 0.9);
+            border-color: #4caf50;
         }
 
         .add-id-form-container button {
             width: 100%;
-            padding: 14px;
+            padding: 16px;
             background: #4caf50;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             color: white;
             font-weight: bold;
-            font-size: 17px;
+            font-size: 19px;
             cursor: pointer;
+            transition: all 0.3s;
         }
 
         .add-id-form-container button:hover {
             background: #66d66a;
+            transform: scale(1.05);
         }
 
-        /* الرسايل */
+        /* باقي الستايل زي ما هو */
         .flash-message {
             padding: 16px;
             margin: 20px auto;
@@ -92,11 +105,10 @@
             border-color: #e53935;
         }
 
-        /* الجدول - أسرع وأنظف */
         .table-container {
             max-width: 1400px;
             margin: 30px auto;
-            padding: 0 20px;
+            padding: 0 20px 100px 20px;
         }
 
         table {
@@ -129,22 +141,20 @@
             background: rgba(76, 175, 80, 0.2);
         }
 
-        /* الأزرار تحت */
         .bottom-actions {
             text-align: center;
-            margin: 50px 0;
+            margin: 60px 0;
         }
 
-        .bottom-actions button,
-        .bottom-actions a {
+        .delete-all-btn, .home-btn {
             display: inline-block;
-            padding: 14px 40px;
+            padding: 16px 50px;
             margin: 0 15px;
-            border-radius: 10px;
-            font-size: 18px;
+            border-radius: 12px;
+            font-size: 19px;
             font-weight: bold;
             text-decoration: none;
-            min-width: 260px;
+            min-width: 280px;
             transition: all 0.3s;
         }
 
@@ -158,7 +168,6 @@
         .delete-all-btn:hover {
             background: #e53935;
             transform: translateY(-4px);
-            box-shadow: 0 10px 25px rgba(198, 40, 40, 0.5);
         }
 
         .home-btn {
@@ -173,9 +182,9 @@
 
         .no-data {
             text-align: center;
-            padding: 80px;
-            font-size: 24px;
-            color: #aaa;
+            padding: 100px;
+            font-size: 26px;
+            color: #666;
         }
     </style>
 </head>
@@ -191,10 +200,16 @@
 
     <header>Attendance Table</header>
 
-    <!-- فورم الإضافة -->
+    <!-- فورم الإضافة - input في النص تمامًا -->
     <div class="add-id-form-container">
         <form action="{{ url_for('attendance_table') }}" method="post">
-            <input type="text" id="member_id" name="member_id" required autocomplete="off" autofocus placeholder="Enter Member ID">
+            <input type="text" 
+                   id="member_id" 
+                   name="member_id" 
+                   required 
+                   autocomplete="off" 
+                   autofocus 
+                   placeholder="Enter Member ID">
             <button type="submit">Add Attendance</button>
         </form>
     </div>
@@ -237,42 +252,31 @@
     <div class="bottom-actions">
         <form action="{{ url_for('delete_all_data') }}" method="post" style="display:inline;">
             <button type="submit" class="delete-all-btn"
-                    onclick="return confirm('Are you 100% sure?\nAll attendance will be moved to backup and table cleared!');">
+                    onclick="return confirm('Are you 100% sure?\nAll attendance will be moved to backup!');">
                 Move to Backup & Clear
             </button>
         </form>
-
         <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
     </div>
 
+    <!-- السكرول التلقائي + الفوكس -->
     <script>
-        document.getElementById('member_id').focus();
+        function scrollToBottom() {
+            window.scrollTo({
+                top: document.body.scrollHeight,
+                behavior: "smooth"
+            });
+        }
 
-// السكرول التلقائي لآخر عضو مضاف - الطريقة اللي شغالة فعلاً
-document.addEventListener("DOMContentLoaded", function () {
-    // نعمل سكرول لتحت أول ما الصفحة تتحمل
-    scrollToBottom();
+        document.addEventListener("DOMContentLoaded", function () {
+            scrollToBottom();
+            
+            document.querySelector("form").addEventListener("submit", function () {
+                setTimeout(scrollToBottom, 500);
+            });
 
-    // كل ما نضغط Submit على الفورم → نستنى 500 مللي ثانية وبعدين نسكرول تاني
-    const form = document.querySelector(".add-id-form");
-    if (form) {
-        form.addEventListener("submit", function () {
-            setTimeout(scrollToBottom, 500);
+            document.getElementById("member_id")?.focus();
         });
-    }
-
-    // نرجع الفوكس على الإنبوت تاني عشان السرعة
-    const input = document.getElementById("member_id");
-    if (input) input.focus();
-});
-
-function scrollToBottom() {
-    // الطريقة دي شغالة حتى لو الجدول داخل div أو body مباشرة
-    window.scrollTo({
-        top: document.body.scrollHeight,
-        behavior: "smooth"   // ناعم وسريع
-    });
-}
     </script>
 
 </body>
