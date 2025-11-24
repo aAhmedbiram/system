@@ -545,14 +545,6 @@ def send_email():
             smtp_server = 'smtp.gmail.com'
             smtp_port = 587
             
-            # Create message
-            msg = MIMEMultipart()
-            msg['From'] = sender_email
-            msg['Subject'] = 'Message from Rival Gym'
-            
-            # Add message body
-            msg.attach(MIMEText(message, 'plain'))
-            
             # Send email to each member
             sent_count = 0
             failed_emails = []
@@ -565,7 +557,13 @@ def send_email():
                 for member in members:
                     recipient_email = member['email']
                     try:
+                        # Create a new message for each recipient
+                        msg = MIMEMultipart()
+                        msg['From'] = sender_email
                         msg['To'] = recipient_email
+                        msg['Subject'] = 'Message from Rival Gym'
+                        msg.attach(MIMEText(message, 'plain'))
+                        
                         server.sendmail(sender_email, recipient_email, msg.as_string())
                         sent_count += 1
                     except Exception as e:
@@ -582,13 +580,27 @@ def send_email():
                 else:
                     flash('Failed to send emails to all recipients!', 'error')
                     
-            except smtplib.SMTPAuthenticationError:
-                flash('Email authentication failed. Please check GMAIL_APP_PASSWORD.', 'error')
+            except smtplib.SMTPAuthenticationError as e:
+                error_msg = f'Email authentication failed: {str(e)}. Please check GMAIL_APP_PASSWORD.'
+                print(f"SMTP Auth Error: {e}")
+                flash(error_msg, 'error')
+            except smtplib.SMTPException as e:
+                error_msg = f'SMTP error occurred: {str(e)}'
+                print(f"SMTP Error: {e}")
+                flash(error_msg, 'error')
             except Exception as e:
-                flash(f'Error sending emails: {str(e)}', 'error')
+                error_msg = f'Error sending emails: {str(e)}'
+                print(f"General Error: {e}")
+                import traceback
+                traceback.print_exc()
+                flash(error_msg, 'error')
                 
         except Exception as e:
-            flash(f'Error: {str(e)}', 'error')
+            error_msg = f'Database or general error: {str(e)}'
+            print(f"Database/General Error: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(error_msg, 'error')
     
     return render_template('send_email.html')
 
