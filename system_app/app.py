@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g,jsonify
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from datetime import datetime, timedelta
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -149,6 +149,7 @@ def clear_login_attempts(ip_address):
         del _login_attempts[ip_address]
 
 @app.route('/login', methods=['GET', 'POST'])
+@csrf.exempt  # Exempt login from CSRF (public endpoint, no authenticated session yet)
 def login():
     # If already logged in, redirect to index
     if 'user_id' in session:
