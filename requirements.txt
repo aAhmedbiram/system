@@ -102,4 +102,5 @@ Flask
 gunicorn
 Werkzeug
 deep-translator==1.11.4
+openai>=1.0.0
 

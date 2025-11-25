@@ -1244,13 +1244,103 @@ def offers():
 
 
 def process_offer_with_ai(offer_text):
-    """Process offer text with AI and return structured data"""
+    """Process offer text with OpenAI AI and return structured data"""
+    try:
+        # Try to import OpenAI
+        try:
+            import openai
+        except ImportError:
+            print("OpenAI library not installed. Falling back to pattern matching.")
+            return process_offer_with_pattern_matching(offer_text)
+        
+        # Get OpenAI API key from environment
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            print("OPENAI_API_KEY not found in environment. Falling back to pattern matching.")
+            return process_offer_with_pattern_matching(offer_text)
+        
+        # Initialize OpenAI client
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Create a detailed prompt for extracting structured offer information
+        prompt = f"""Analyze the following gym membership offer and extract all relevant information in a structured format. 
+Return the information as a JSON object with the following fields (use null if information is not available):
+
+- title: A short, catchy title for the offer
+- duration: Membership duration (e.g., "3 months", "6 months", "1 year")
+- price: Price with currency symbol (e.g., "$300", "AED 500")
+- original_price: Original price if this is a discount offer
+- discount_percentage: Discount percentage if applicable
+- features: List of features/benefits included (e.g., "Personal Training Sessions", "Nutrition Consultation", "Gym Access")
+- number_of_sessions: Number of personal training sessions if mentioned
+- valid_until: Expiry date or validity period
+- eligibility: Who is eligible (e.g., "New Members Only", "Existing Members", "All Members")
+- offer_type: Type of offer (e.g., "Special Promotion", "Limited Time Offer", "Standard Offer")
+- terms_and_conditions: Any terms, conditions, or restrictions mentioned
+- description: A brief summary of the offer
+
+Offer text: "{offer_text}"
+
+Return ONLY a valid JSON object, no additional text or explanation."""
+
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # You can use "gpt-4" for better results
+            messages=[
+                {"role": "system", "content": "You are an expert at analyzing gym membership offers and extracting structured information. Always return valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,  # Lower temperature for more consistent, structured output
+            max_tokens=500
+        )
+        
+        # Extract the response
+        ai_response = response.choices[0].message.content.strip()
+        
+        # Parse JSON response
+        import json
+        # Remove markdown code blocks if present
+        if ai_response.startswith('```'):
+            ai_response = ai_response.split('```')[1]
+            if ai_response.startswith('json'):
+                ai_response = ai_response[4:]
+            ai_response = ai_response.strip()
+        
+        structured_offer = json.loads(ai_response)
+        
+        # Convert to list format for table display
+        # Clean up the data and ensure all fields are strings
+        cleaned_offer = {}
+        for key, value in structured_offer.items():
+            if value is None:
+                cleaned_offer[key.replace('_', ' ').title()] = '-'
+            elif isinstance(value, list):
+                cleaned_offer[key.replace('_', ' ').title()] = ', '.join(str(v) for v in value)
+            else:
+                cleaned_offer[key.replace('_', ' ').title()] = str(value)
+        
+        return [cleaned_offer]
+        
+    except json.JSONDecodeError as e:
+        import json
+        print(f"Error parsing AI JSON response: {e}")
+        if 'ai_response' in locals():
+            print(f"AI Response: {ai_response}")
+        # Fall back to pattern matching
+        return process_offer_with_pattern_matching(offer_text)
+    except Exception as e:
+        print(f"Error in process_offer_with_ai: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fall back to pattern matching if OpenAI fails
+        return process_offer_with_pattern_matching(offer_text)
+
+
+def process_offer_with_pattern_matching(offer_text):
+    """Fallback function using pattern matching when OpenAI is not available"""
     try:
         import json
         import re
-        
-        # Simple AI-like processing using pattern matching and extraction
-        # This can be replaced with actual AI API call (OpenAI, etc.)
         
         structured_offer = {}
         
@@ -1319,7 +1409,7 @@ def process_offer_with_ai(offer_text):
         return [structured_offer]
         
     except Exception as e:
-        print(f"Error in process_offer_with_ai: {e}")
+        print(f"Error in process_offer_with_pattern_matching: {e}")
         import traceback
         traceback.print_exc()
         return None
