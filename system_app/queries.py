@@ -302,12 +302,12 @@ def get_member_logs(member_id=None):
         return query_db('''
             SELECT * FROM member_logs 
             WHERE member_id = %s 
-            ORDER BY edit_time DESC
+            ORDER BY edit_time ASC
         ''', (member_id,))
     else:
         return query_db('''
             SELECT * FROM member_logs 
-            ORDER BY edit_time DESC
+            ORDER BY edit_time ASC
         ''')
 
 
@@ -315,5 +315,5 @@ def get_all_logs():
     """Get all logs ordered by most recent first"""
     return query_db('''
         SELECT * FROM member_logs 
-        ORDER BY edit_time DESC
+        ORDER BY edit_time ASC
     ''')
