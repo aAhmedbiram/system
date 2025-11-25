@@ -115,6 +115,7 @@
         <section class="search-section">
             <h2>Search by Name</h2>
             <form method="post" action="/search">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <label for="name">Enter member name:</label>
                 <input type="text" id="name" name="name" required>
                 <button type="submit">Search</button>

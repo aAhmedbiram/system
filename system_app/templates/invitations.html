@@ -288,6 +288,7 @@
         <h2>Use Invitation</h2>
         <div class="form-section">
             <form method="POST" action="{{ url_for('invitations') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="form-group">
                     <label for="member_id">Member ID:</label>
                     <input type="number" id="member_id" name="member_id" required 

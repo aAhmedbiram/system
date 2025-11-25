@@ -219,6 +219,7 @@
         <section class="edit-member-section">
             <h2>Edit Member</h2>
             <form action="{{ url_for('edit_member', member_id=member.id) }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <label for="edit_member_name">Name:</label>
                 <input type="text" id="edit_member_name" name="edit_member_name" value="{{ member.name }}" required>
 

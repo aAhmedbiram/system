@@ -281,6 +281,7 @@
     <!-- Add form - input centered in the text -->
     <div class="add-id-form-container">
         <form action="{{ url_for('attendance_table') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="text" 
                    id="member_id" 
                    name="member_id" 
@@ -346,6 +347,7 @@
 
     <div class="bottom-actions">
         <form action="{{ url_for('delete_attendance_data') }}" method="post" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="delete-all-btn"
                     onclick="return confirm('Are you 100% sure?\nAll attendance will be moved to backup!');">
                 Move to Backup & Clear

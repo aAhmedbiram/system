@@ -172,6 +172,7 @@
         {% endwith %}
         
         <form action="{{ url_for('send_email') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <label for="message">Message:</label>
             <textarea id="message" name="message" placeholder="Enter your message here..." required></textarea>
 

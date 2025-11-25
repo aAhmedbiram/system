@@ -224,16 +224,19 @@
         <section class="search-section">
             <h2>Search</h2>
             <form class="search-id-form" action="{{ url_for('show_member_data') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <label class="search-member-id" for="member_id">Enter Member ID:</label>
                 <input class="search-id" type="text" id="member_id" name="member_id" required>
                 <button class="search-member-id-button" type="submit">Search</button>
             </form>
             <form class="search-name-form" method="post" action="{{ url_for('result') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <label class="search-member-name" for="member_name">Enter member name:</label>
                 <input class="search-name" type="text" id="member_name" name="member_name" required>
                 <button class="search-member-name-button" type="submit">Search</button>
             </form>
             <form class="search-phone-form" method="post" action="{{ url_for('search_by_mobile_number') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <label class="search-member-phone" for="member_phone">Enter member mobile number:</label>
                 <input class="search-phone" type="number" id="member_phone" name="member_phone" required>
                 <button class="search-member-phone-button" type="submit">Search</button>
@@ -248,6 +251,7 @@
         <section class="add-new-member-section">
             <h2 class="add-new-member-h2">Add New Member</h2>
             <form class="add-new-member-form" action="{{ url_for('add_member_route') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <label class="label_name" for="member_name">Name:</label>
                 <input class="name-input" type="text" id="member_name" name="member_name" required>
 

@@ -226,6 +226,7 @@
                 <p>Example: "3 months membership for $300, includes personal training sessions, valid until end of month"</p>
             </div>
             <form id="offerForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="form-group">
                     <label for="offer_text">Enter Offer Description:</label>
                     <textarea id="offer_text" name="offer_text" placeholder="Example: Special offer! 3 months membership for $300. Includes 5 personal training sessions. Valid until December 31, 2024. Available for new members only." required>{{ request.form.get('offer_text', '') }}</textarea>
