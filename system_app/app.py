@@ -1277,42 +1277,57 @@ You understand:
 
 Be thorough, accurate, and extract every piece of valuable information. Think like a human business analyst would."""
 
-        user_prompt = f"""Analyze this gym membership offer with deep understanding and extract ALL information intelligently:
+        user_prompt = f"""You are an expert at extracting EXACT information from gym membership offers. Be PRECISE and ACCURATE.
 
+Analyze this offer text carefully:
 "{offer_text}"
 
-Extract and return a comprehensive JSON object with these fields (use null only if truly not available or cannot be inferred):
+CRITICAL RULES:
+1. PRICE: Extract the EXACT number mentioned. If it says "1200", the price is 1200 (or $1200 if currency context suggests). Do NOT extract partial words or letters.
+2. ELIGIBILITY: If text says "for old members and new members" or "for old and new members", the eligibility is "All Members" or "Old Members and New Members". If it says "for old members" only, it's "Existing Members Only". If it says "for new members" only, it's "New Members Only".
+3. DURATION: Extract the exact duration mentioned (e.g., "4 months" not "4 month")
+4. DATES: If it says "until this month end" or "until end of month", calculate the actual last day of the current month.
 
-1. title: Create a compelling, professional title that captures the essence of the offer
-2. duration: Membership duration - be smart about interpreting "monthly", "quarterly", "annual", etc.
-3. price: Final price with currency (infer currency from context if not specified)
-4. original_price: Original/regular price if this is a discounted offer
-5. discount_amount: The actual discount amount (price difference)
-6. discount_percentage: Calculate percentage if both prices are available
-7. savings: How much the customer saves (in currency and percentage)
-8. features: Comprehensive list of ALL features, benefits, services included (be thorough)
-9. number_of_sessions: Personal training sessions count (if any)
-10. session_duration: Duration of each session if mentioned
-11. valid_from: When the offer starts (be smart about "now", "today", dates)
-12. valid_until: When the offer expires (understand relative dates like "end of month", "next week")
-13. eligibility: Who can use this (new members, existing, students, seniors, etc.)
-14. offer_type: Categorize (Limited Time, Special Promotion, Seasonal, Referral, etc.)
-15. payment_options: Payment plans, installments, upfront payment requirements
-16. restrictions: Any limitations, blackout dates, time restrictions
-17. terms_and_conditions: All terms, conditions, fine print, requirements
-18. additional_benefits: Any extra perks (locker, towel service, guest passes, etc.)
-19. cancellation_policy: Refund or cancellation terms if mentioned
-20. description: A well-written, professional summary of the entire offer
-21. target_audience: Who this offer is best suited for
-22. urgency_indicators: Limited spots, limited time, etc.
-23. comparison_value: Why this offer is valuable compared to regular pricing
+Extract and return a JSON object with these fields (use null only if truly not available):
 
-Think deeply about the context. If someone says "50% off", calculate what the original price would be if current price is given.
-If they say "valid until end of month", calculate the actual date.
-If they mention "3 PT sessions", understand this means Personal Training.
-Be intelligent about abbreviations and gym terminology.
+1. title: A compelling title for the offer
+2. duration: EXACT duration mentioned (e.g., "4 months", "6 months", "1 year")
+3. price: EXACT price number mentioned - extract the FULL number, not partial text. If "1200" is mentioned, price should be "1200" or "$1200" (add currency if context suggests)
+4. original_price: Original price if this is a discount
+5. discount_amount: Discount amount if applicable
+6. discount_percentage: Discount percentage if mentioned
+7. savings: Customer savings
+8. features: All features/benefits included
+9. number_of_sessions: Personal training sessions count
+10. session_duration: Session duration if mentioned
+11. valid_from: When offer starts
+12. valid_until: When offer expires - if "end of month" or "this month end", calculate actual date (format: YYYY-MM-DD or readable date)
+13. eligibility: EXACT eligibility - if text says "old members and new members", return "All Members" or "Old Members and New Members". Be precise!
+14. offer_type: Type (Limited Time Offer, Special Promotion, etc.)
+15. payment_options: Payment plans if mentioned
+16. restrictions: Any limitations
+17. terms_and_conditions: Terms and conditions
+18. additional_benefits: Extra perks
+19. cancellation_policy: Cancellation terms
+20. description: Professional summary
+21. target_audience: Who this is for
+22. urgency_indicators: Urgency cues
+23. comparison_value: Value proposition
 
-Return ONLY valid JSON, no markdown, no explanations, just the JSON object."""
+EXAMPLES:
+- Input: "4 months for 1200 for old members and new members until this month end"
+  - duration: "4 months"
+  - price: "1200" or "$1200"
+  - eligibility: "All Members" or "Old Members and New Members"
+  - valid_until: Calculate actual end of current month date
+
+- Input: "3 months membership $500"
+  - duration: "3 months"
+  - price: "$500"
+
+Be EXTREMELY careful with number extraction. Extract the COMPLETE number, not partial text.
+
+Return ONLY valid JSON object, no markdown, no explanations."""
 
         # Try GPT-4 first (smarter), fallback to GPT-3.5-turbo
         models_to_try = ["gpt-4", "gpt-4-turbo-preview", "gpt-3.5-turbo"]
@@ -1353,6 +1368,53 @@ Return ONLY valid JSON, no markdown, no explanations, just the JSON object."""
         
         structured_offer = json.loads(ai_response)
         
+        # Post-process and validate extracted data
+        import re
+        from datetime import datetime, timedelta
+        import calendar
+        
+        # Fix price extraction if it looks wrong
+        if 'price' in structured_offer and structured_offer['price']:
+            price_str = str(structured_offer['price']).strip()
+            # If price contains letters that shouldn't be there, extract just the number
+            if re.search(r'[a-zA-Z]', price_str) and not any(c in price_str for c in ['$', '€', '£', 'AED']):
+                # Extract numbers from the original text
+                numbers = re.findall(r'\d+', offer_text)
+                if numbers:
+                    # Find the number that's likely the price (usually the largest or most prominent)
+                    # Look for numbers near "for" or price-related words
+                    price_context = re.search(r'(?:for|price|cost|pay)\s*(\d+)', offer_text, re.IGNORECASE)
+                    if price_context:
+                        structured_offer['price'] = price_context.group(1)
+                    elif len(numbers) >= 2:
+                        # If multiple numbers, the larger one is usually the price
+                        structured_offer['price'] = max(numbers, key=int)
+        
+        # Fix eligibility if it's wrong
+        if 'eligibility' in structured_offer:
+            eligibility_lower = str(structured_offer['eligibility']).lower()
+            offer_lower = offer_text.lower()
+            # Check if text mentions both old and new members
+            if ('old' in offer_lower and 'new' in offer_lower) or ('existing' in offer_lower and 'new' in offer_lower):
+                if 'all' not in eligibility_lower and 'both' not in eligibility_lower:
+                    structured_offer['eligibility'] = "All Members (Old and New)"
+        
+        # Fix duration format (ensure plural)
+        if 'duration' in structured_offer and structured_offer['duration']:
+            duration = str(structured_offer['duration']).strip()
+            # If it says "4 month" make it "4 months"
+            if re.match(r'^\d+\s+month$', duration, re.IGNORECASE):
+                structured_offer['duration'] = duration + 's'
+        
+        # Calculate end of month if mentioned
+        if 'valid_until' in structured_offer:
+            valid_until = str(structured_offer['valid_until']).lower()
+            if 'end of month' in valid_until or 'month end' in valid_until or 'this month end' in valid_until:
+                today = datetime.now()
+                last_day = calendar.monthrange(today.year, today.month)[1]
+                end_date = datetime(today.year, today.month, last_day)
+                structured_offer['valid_until'] = end_date.strftime('%B %d, %Y')
+        
         # Intelligent data cleaning and formatting
         cleaned_offer = {}
         for key, value in structured_offer.items():
@@ -1371,11 +1433,8 @@ Return ONLY valid JSON, no markdown, no explanations, just the JSON object."""
             elif isinstance(value, (int, float)):
                 # Format numbers appropriately
                 if 'price' in key.lower() or 'amount' in key.lower() or 'savings' in key.lower():
-                    # Try to add currency if not present
-                    if '$' not in str(value) and '€' not in str(value) and '£' not in str(value) and 'AED' not in str(value):
-                        cleaned_offer[formatted_key] = f"${value}"
-                    else:
-                        cleaned_offer[formatted_key] = str(value)
+                    # Don't add currency if it's already a clean number - let user see the number
+                    cleaned_offer[formatted_key] = str(value)
                 elif 'percentage' in key.lower() or 'discount' in key.lower():
                     cleaned_offer[formatted_key] = f"{value}%"
                 else:
@@ -1385,6 +1444,13 @@ Return ONLY valid JSON, no markdown, no explanations, just the JSON object."""
             else:
                 # String values - clean them up
                 str_value = str(value).strip()
+                # Remove any weird characters that shouldn't be in prices
+                if 'price' in key.lower() and str_value:
+                    # If price has random letters, try to extract just the number
+                    if re.search(r'[a-zA-Z]', str_value) and not any(c in str_value for c in ['$', '€', '£', 'AED']):
+                        numbers = re.findall(r'\d+', str_value)
+                        if numbers:
+                            str_value = numbers[0]  # Take the first number found
                 if str_value:
                     cleaned_offer[formatted_key] = str_value
         
