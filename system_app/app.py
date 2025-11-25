@@ -546,8 +546,8 @@ def send_email():
                     return render_template('send_email.html')
                 
                 # Email configuration
-                sender_email = 'ahmedbiram47@gmail.com'
-                sender_password = os.environ.get('GMAIL_APP_PASSWORD', 'ypvg tfbd zdru niow')
+                sender_email = 'rival.gym1@gmail.com'
+                sender_password = os.environ.get('GMAIL_APP_PASSWORD', 'kshbfyznimlxhiqr')
                 
                 if not sender_password:
                     flash('Email password not configured!', 'error')
