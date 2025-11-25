@@ -1049,6 +1049,8 @@ def data_management():
                 import pandas as pd
                 import io
                 
+                print(f"Starting Excel import for file: {file.filename}")
+                
                 # Read the file with optimizations for large files
                 file_content = file.read()
                 # Use read_excel with optimizations for large files
@@ -1065,234 +1067,321 @@ def data_management():
                     flash(f'File has {len(df)} rows. Processing first {max_rows} rows only. Please split large files.', 'error')
                     df = df.head(max_rows)
                 
-                # Expected columns (case-insensitive matching)
-                # Priority: exact column names from Excel sheet first
-                column_mapping = {
-                    'id': ['id'],  # Will be used as custom_id if provided
-                    'name': ['name', 'member name', 'full name'],
-                    'phone': ['phone', 'mobile', 'phone number', 'mobile number'],
-                    'age': ['age'],
-                    'gender': ['gender', 'sex'],
-                    'birthdate': ['date of birth', 'birthdate', 'birth date', 'dob'],
-                    'actual_starting_date': ['actual starting date', 'actual start date'],
-                    'starting_date': ['starting date', 'start date', 'membership start'],
-                    'end_date': ['end date', 'membership end', 'expiry date'],
-                    'membership_packages': ['membership packages', 'membership package', 'package', 'plan'],
-                    'membership_fees': ['membership fee', 'membership fees', 'fees', 'fee', 'price'],
-                    'membership_status': ['status', 'membership status'],
-                    'email': ['email', 'e-mail', 'email address'],  # Optional
-                    'invitations': ['invitations', 'invitation'],  # Optional
-                    'comment': ['comment', 'comments', 'notes', 'note']  # Optional
+                # Expected columns - exact mapping as specified by user
+                # Map columns (case-insensitive, but preserve original case for matching)
+                original_columns = df.columns.tolist()
+                df.columns = df.columns.str.strip()  # Remove whitespace but keep case
+                
+                # Create mapping dictionary with exact column names from user's Excel
+                column_mapping_exact = {
+                    'id': ['id', 'ID'],
+                    'name': ['Name', 'name', 'NAME'],
+                    'date of birth': ['Date of Birth', 'date of birth', 'DATE OF BIRTH'],
+                    'age': ['Age', 'age', 'AGE'],
+                    'gender': ['Gender', 'gender', 'GENDER'],
+                    'membership packages': ['Membership Packages', 'Membership packages', 'membership packages', 'MEMBERSHIP PACKAGES'],
+                    'membership fees': ['Membership Fees', 'Membership fees', 'membership fees', 'MEMBERSHIP FEES'],
+                    'actual starting date': ['Actual Starting Date', 'Actual starting date', 'actual starting date', 'ACTUAL STARTING DATE'],
+                    'starting date': ['Starting Date', 'Starting date', 'starting date', 'STARTING DATE'],
+                    'end date': ['End Date', 'End date', 'end date', 'END DATE'],
+                    'status': ['Status', 'status', 'STATUS'],
+                    'phone': ['Phone', 'phone', 'PHONE']
                 }
                 
-                # Map columns (case-insensitive)
-                df.columns = df.columns.str.strip().str.lower()
+                # Map columns (case-insensitive matching)
                 mapped_columns = {}
-                for target_col, possible_names in column_mapping.items():
-                    for col in df.columns:
-                        if col in possible_names or col == target_col:
-                            mapped_columns[target_col] = col
+                df_lower = df.columns.str.lower().str.strip()
+                
+                for target_col, possible_names in column_mapping_exact.items():
+                    target_lower = target_col.lower().strip()
+                    # Try exact match first
+                    for orig_col in original_columns:
+                        orig_col_clean = orig_col.strip()
+                        orig_col_lower = orig_col_clean.lower()
+                        
+                        # Check if it matches any of the possible names (case-insensitive)
+                        if orig_col_lower == target_lower:
+                            mapped_columns[target_col] = orig_col_clean
                             break
+                        # Also check if it's in the possible names list
+                        for possible in possible_names:
+                            if orig_col_lower == possible.lower().strip():
+                                mapped_columns[target_col] = orig_col_clean
+                                break
+                        if target_col in mapped_columns:
+                            break
+                
+                # Debug: Print what columns were found
+                print(f"Excel columns found: {list(original_columns)}")
+                print(f"Mapped columns: {mapped_columns}")
+                
+                # Verify required columns are found
+                required_cols = ['name']
+                missing_cols = [col for col in required_cols if col not in mapped_columns and 'name' not in [k.lower() for k in mapped_columns.keys()]]
+                if missing_cols:
+                    flash(f'Required column "Name" not found in Excel file. Found columns: {", ".join(original_columns)}', 'error')
+                    return redirect(url_for('data_management'))
                 
                 # Import members in batches to handle large files
                 imported = 0
                 errors = []
-                batch_size = 100  # Process 100 rows at a time
+                skipped = 0
+                batch_size = 200  # Increased batch size for better performance
                 total_rows = len(df)
                 
                 print(f"Starting import of {total_rows} rows in batches of {batch_size}")
                 
                 # Process in batches to avoid memory/timeout issues
                 for batch_start in range(0, total_rows, batch_size):
-                    batch_end = min(batch_start + batch_size, total_rows)
-                    batch_df = df.iloc[batch_start:batch_end]
-                    
-                    print(f"Processing batch {batch_start//batch_size + 1}: rows {batch_start+1} to {batch_end}")
-                    
-                    for idx, row in batch_df.iterrows():
-                        try:
-                            # Extract data with defaults
-                            name = str(row.get(mapped_columns.get('name', ''), '')).strip()
-                            if not name or name == 'nan':
-                                continue  # Skip rows without name
-                            
-                            # Handle ID (use as custom_id if provided, otherwise auto-generate)
-                            custom_id = None
-                            if mapped_columns.get('id'):
-                                try:
-                                    id_val = row.get(mapped_columns.get('id'))
-                                    if pd.notna(id_val):
-                                        custom_id = int(float(id_val))
-                                except:
-                                    pass
-                            
-                            email = str(row.get(mapped_columns.get('email', ''), '')).strip() if mapped_columns.get('email') else None
-                            if email == 'nan' or email == '':
-                                email = None
-                            
-                            phone = str(row.get(mapped_columns.get('phone', ''), '')).strip() if mapped_columns.get('phone') else None
-                            if phone == 'nan' or phone == '' or phone.lower() == 'no number':
-                                phone = None
-                            
-                            age = None
-                            if mapped_columns.get('age'):
-                                try:
-                                    age_val = row.get(mapped_columns.get('age'))
-                                    if pd.notna(age_val):
-                                        age = int(float(age_val))
-                                except:
-                                    pass
-                            
-                            gender = str(row.get(mapped_columns.get('gender', ''), '')).strip() if mapped_columns.get('gender') else None
-                            if gender == 'nan' or gender == '':
-                                gender = None
-                            
-                            # Handle birthdate - convert Excel date format if needed
-                            birthdate = None
-                            if mapped_columns.get('birthdate'):
-                                try:
-                                    birthdate_val = row.get(mapped_columns.get('birthdate'))
-                                    if pd.notna(birthdate_val):
-                                        # If it's a datetime object, format it
-                                        if isinstance(birthdate_val, pd.Timestamp):
-                                            birthdate = birthdate_val.strftime('%m/%d/%Y')
-                                        else:
-                                            birthdate = str(birthdate_val).strip()
-                                            if birthdate == 'nan' or birthdate == '':
-                                                birthdate = None
-                                except:
-                                    pass
-                            
-                            # Handle actual_starting_date - convert Excel date format if needed
-                            actual_starting_date = None
-                            if mapped_columns.get('actual_starting_date'):
-                                try:
-                                    actual_start_val = row.get(mapped_columns.get('actual_starting_date'))
-                                    if pd.notna(actual_start_val):
-                                        # If it's a datetime object, format it
-                                        if isinstance(actual_start_val, pd.Timestamp):
-                                            actual_starting_date = actual_start_val.strftime('%A, %B %d, %Y')
-                                        else:
-                                            actual_starting_date = str(actual_start_val).strip()
-                                            if actual_starting_date == 'nan' or actual_starting_date == '':
-                                                actual_starting_date = None
-                                except:
-                                    pass
-                            
-                            # Handle starting_date - convert Excel date format if needed
-                            starting_date = None
-                            if mapped_columns.get('starting_date'):
-                                try:
-                                    start_val = row.get(mapped_columns.get('starting_date'))
-                                    if pd.notna(start_val):
-                                        # If it's a datetime object, format it as DD/MM/YYYY
-                                        if isinstance(start_val, pd.Timestamp):
-                                            starting_date = start_val.strftime('%d/%m/%Y')
-                                        else:
-                                            starting_date = str(start_val).strip()
-                                            if starting_date == 'nan' or starting_date == '':
-                                                starting_date = None
-                                except:
-                                    pass
-                            
-                            # Handle end_date - convert Excel date format if needed
-                            end_date = None
-                            if mapped_columns.get('end_date'):
-                                try:
-                                    end_val = row.get(mapped_columns.get('end_date'))
-                                    if pd.notna(end_val):
-                                        # If it's a datetime object, format it as DD/MM/YYYY
-                                        if isinstance(end_val, pd.Timestamp):
-                                            end_date = end_val.strftime('%d/%m/%Y')
-                                        else:
-                                            end_date = str(end_val).strip()
-                                            if end_date == 'nan' or end_date == '':
-                                                end_date = None
-                                except:
-                                    pass
-                            
-                            membership_packages = str(row.get(mapped_columns.get('membership_packages', ''), '')).strip() if mapped_columns.get('membership_packages') else None
-                            if membership_packages == 'nan' or membership_packages == '':
-                                membership_packages = None
-                            
-                            membership_fees = None
-                            if mapped_columns.get('membership_fees'):
-                                try:
-                                    fees_val = row.get(mapped_columns.get('membership_fees'))
-                                    if pd.notna(fees_val):
-                                        membership_fees = float(fees_val)
-                                except:
-                                    pass
-                            
-                            membership_status = str(row.get(mapped_columns.get('membership_status', ''), '')).strip() if mapped_columns.get('membership_status') else None
-                            if membership_status == 'nan' or membership_status == '':
-                                membership_status = None
-                            
-                            invitations = 0
-                            if mapped_columns.get('invitations'):
-                                try:
-                                    inv_val = row.get(mapped_columns.get('invitations'))
-                                    if pd.notna(inv_val):
-                                        invitations = int(float(inv_val))
-                                except:
-                                    pass
-                            
-                            comment = str(row.get(mapped_columns.get('comment', ''), '')).strip() if mapped_columns.get('comment') else None
-                            if comment == 'nan' or comment == '':
-                                comment = None
-                            
-                            # Calculate invitations if package is provided but invitations not set
-                            if invitations == 0 and membership_packages:
-                                invitations = calculate_invitations(membership_packages)
-                            
-                            # Add member with custom_id if provided
-                            add_member(
-                                name=name,
-                                email=email,
-                                phone=phone,
-                                age=age,
-                                gender=gender,
-                                birthdate=birthdate,
-                                actual_starting_date=actual_starting_date,
-                                starting_date=starting_date,
-                                end_date=end_date,
-                                membership_packages=membership_packages,
-                                membership_fees=membership_fees,
-                                membership_status=membership_status,
-                                invitations=invitations,
-                                comment=comment,
-                                custom_id=custom_id
-                            )
-                            imported += 1
-                        except Exception as e:
-                            error_msg = str(e)
-                            # Truncate long error messages
-                            if len(error_msg) > 100:
-                                error_msg = error_msg[:100] + "..."
-                            errors.append(f"Row {idx + 2}: {error_msg}")  # +2 because Excel rows start at 1 and we have header
-                            print(f"Error importing row {idx + 2}: {e}")
-                    
-                    # Commit batch to database periodically
                     try:
-                        # Force a small delay to prevent overwhelming the database
+                        batch_end = min(batch_start + batch_size, total_rows)
+                        batch_df = df.iloc[batch_start:batch_end]
+                        
+                        batch_num = batch_start//batch_size + 1
+                        total_batches = (total_rows + batch_size - 1) // batch_size
+                        print(f"Processing batch {batch_num}/{total_batches}: rows {batch_start+1} to {batch_end}")
+                        
+                        for idx, row in batch_df.iterrows():
+                            try:
+                                # Extract data with defaults - using exact column mapping
+                                # Name (required)
+                                name_col = mapped_columns.get('name') or mapped_columns.get('Name')
+                                if not name_col:
+                                    # Try to find name column by checking all columns
+                                    for col in original_columns:
+                                        if col.lower().strip() == 'name':
+                                            name_col = col
+                                            break
+                                
+                                if not name_col:
+                                    continue  # Skip if no name column found
+                                
+                                name = str(row.get(name_col, '')).strip() if name_col in row.index else ''
+                                if not name or name == 'nan' or name == '':
+                                    continue  # Skip rows without name
+                                
+                                # ID (optional - use as custom_id)
+                                custom_id = None
+                                id_col = mapped_columns.get('id') or mapped_columns.get('ID')
+                                if id_col and id_col in row.index:
+                                    try:
+                                        id_val = row.get(id_col)
+                                        if pd.notna(id_val):
+                                            custom_id = int(float(id_val))
+                                    except:
+                                        pass
+                                
+                                # Phone
+                                phone = None
+                                phone_col = mapped_columns.get('phone') or mapped_columns.get('Phone')
+                                if phone_col and phone_col in row.index:
+                                    phone_val = row.get(phone_col)
+                                    if pd.notna(phone_val):
+                                        phone = str(phone_val).strip()
+                                        if phone == 'nan' or phone == '' or phone.lower() == 'no number':
+                                            phone = None
+                                
+                                # Age
+                                age = None
+                                age_col = mapped_columns.get('age') or mapped_columns.get('Age')
+                                if age_col and age_col in row.index:
+                                    try:
+                                        age_val = row.get(age_col)
+                                        if pd.notna(age_val):
+                                            age = int(float(age_val))
+                                    except:
+                                        pass
+                                
+                                # Gender
+                                gender = None
+                                gender_col = mapped_columns.get('gender') or mapped_columns.get('Gender')
+                                if gender_col and gender_col in row.index:
+                                    gender_val = row.get(gender_col)
+                                    if pd.notna(gender_val):
+                                        gender = str(gender_val).strip()
+                                        if gender == 'nan' or gender == '':
+                                            gender = None
+                                
+                                # Date of Birth → birthdate
+                                birthdate = None
+                                dob_col = mapped_columns.get('date of birth') or mapped_columns.get('Date of Birth')
+                                if dob_col and dob_col in row.index:
+                                    try:
+                                        birthdate_val = row.get(dob_col)
+                                        if pd.notna(birthdate_val):
+                                            if isinstance(birthdate_val, pd.Timestamp):
+                                                birthdate = birthdate_val.strftime('%m/%d/%Y')
+                                            else:
+                                                birthdate = str(birthdate_val).strip()
+                                                if birthdate == 'nan' or birthdate == '':
+                                                    birthdate = None
+                                    except Exception as e:
+                                        print(f"Error processing birthdate: {e}")
+                                
+                                # Actual Starting Date → actual_starting_date
+                                actual_starting_date = None
+                                actual_start_col = mapped_columns.get('actual starting date') or mapped_columns.get('Actual Starting Date')
+                                if actual_start_col and actual_start_col in row.index:
+                                    try:
+                                        actual_start_val = row.get(actual_start_col)
+                                        if pd.notna(actual_start_val):
+                                            if isinstance(actual_start_val, pd.Timestamp):
+                                                actual_starting_date = actual_start_val.strftime('%A, %B %d, %Y')
+                                            else:
+                                                actual_starting_date = str(actual_start_val).strip()
+                                                if actual_starting_date == 'nan' or actual_starting_date == '':
+                                                    actual_starting_date = None
+                                    except Exception as e:
+                                        print(f"Error processing actual_starting_date: {e}")
+                                
+                                # Starting Date → starting_date
+                                starting_date = None
+                                start_col = mapped_columns.get('starting date') or mapped_columns.get('Starting Date')
+                                if start_col and start_col in row.index:
+                                    try:
+                                        start_val = row.get(start_col)
+                                        if pd.notna(start_val):
+                                            if isinstance(start_val, pd.Timestamp):
+                                                starting_date = start_val.strftime('%d/%m/%Y')
+                                            else:
+                                                starting_date = str(start_val).strip()
+                                                if starting_date == 'nan' or starting_date == '':
+                                                    starting_date = None
+                                    except Exception as e:
+                                        print(f"Error processing starting_date: {e}")
+                                
+                                # End Date → end_date
+                                end_date = None
+                                end_col = mapped_columns.get('end date') or mapped_columns.get('End Date')
+                                if end_col and end_col in row.index:
+                                    try:
+                                        end_val = row.get(end_col)
+                                        if pd.notna(end_val):
+                                            if isinstance(end_val, pd.Timestamp):
+                                                end_date = end_val.strftime('%d/%m/%Y')
+                                            else:
+                                                end_date = str(end_val).strip()
+                                                if end_date == 'nan' or end_date == '':
+                                                    end_date = None
+                                    except Exception as e:
+                                        print(f"Error processing end_date: {e}")
+                                
+                                # Membership Packages → membership_packages
+                                membership_packages = None
+                                packages_col = mapped_columns.get('membership packages') or mapped_columns.get('Membership Packages')
+                                if packages_col and packages_col in row.index:
+                                    packages_val = row.get(packages_col)
+                                    if pd.notna(packages_val):
+                                        membership_packages = str(packages_val).strip()
+                                        if membership_packages == 'nan' or membership_packages == '':
+                                            membership_packages = None
+                                
+                                # Membership Fees → membership_fees
+                                membership_fees = None
+                                fees_col = mapped_columns.get('membership fees') or mapped_columns.get('Membership Fees')
+                                if fees_col and fees_col in row.index:
+                                    try:
+                                        fees_val = row.get(fees_col)
+                                        if pd.notna(fees_val):
+                                            membership_fees = float(fees_val)
+                                    except Exception as e:
+                                        print(f"Error processing membership_fees: {e}")
+                                
+                                # Status → membership_status
+                                membership_status = None
+                                status_col = mapped_columns.get('status') or mapped_columns.get('Status')
+                                if status_col and status_col in row.index:
+                                    status_val = row.get(status_col)
+                                    if pd.notna(status_val):
+                                        membership_status = str(status_val).strip()
+                                        if membership_status == 'nan' or membership_status == '':
+                                            membership_status = None
+                                
+                                # Email (optional - not in user's list but keep for compatibility)
+                                email = None
+                                
+                                # Comment (optional - not in user's list but keep for compatibility)
+                                comment = None
+                                
+                                # Calculate invitations if package is provided but invitations not set
+                                invitations = 0
+                                if membership_packages:
+                                    invitations = calculate_invitations(membership_packages)
+                                
+                                # Add member with custom_id if provided
+                                add_member(
+                                    name=name,
+                                    email=email,
+                                    phone=phone,
+                                    age=age,
+                                    gender=gender,
+                                    birthdate=birthdate,
+                                    actual_starting_date=actual_starting_date,
+                                    starting_date=starting_date,
+                                    end_date=end_date,
+                                    membership_packages=membership_packages,
+                                    membership_fees=membership_fees,
+                                    membership_status=membership_status,
+                                    invitations=invitations,
+                                    comment=comment,
+                                    custom_id=custom_id
+                                )
+                                imported += 1
+                            except Exception as e:
+                                error_msg = str(e)
+                                # Truncate long error messages
+                                if len(error_msg) > 100:
+                                    error_msg = error_msg[:100] + "..."
+                                errors.append(f"Row {idx + 2}: {error_msg}")  # +2 because Excel rows start at 1 and we have header
+                                print(f"Error importing row {idx + 2}: {e}")
+                                # Continue processing next row even if this one fails
+                                continue
+                        
+                        # Log batch completion
+                        print(f"Batch {batch_num} completed. Imported so far: {imported} rows")
+                        
+                        # Small delay between batches to prevent overwhelming the database
                         import time
-                        time.sleep(0.1)
-                    except:
-                        pass
+                        time.sleep(0.05)  # Reduced delay for faster processing
+                        
+                    except Exception as batch_error:
+                        # If entire batch fails, log it but continue with next batch
+                        print(f"ERROR in batch {batch_num}: {batch_error}")
+                        errors.append(f"Batch {batch_num} (rows {batch_start+1}-{batch_end}): {str(batch_error)[:100]}")
+                        # Continue to next batch
+                        continue
+                
+                # Final summary
+                print(f"Import completed. Total: {imported} imported, {len(errors)} errors, {total_rows - imported - len(errors)} skipped")
                 
                 if imported > 0:
-                    flash(f'Successfully imported {imported} member(s) out of {total_rows} row(s)!', 'success')
+                    success_msg = f'Successfully imported {imported} member(s) out of {total_rows} row(s)!'
+                    if len(errors) > 0:
+                        success_msg += f' ({len(errors)} row(s) had errors)'
+                    flash(success_msg, 'success')
+                
                 if errors:
-                    error_msg = f'Errors in {len(errors)} row(s): ' + '; '.join(errors[:10])
-                    if len(errors) > 10:
-                        error_msg += f' ... and {len(errors) - 10} more'
+                    # Show summary of errors
+                    error_count = len(errors)
+                    if error_count <= 5:
+                        error_msg = f'Errors in {error_count} row(s): ' + '; '.join(errors)
+                    else:
+                        error_msg = f'Errors in {error_count} row(s). First 5: ' + '; '.join(errors[:5]) + f' ... and {error_count - 5} more'
                     flash(error_msg, 'error')
                 
             except Exception as e:
-                print(f"Error importing Excel: {e}")
+                print(f"CRITICAL ERROR importing Excel: {e}")
                 import traceback
-                traceback.print_exc()
-                flash(f'Error importing Excel file: {str(e)}', 'error')
+                error_trace = traceback.format_exc()
+                print(error_trace)
+                # Show user-friendly error message
+                error_msg = f'Error importing Excel file: {str(e)}'
+                if len(error_msg) > 200:
+                    error_msg = error_msg[:200] + "..."
+                flash(error_msg, 'error')
+                # Also log the full traceback for debugging
+                print("Full error traceback:")
+                print(error_trace)
         
         return redirect(url_for('data_management'))
     
