@@ -188,6 +188,27 @@
         .filter-section button:hover {
             background-color: #42a5f5;
         }
+
+        .download-btn {
+            background-color: #2196F3;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+            margin-left: 10px;
+        }
+
+        .download-btn:hover {
+            background-color: #42a5f5;
+            transform: scale(1.03);
+        }
     </style>
 </head>
 
@@ -201,6 +222,9 @@
         {% if member_name %}
         <a href="{{ url_for('logs') }}" class="filter-btn">Show All Logs</a>
         {% endif %}
+        {% if logs_data %}
+        <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
+        {% endif %}
 
         <h2>{% if member_name %}Edit Logs for {{ member_name }} (ID: {{ member_id }}){% else %}All Member Edit Logs{% endif %}</h2>
 
@@ -213,7 +237,7 @@
 
         <div class="table-container">
             {% if logs_data %}
-            <table>
+            <table id="logsTable">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -258,6 +282,49 @@
             {% endif %}
         </div>
     </section>
+
+    <script>
+        /* DOWNLOAD CSV */
+        function downloadCSV() {
+            let table = document.getElementById("logsTable");
+            if (!table) {
+                alert("No data to download");
+                return;
+            }
+            
+            let rows = table.querySelectorAll("tr");
+            let csv = "";
+
+            rows.forEach((row) => {
+                let cols = row.querySelectorAll("th, td");
+                let rowData = [];
+                cols.forEach((col) => {
+                    // Get text content and clean it up
+                    let text = col.innerText || col.textContent || "";
+                    // Remove line breaks and extra spaces, replace commas with spaces
+                    text = text.replace(/\n/g, " ").replace(/,/g, " ").replace(/\s+/g, " ").trim();
+                    rowData.push('"' + text + '"');
+                });
+                csv += rowData.join(",") + "\n";
+            });
+
+            let blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            
+            // Generate filename based on whether filtering by member
+            {% if member_name %}
+            let filename = "edit_logs_member_{{ member_id }}_{{ member_name|replace(' ', '_') }}.csv";
+            {% else %}
+            let filename = "all_edit_logs.csv";
+            {% endif %}
+            link.download = filename;
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
 </body>
 
 </html>
