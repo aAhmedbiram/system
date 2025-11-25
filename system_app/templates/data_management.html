@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Management - Rival Gym System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #fff;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .section {
+            background: rgba(34, 34, 34, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #4caf50;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .info-box {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            color: #ffc107;
+        }
+
+        .warning-box {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid #f44336;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .warning-box p {
+            margin: 5px 0;
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #4caf50;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-danger {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #e53935;
+            transform: scale(1.02);
+        }
+
+        .btn-primary {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #66d66a;
+            transform: scale(1.02);
+        }
+
+        .btn-secondary {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #42a5f5;
+            transform: scale(1.02);
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-box h3 {
+            margin: 0;
+            color: #4caf50;
+            font-size: 18px;
+        }
+
+        .stat-box p {
+            margin: 10px 0 0 0;
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .excel-format {
+            background: rgba(34, 34, 34, 0.95);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+
+        .excel-format table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .excel-format th,
+        .excel-format td {
+            border: 1px solid #444;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .excel-format th {
+            background: #333;
+            color: #4caf50;
+        }
+
+        .back-btn {
+            display: inline-block;
+            background-color: #666;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .back-btn:hover {
+            background-color: #777;
+            transform: scale(1.03);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Rival Gym System - Data Management</h1>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ category }}" style="max-width: 900px; margin: 20px auto; padding: 16px; border-radius: 10px; font-weight: bold; text-align: center; background: {% if category == 'error' %}rgba(198, 40, 40, 0.95){% else %}rgba(46, 125, 50, 0.95){% endif %}; color: white; border: 1px solid {% if category == 'error' %}#e53935{% else %}#4caf50{% endif %};">
+            {{ message | safe }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="container">
+        <!-- Statistics -->
+        <div class="section">
+            <h2>Current Data Statistics</h2>
+            <div class="stats">
+                <div class="stat-box">
+                    <h3>Total Members</h3>
+                    <p>{{ member_count }}</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Attendance Records</h3>
+                    <p>{{ attendance_count }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete All Data Section -->
+        <div class="section">
+            <h2>Delete All Data</h2>
+            <div class="warning-box">
+                <p>⚠️ WARNING: This will permanently delete ALL data from:</p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>All Members</li>
+                    <li>All Attendance Records</li>
+                    <li>All Edit Logs</li>
+                    <li>All Invitation Records</li>
+                    <li>All Attendance Backup Records</li>
+                </ul>
+                <p style="margin-top: 10px;">This action CANNOT be undone! Make sure you have a backup before proceeding.</p>
+            </div>
+            <form method="POST" onsubmit="return confirm('Are you ABSOLUTELY SURE you want to delete ALL data? This cannot be undone! Type OK to confirm.');">
+                <input type="hidden" name="action" value="delete_all">
+                <button type="submit" class="btn btn-danger">Delete All Data</button>
+            </form>
+        </div>
+
+        <!-- Excel Import Section -->
+        <div class="section">
+            <h2>Import Members from Excel</h2>
+            <div class="info-box">
+                <p>📋 Excel File Format Requirements:</p>
+                <ul style="margin: 10px 0; padding-left: 20px; color: #ffc107;">
+                    <li>File format: .xlsx or .xls</li>
+                    <li>First row should contain column headers</li>
+                    <li>Required column: <strong>Name</strong></li>
+                    <li>Optional columns: Email, Phone, Age, Gender, Birthdate, Actual Starting Date, Starting Date, End Date, Membership Packages, Membership Fees, Membership Status, Invitations, Comment</li>
+                </ul>
+            </div>
+
+            <div class="excel-format">
+                <p style="color: #4caf50; margin-bottom: 10px;"><strong>Example Excel Format:</strong></p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Age</th>
+                            <th>Gender</th>
+                            <th>Membership Packages</th>
+                            <th>Membership Fees</th>
+                            <th>Membership Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>John Doe</td>
+                            <td>john@example.com</td>
+                            <td>1234567890</td>
+                            <td>25</td>
+                            <td>Male</td>
+                            <td>3 Months</td>
+                            <td>300</td>
+                            <td>ACT</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="import_excel">
+                <div class="form-group">
+                    <label for="excel_file">Select Excel File:</label>
+                    <input type="file" id="excel_file" name="excel_file" accept=".xlsx,.xls" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Import Members from Excel</button>
+            </form>
+        </div>
+
+        <div style="text-align: center;">
+            <a href="{{ url_for('index') }}" class="back-btn">Back to Home</a>
+        </div>
+    </div>
+</body>
+</html>
+

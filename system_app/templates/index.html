@@ -297,6 +297,7 @@
         <a class="attendance-btn" href="{{ url_for('invitations') }}" style="background-color: #9c27b0;">Invitations</a>
         {% if session.username == 'rino' %}
         <a class="send-email-btn" href="{{ url_for('send_email') }}">Send Email to Members</a>
+        <a class="send-email-btn" href="{{ url_for('data_management') }}" style="background-color: #f44336;">Data Management</a>
         {% endif %}
         <form action="{{ url_for('logout') }}" method="get" style="display: inline;">
             <button class="logout" type="submit">Logout</button>

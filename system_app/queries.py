@@ -266,6 +266,30 @@ def delete_member(member_id):
     query_db('DELETE FROM members WHERE id = %s', (member_id,), commit=True)
 
 
+def delete_all_data():
+    """Delete all data from all tables (except users table)"""
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    cur = conn.cursor()
+    try:
+        # Delete in order to respect foreign key constraints
+        # Tables with CASCADE will be deleted automatically when members are deleted
+        cur.execute('TRUNCATE TABLE invitations RESTART IDENTITY CASCADE')
+        cur.execute('TRUNCATE TABLE member_logs RESTART IDENTITY CASCADE')
+        cur.execute('TRUNCATE TABLE attendance RESTART IDENTITY CASCADE')
+        cur.execute('TRUNCATE TABLE attendance_backup RESTART IDENTITY CASCADE')
+        cur.execute('TRUNCATE TABLE members RESTART IDENTITY CASCADE')
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"Error deleting all data: {e}")
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+
+
 def search_members(name=None, phone=None, email=None):
     conditions = []
     args = []

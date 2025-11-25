@@ -17,7 +17,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
-    add_member, get_member, update_member, delete_member,
+    add_member, get_member, update_member, delete_member, delete_all_data,
     add_attendance, get_all_logs, get_member_logs,
     use_invitation, get_all_invitations, get_member_invitations
 )
@@ -1010,6 +1010,206 @@ def send_email():
         traceback.print_exc()
         flash(error_msg, 'error')
         return render_template('send_email.html')
+
+
+@app.route('/data_management', methods=['GET', 'POST'])
+@rino_required
+def data_management():
+    """Page for deleting all data and importing Excel"""
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'delete_all':
+            try:
+                delete_all_data()
+                flash('All data deleted successfully! You can now import your Excel file.', 'success')
+            except Exception as e:
+                print(f"Error deleting all data: {e}")
+                import traceback
+                traceback.print_exc()
+                flash(f'Error deleting all data: {str(e)}', 'error')
+        
+        elif action == 'import_excel':
+            try:
+                if 'excel_file' not in request.files:
+                    flash('No file selected!', 'error')
+                    return redirect(url_for('data_management'))
+                
+                file = request.files['excel_file']
+                if file.filename == '':
+                    flash('No file selected!', 'error')
+                    return redirect(url_for('data_management'))
+                
+                if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+                    flash('Please upload an Excel file (.xlsx or .xls)!', 'error')
+                    return redirect(url_for('data_management'))
+                
+                # Read Excel file
+                import pandas as pd
+                import io
+                
+                # Read the file
+                file_content = file.read()
+                df = pd.read_excel(io.BytesIO(file_content))
+                
+                # Expected columns (case-insensitive matching)
+                column_mapping = {
+                    'name': ['name', 'member name', 'full name'],
+                    'email': ['email', 'e-mail', 'email address'],
+                    'phone': ['phone', 'mobile', 'phone number', 'mobile number'],
+                    'age': ['age'],
+                    'gender': ['gender', 'sex'],
+                    'birthdate': ['birthdate', 'birth date', 'date of birth', 'dob'],
+                    'actual_starting_date': ['actual starting date', 'actual start date'],
+                    'starting_date': ['starting date', 'start date', 'membership start'],
+                    'end_date': ['end date', 'membership end', 'expiry date'],
+                    'membership_packages': ['membership packages', 'package', 'membership package', 'plan'],
+                    'membership_fees': ['membership fees', 'fees', 'fee', 'price'],
+                    'membership_status': ['membership status', 'status'],
+                    'invitations': ['invitations', 'invitation'],
+                    'comment': ['comment', 'comments', 'notes']
+                }
+                
+                # Map columns (case-insensitive)
+                df.columns = df.columns.str.strip().str.lower()
+                mapped_columns = {}
+                for target_col, possible_names in column_mapping.items():
+                    for col in df.columns:
+                        if col in possible_names or col == target_col:
+                            mapped_columns[target_col] = col
+                            break
+                
+                # Import members
+                imported = 0
+                errors = []
+                
+                for idx, row in df.iterrows():
+                    try:
+                        # Extract data with defaults
+                        name = str(row.get(mapped_columns.get('name', ''), '')).strip()
+                        if not name or name == 'nan':
+                            continue  # Skip rows without name
+                        
+                        email = str(row.get(mapped_columns.get('email', ''), '')).strip() if mapped_columns.get('email') else None
+                        if email == 'nan' or email == '':
+                            email = None
+                        
+                        phone = str(row.get(mapped_columns.get('phone', ''), '')).strip() if mapped_columns.get('phone') else None
+                        if phone == 'nan' or phone == '':
+                            phone = None
+                        
+                        age = None
+                        if mapped_columns.get('age'):
+                            try:
+                                age_val = row.get(mapped_columns.get('age'))
+                                if pd.notna(age_val):
+                                    age = int(float(age_val))
+                            except:
+                                pass
+                        
+                        gender = str(row.get(mapped_columns.get('gender', ''), '')).strip() if mapped_columns.get('gender') else None
+                        if gender == 'nan' or gender == '':
+                            gender = None
+                        
+                        birthdate = str(row.get(mapped_columns.get('birthdate', ''), '')).strip() if mapped_columns.get('birthdate') else None
+                        if birthdate == 'nan' or birthdate == '':
+                            birthdate = None
+                        
+                        actual_starting_date = str(row.get(mapped_columns.get('actual_starting_date', ''), '')).strip() if mapped_columns.get('actual_starting_date') else None
+                        if actual_starting_date == 'nan' or actual_starting_date == '':
+                            actual_starting_date = None
+                        
+                        starting_date = str(row.get(mapped_columns.get('starting_date', ''), '')).strip() if mapped_columns.get('starting_date') else None
+                        if starting_date == 'nan' or starting_date == '':
+                            starting_date = None
+                        
+                        end_date = str(row.get(mapped_columns.get('end_date', ''), '')).strip() if mapped_columns.get('end_date') else None
+                        if end_date == 'nan' or end_date == '':
+                            end_date = None
+                        
+                        membership_packages = str(row.get(mapped_columns.get('membership_packages', ''), '')).strip() if mapped_columns.get('membership_packages') else None
+                        if membership_packages == 'nan' or membership_packages == '':
+                            membership_packages = None
+                        
+                        membership_fees = None
+                        if mapped_columns.get('membership_fees'):
+                            try:
+                                fees_val = row.get(mapped_columns.get('membership_fees'))
+                                if pd.notna(fees_val):
+                                    membership_fees = float(fees_val)
+                            except:
+                                pass
+                        
+                        membership_status = str(row.get(mapped_columns.get('membership_status', ''), '')).strip() if mapped_columns.get('membership_status') else None
+                        if membership_status == 'nan' or membership_status == '':
+                            membership_status = None
+                        
+                        invitations = 0
+                        if mapped_columns.get('invitations'):
+                            try:
+                                inv_val = row.get(mapped_columns.get('invitations'))
+                                if pd.notna(inv_val):
+                                    invitations = int(float(inv_val))
+                            except:
+                                pass
+                        
+                        comment = str(row.get(mapped_columns.get('comment', ''), '')).strip() if mapped_columns.get('comment') else None
+                        if comment == 'nan' or comment == '':
+                            comment = None
+                        
+                        # Calculate invitations if package is provided but invitations not set
+                        if invitations == 0 and membership_packages:
+                            invitations = calculate_invitations(membership_packages)
+                        
+                        # Add member
+                        add_member(
+                            name=name,
+                            email=email,
+                            phone=phone,
+                            age=age,
+                            gender=gender,
+                            birthdate=birthdate,
+                            actual_starting_date=actual_starting_date,
+                            starting_date=starting_date,
+                            end_date=end_date,
+                            membership_packages=membership_packages,
+                            membership_fees=membership_fees,
+                            membership_status=membership_status,
+                            invitations=invitations,
+                            comment=comment
+                        )
+                        imported += 1
+                    except Exception as e:
+                        errors.append(f"Row {idx + 2}: {str(e)}")  # +2 because Excel rows start at 1 and we have header
+                
+                if imported > 0:
+                    flash(f'Successfully imported {imported} member(s)!', 'success')
+                if errors:
+                    error_msg = f'Errors in {len(errors)} row(s): ' + '; '.join(errors[:10])
+                    if len(errors) > 10:
+                        error_msg += f' ... and {len(errors) - 10} more'
+                    flash(error_msg, 'error')
+                
+            except Exception as e:
+                print(f"Error importing Excel: {e}")
+                import traceback
+                traceback.print_exc()
+                flash(f'Error importing Excel file: {str(e)}', 'error')
+        
+        return redirect(url_for('data_management'))
+    
+    # GET request - show data management page
+    try:
+        member_count = query_db('SELECT COUNT(*) as count FROM members', one=True)
+        attendance_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
+        return render_template('data_management.html',
+                            member_count=member_count['count'] if member_count else 0,
+                            attendance_count=attendance_count['count'] if attendance_count else 0)
+    except Exception as e:
+        print(f"Error in data_management route: {e}")
+        import traceback
+        traceback.print_exc()
+        return render_template('data_management.html', member_count=0, attendance_count=0)
 
 # === Run application ===
 if __name__ == '__main__':
