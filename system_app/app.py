@@ -1244,7 +1244,7 @@ def offers():
 
 
 def process_offer_with_ai(offer_text):
-    """Process offer text with OpenAI AI and return structured data"""
+    """Process offer text with OpenAI AI and return structured data - Enhanced with smarter AI"""
     try:
         # Try to import OpenAI
         try:
@@ -1262,44 +1262,89 @@ def process_offer_with_ai(offer_text):
         # Initialize OpenAI client
         client = openai.OpenAI(api_key=api_key)
         
-        # Create a detailed prompt for extracting structured offer information
-        prompt = f"""Analyze the following gym membership offer and extract all relevant information in a structured format. 
-Return the information as a JSON object with the following fields (use null if information is not available):
+        # Enhanced, more intelligent prompt that understands context better
+        system_prompt = """You are an expert business analyst specializing in gym and fitness center membership offers. 
+Your task is to intelligently analyze offer descriptions and extract ALL relevant information with deep understanding of context.
 
-- title: A short, catchy title for the offer
-- duration: Membership duration (e.g., "3 months", "6 months", "1 year")
-- price: Price with currency symbol (e.g., "$300", "AED 500")
-- original_price: Original price if this is a discount offer
-- discount_percentage: Discount percentage if applicable
-- features: List of features/benefits included (e.g., "Personal Training Sessions", "Nutrition Consultation", "Gym Access")
-- number_of_sessions: Number of personal training sessions if mentioned
-- valid_until: Expiry date or validity period
-- eligibility: Who is eligible (e.g., "New Members Only", "Existing Members", "All Members")
-- offer_type: Type of offer (e.g., "Special Promotion", "Limited Time Offer", "Standard Offer")
-- terms_and_conditions: Any terms, conditions, or restrictions mentioned
-- description: A brief summary of the offer
+You understand:
+- Implied information (e.g., if price is mentioned without currency, infer from context)
+- Relative dates (e.g., "end of month", "next week", "in 2 days")
+- Discount calculations (if original and new price are mentioned)
+- Membership tiers and what they typically include
+- Common gym terminology and abbreviations
+- Multiple offers in one text
+- Hidden conditions or restrictions
 
-Offer text: "{offer_text}"
+Be thorough, accurate, and extract every piece of valuable information. Think like a human business analyst would."""
 
-Return ONLY a valid JSON object, no additional text or explanation."""
+        user_prompt = f"""Analyze this gym membership offer with deep understanding and extract ALL information intelligently:
 
-        # Call OpenAI API
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # You can use "gpt-4" for better results
-            messages=[
-                {"role": "system", "content": "You are an expert at analyzing gym membership offers and extracting structured information. Always return valid JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,  # Lower temperature for more consistent, structured output
-            max_tokens=500
-        )
+"{offer_text}"
+
+Extract and return a comprehensive JSON object with these fields (use null only if truly not available or cannot be inferred):
+
+1. title: Create a compelling, professional title that captures the essence of the offer
+2. duration: Membership duration - be smart about interpreting "monthly", "quarterly", "annual", etc.
+3. price: Final price with currency (infer currency from context if not specified)
+4. original_price: Original/regular price if this is a discounted offer
+5. discount_amount: The actual discount amount (price difference)
+6. discount_percentage: Calculate percentage if both prices are available
+7. savings: How much the customer saves (in currency and percentage)
+8. features: Comprehensive list of ALL features, benefits, services included (be thorough)
+9. number_of_sessions: Personal training sessions count (if any)
+10. session_duration: Duration of each session if mentioned
+11. valid_from: When the offer starts (be smart about "now", "today", dates)
+12. valid_until: When the offer expires (understand relative dates like "end of month", "next week")
+13. eligibility: Who can use this (new members, existing, students, seniors, etc.)
+14. offer_type: Categorize (Limited Time, Special Promotion, Seasonal, Referral, etc.)
+15. payment_options: Payment plans, installments, upfront payment requirements
+16. restrictions: Any limitations, blackout dates, time restrictions
+17. terms_and_conditions: All terms, conditions, fine print, requirements
+18. additional_benefits: Any extra perks (locker, towel service, guest passes, etc.)
+19. cancellation_policy: Refund or cancellation terms if mentioned
+20. description: A well-written, professional summary of the entire offer
+21. target_audience: Who this offer is best suited for
+22. urgency_indicators: Limited spots, limited time, etc.
+23. comparison_value: Why this offer is valuable compared to regular pricing
+
+Think deeply about the context. If someone says "50% off", calculate what the original price would be if current price is given.
+If they say "valid until end of month", calculate the actual date.
+If they mention "3 PT sessions", understand this means Personal Training.
+Be intelligent about abbreviations and gym terminology.
+
+Return ONLY valid JSON, no markdown, no explanations, just the JSON object."""
+
+        # Try GPT-4 first (smarter), fallback to GPT-3.5-turbo
+        models_to_try = ["gpt-4", "gpt-4-turbo-preview", "gpt-3.5-turbo"]
+        ai_response = None
+        last_error = None
         
-        # Extract the response
-        ai_response = response.choices[0].message.content.strip()
+        for model in models_to_try:
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.2,  # Lower for more consistent, accurate extraction
+                    max_tokens=1500,  # Increased for comprehensive extraction
+                    response_format={"type": "json_object"}  # Force JSON output
+                )
+                ai_response = response.choices[0].message.content.strip()
+                print(f"Successfully used model: {model}")
+                break
+            except Exception as e:
+                last_error = e
+                print(f"Model {model} failed, trying next...")
+                continue
+        
+        if not ai_response:
+            raise Exception(f"All models failed. Last error: {last_error}")
         
         # Parse JSON response
         import json
-        # Remove markdown code blocks if present
+        # Remove markdown code blocks if present (though response_format should prevent this)
         if ai_response.startswith('```'):
             ai_response = ai_response.split('```')[1]
             if ai_response.startswith('json'):
@@ -1308,24 +1353,53 @@ Return ONLY a valid JSON object, no additional text or explanation."""
         
         structured_offer = json.loads(ai_response)
         
-        # Convert to list format for table display
-        # Clean up the data and ensure all fields are strings
+        # Intelligent data cleaning and formatting
         cleaned_offer = {}
         for key, value in structured_offer.items():
-            if value is None:
-                cleaned_offer[key.replace('_', ' ').title()] = '-'
-            elif isinstance(value, list):
-                cleaned_offer[key.replace('_', ' ').title()] = ', '.join(str(v) for v in value)
+            # Skip null values or convert them
+            if value is None or value == "":
+                continue  # Skip empty fields instead of showing "-"
+            
+            # Format key name (snake_case to Title Case)
+            formatted_key = key.replace('_', ' ').title()
+            
+            # Handle different data types intelligently
+            if isinstance(value, list):
+                if len(value) > 0:
+                    # Join list items with proper formatting
+                    cleaned_offer[formatted_key] = ', '.join(str(v) for v in value if v)
+            elif isinstance(value, (int, float)):
+                # Format numbers appropriately
+                if 'price' in key.lower() or 'amount' in key.lower() or 'savings' in key.lower():
+                    # Try to add currency if not present
+                    if '$' not in str(value) and '€' not in str(value) and '£' not in str(value) and 'AED' not in str(value):
+                        cleaned_offer[formatted_key] = f"${value}"
+                    else:
+                        cleaned_offer[formatted_key] = str(value)
+                elif 'percentage' in key.lower() or 'discount' in key.lower():
+                    cleaned_offer[formatted_key] = f"{value}%"
+                else:
+                    cleaned_offer[formatted_key] = str(value)
+            elif isinstance(value, bool):
+                cleaned_offer[formatted_key] = "Yes" if value else "No"
             else:
-                cleaned_offer[key.replace('_', ' ').title()] = str(value)
+                # String values - clean them up
+                str_value = str(value).strip()
+                if str_value:
+                    cleaned_offer[formatted_key] = str_value
         
-        return [cleaned_offer]
+        # If we got good data, return it
+        if cleaned_offer:
+            return [cleaned_offer]
+        else:
+            # If AI returned empty, fall back
+            return process_offer_with_pattern_matching(offer_text)
         
     except json.JSONDecodeError as e:
         import json
         print(f"Error parsing AI JSON response: {e}")
-        if 'ai_response' in locals():
-            print(f"AI Response: {ai_response}")
+        if 'ai_response' in locals() and ai_response:
+            print(f"AI Response: {ai_response[:500]}...")  # Print first 500 chars
         # Fall back to pattern matching
         return process_offer_with_pattern_matching(offer_text)
     except Exception as e:
