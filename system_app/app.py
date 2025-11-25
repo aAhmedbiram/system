@@ -242,12 +242,17 @@ def send_verification_email(email, username, verification_token):
         sender_email = 'rival.gym1@gmail.com'
         sender_password = os.environ.get('GMAIL_APP_PASSWORD', 'kshbfyznimlxhiqr')
         
-        if not sender_password:
+        if not sender_password or sender_password == '':
             print("Warning: Gmail password not configured. Email verification will not be sent.")
             return False
         
-        # Get base URL (for verification link)
-        base_url = request.host_url.rstrip('/')
+        # Get base URL (for verification link) - handle both local and production
+        if request.is_secure:
+            base_url = f"https://{request.host}"
+        else:
+            # For Railway/production, use environment variable or request host
+            base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
+        
         verification_url = f"{base_url}/verify_email/{verification_token}"
         
         # Create email
@@ -279,17 +284,41 @@ def send_verification_email(email, username, verification_token):
         # Send email
         smtp_server = 'smtp.gmail.com'
         try:
-            server = smtplib.SMTP(smtp_server, 587, timeout=30)
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-            server.quit()
-            return True
+            # Try port 587 first (TLS)
+            try:
+                server = smtplib.SMTP(smtp_server, 587, timeout=30)
+                server.starttls(context=ssl.create_default_context())
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+                server.quit()
+                print(f"Verification email sent successfully to {email}")
+                return True
+            except Exception as e1:
+                print(f"Error with port 587: {e1}")
+                # Try port 465 (SSL) as fallback
+                try:
+                    context = ssl.create_default_context()
+                    server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30, context=context)
+                    server.login(sender_email, sender_password)
+                    server.send_message(msg)
+                    server.quit()
+                    print(f"Verification email sent successfully to {email} (via SSL)")
+                    return True
+                except Exception as e2:
+                    print(f"Error with port 465: {e2}")
+                    print(f"Failed to send verification email to {email}")
+                    import traceback
+                    traceback.print_exc()
+                    return False
         except Exception as e:
             print(f"Error sending verification email: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     except Exception as e:
         print(f"Error preparing verification email: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -420,6 +449,63 @@ def verify_email(token):
     except Exception as e:
         print(f"Error verifying email: {e}")
         return render_template('verify_email.html', success=False, error_message='An error occurred during verification.')
+
+@app.route('/resend_verification', methods=['GET', 'POST'])
+@csrf.exempt  # Exempt from CSRF (public endpoint)
+def resend_verification():
+    """Resend verification email to user"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        
+        if not email:
+            flash('Email address is required!', 'error')
+            return render_template('resend_verification.html')
+        
+        try:
+            # Validate email
+            validation = validate_email(email)
+            email = validation.email
+        except EmailNotValidError as e:
+            flash(f'Invalid email address: {str(e)}', 'error')
+            return render_template('resend_verification.html')
+        
+        # Find user by email
+        user = query_db(
+            'SELECT id, username, email_verified, verification_token, token_expires FROM users WHERE email = %s',
+            (email,), one=True
+        )
+        
+        if not user:
+            flash('No account found with this email address.', 'error')
+            return render_template('resend_verification.html')
+        
+        # Check if already verified
+        if user.get('email_verified', False):
+            flash('This email is already verified. You can log in now.', 'success')
+            return redirect(url_for('login'))
+        
+        # Generate new token
+        verification_token = secrets.token_urlsafe(32)
+        token_expires = datetime.now() + timedelta(hours=24)
+        
+        # Update user with new token
+        query_db(
+            'UPDATE users SET verification_token = %s, token_expires = %s WHERE id = %s',
+            (verification_token, token_expires, user['id']), commit=True
+        )
+        
+        # Send verification email
+        email_sent = send_verification_email(email, user['username'], verification_token)
+        
+        if email_sent:
+            flash('Verification email sent successfully! Please check your inbox.', 'success')
+        else:
+            flash(f'Could not send email. Manual verification link: {request.host_url}verify_email/{verification_token}', 'error')
+            print(f"MANUAL VERIFICATION TOKEN for {user['username']} ({email}): {verification_token}")
+        
+        return redirect(url_for('login'))
+    
+    return render_template('resend_verification.html')
 
 # @app.route("/home")
 # def index():
