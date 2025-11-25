@@ -108,6 +108,34 @@ def create_table():
             )
         ''')
 
+        # Create indexes for better query performance
+        try:
+            # Indexes for members table (frequently queried columns)
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_members_name ON members(name)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_members_phone ON members(phone)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_members_email ON members(email)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_members_id ON members(id)')
+            
+            # Indexes for attendance table
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_member_id ON attendance(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(attendance_date)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_num ON attendance(num)')
+            
+            # Indexes for member_logs table
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_member_logs_member_id ON member_logs(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_member_logs_edit_time ON member_logs(edit_time)')
+            
+            # Indexes for invitations table
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_invitations_member_id ON invitations(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_invitations_used_date ON invitations(used_date)')
+            
+            conn.commit()
+            print("PostgreSQL tables and indexes created successfully!")
+        except Exception as e:
+            print(f"Error creating indexes: {e}")
+            # Don't fail if indexes already exist
+            conn.rollback()
+
         conn.commit()
         print("PostgreSQL tables created successfully!")
     except Exception as e:

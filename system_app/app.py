@@ -66,8 +66,9 @@ def rino_required(f):
 def index():
     # Don't do any flash here ever
     try:
-        attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
-        members_data = query_db('SELECT * FROM members ORDER BY id DESC')
+        # Limit to recent 50 records for performance
+        attendance_data = query_db('SELECT * FROM attendance ORDER BY num DESC LIMIT 50')
+        members_data = query_db('SELECT * FROM members ORDER BY id DESC LIMIT 50')
         return render_template("index.html", 
                             attendance_data=attendance_data or [], 
                             members_data=members_data or [])
@@ -299,14 +300,32 @@ def add_member_done():
 @login_required
 def all_members():
     try:
-        members_data = query_db('SELECT * FROM members ORDER BY id ASC')
-        return render_template("all_members.html", members_data=members_data or [])
+        # Pagination: 50 items per page
+        page = request.args.get('page', 1, type=int)
+        per_page = 50
+        offset = (page - 1) * per_page
+        
+        # Get total count for pagination
+        total_count = query_db('SELECT COUNT(*) as count FROM members', one=True)
+        total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+        
+        # Get paginated data
+        members_data = query_db(
+            'SELECT * FROM members ORDER BY id ASC LIMIT %s OFFSET %s',
+            (per_page, offset)
+        )
+        
+        return render_template("all_members.html", 
+                            members_data=members_data or [],
+                            page=page,
+                            total_pages=total_pages,
+                            total_count=total_count['count'] if total_count else 0)
     except Exception as e:
         print(f"Error in all_members route: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error loading members: {str(e)}", "error")
-        return render_template("all_members.html", members_data=[])
+        return render_template("all_members.html", members_data=[], page=1, total_pages=1, total_count=0)
 
 # === Edit member ===
 @app.route("/edit_member/<int:member_id>", methods=["GET", "POST"])
@@ -533,28 +552,58 @@ def attendance_table():
                 flash(f"Error loading member: {str(e)}", "error")
 
         try:
+            # Pagination: 50 items per page
+            page = request.args.get('page', 1, type=int)
+            per_page = 50
+            offset = (page - 1) * per_page
+            
+            # Get total count for pagination
+            total_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
+            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+            
+            # Get paginated data
             data = query_db("""
                 SELECT a.*, m.comment 
                 FROM attendance a 
                 LEFT JOIN members m ON a.member_id = m.id 
-                ORDER BY a.num ASC
-            """)
-            return render_template("attendance_table.html", members_data=data or [])
+                ORDER BY a.num DESC
+                LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            return render_template("attendance_table.html", 
+                                members_data=data or [],
+                                page=page,
+                                total_pages=total_pages,
+                                total_count=total_count['count'] if total_count else 0)
         except Exception as e:
             print(f"Error loading attendance data: {e}")
             import traceback
             traceback.print_exc()
             flash(f"Error loading attendance: {str(e)}", "error")
-            return render_template("attendance_table.html", members_data=[])
+            return render_template("attendance_table.html", members_data=[], page=1, total_pages=1, total_count=0)
 
     try:
+        # Pagination: 50 items per page
+        page = request.args.get('page', 1, type=int)
+        per_page = 50
+        offset = (page - 1) * per_page
+        
+        # Get total count for pagination
+        total_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
+        total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+        
+        # Get paginated data
         data = query_db("""
             SELECT a.*, m.comment 
             FROM attendance a 
             LEFT JOIN members m ON a.member_id = m.id 
-            ORDER BY a.num ASC
-        """)
-        return render_template("attendance_table.html", members_data=data or [])
+            ORDER BY a.num DESC
+            LIMIT %s OFFSET %s
+        """, (per_page, offset))
+        return render_template("attendance_table.html", 
+                            members_data=data or [],
+                            page=page,
+                            total_pages=total_pages,
+                            total_count=total_count['count'] if total_count else 0)
     except Exception as e:
         print(f"Error loading attendance data: {e}")
         import traceback
@@ -689,16 +738,33 @@ def invitations():
     
     # GET request - show invitations page
     try:
-        invitations_data = get_all_invitations()
+        # Pagination: 50 items per page
+        page = request.args.get('page', 1, type=int)
+        per_page = 50
+        offset = (page - 1) * per_page
+        
+        # Get total count for pagination
+        total_count = query_db('SELECT COUNT(*) as count FROM invitations', one=True)
+        total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+        
+        # Get paginated invitations
+        invitations_data = query_db(
+            'SELECT * FROM invitations ORDER BY id ASC LIMIT %s OFFSET %s',
+            (per_page, offset)
+        )
+        
         return render_template('invitations.html', 
                              invitations_data=invitations_data or [],
-                             members_data=query_db('SELECT id, name, invitations FROM members ORDER BY id ASC') or [])
+                             members_data=query_db('SELECT id, name, invitations FROM members ORDER BY id ASC') or [],
+                             page=page,
+                             total_pages=total_pages,
+                             total_count=total_count['count'] if total_count else 0)
     except Exception as e:
         print(f"Error in invitations GET route: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error loading invitations: {str(e)}", "error")
-        return render_template('invitations.html', invitations_data=[], members_data=[])
+        return render_template('invitations.html', invitations_data=[], members_data=[], page=1, total_pages=1, total_count=0)
 
 @app.route('/logs')
 @login_required
@@ -706,24 +772,47 @@ def logs():
     """Display all member edit logs"""
     try:
         member_id = request.args.get('member_id', type=int)
+        page = request.args.get('page', 1, type=int)
+        per_page = 50
+        offset = (page - 1) * per_page
+        
         if member_id:
-            logs_data = get_member_logs(member_id)
+            # Get total count for pagination
+            total_count = query_db('SELECT COUNT(*) as count FROM member_logs WHERE member_id = %s', (member_id,), one=True)
+            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+            
+            # Get paginated logs
+            logs_data = query_db(
+                'SELECT * FROM member_logs WHERE member_id = %s ORDER BY id ASC LIMIT %s OFFSET %s',
+                (member_id, per_page, offset)
+            )
             member = get_member(member_id)
             member_name = member['name'] if member else f"Member ID {member_id}"
         else:
-            logs_data = get_all_logs()
+            # Get total count for pagination
+            total_count = query_db('SELECT COUNT(*) as count FROM member_logs', one=True)
+            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+            
+            # Get paginated logs
+            logs_data = query_db(
+                'SELECT * FROM member_logs ORDER BY id ASC LIMIT %s OFFSET %s',
+                (per_page, offset)
+            )
             member_name = None
         
         return render_template('logs.html', 
                              logs_data=logs_data or [], 
                              member_id=member_id,
-                             member_name=member_name)
+                             member_name=member_name,
+                             page=page,
+                             total_pages=total_pages,
+                             total_count=total_count['count'] if total_count else 0)
     except Exception as e:
         print(f"Error in logs route: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error loading logs: {str(e)}", "error")
-        return render_template('logs.html', logs_data=[], member_id=None, member_name=None)
+        return render_template('logs.html', logs_data=[], member_id=None, member_name=None, page=1, total_pages=1, total_count=0)
 
 @app.route('/send_email', methods=['GET', 'POST'])
 @rino_required
