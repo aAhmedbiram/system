@@ -223,6 +223,108 @@ def add_member(name, email, phone, age, gender, birthdate,
         raise e
 
 
+def bulk_add_members(members_list):
+    """
+    Bulk insert members for faster import.
+    members_list: List of tuples, each tuple contains member data in order:
+    (custom_id, name, email, phone, age, gender, birthdate, actual_starting_date,
+     starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
+    Returns: number of successfully inserted members
+    """
+    if not members_list:
+        return 0
+    
+    conn = None
+    cur = None
+    inserted = 0
+    
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        cur = conn.cursor()
+        
+        # Check if first member has custom_id
+        has_custom_id = members_list[0][0] is not None if len(members_list) > 0 else False
+        
+        if has_custom_id:
+            # Bulk insert with custom_id
+            insert_query = '''
+                INSERT INTO members 
+                (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            '''
+        else:
+            # Bulk insert without custom_id
+            insert_query = '''
+                INSERT INTO members 
+                (name, email, phone, age, gender, birthdate, actual_starting_date, 
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            '''
+        
+        # Use execute_batch for efficient bulk insert
+        from psycopg2.extras import execute_batch
+        execute_batch(cur, insert_query, members_list, page_size=len(members_list))
+        
+        conn.commit()
+        inserted = len(members_list)
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Bulk insert error: {e}")
+        # Fall back to individual inserts if bulk fails
+        print("Falling back to individual inserts...")
+        for member_data in members_list:
+            try:
+                if has_custom_id:
+                    add_member(
+                        name=member_data[1],
+                        email=member_data[2],
+                        phone=member_data[3],
+                        age=member_data[4],
+                        gender=member_data[5],
+                        birthdate=member_data[6],
+                        actual_starting_date=member_data[7],
+                        starting_date=member_data[8],
+                        end_date=member_data[9],
+                        membership_packages=member_data[10],
+                        membership_fees=member_data[11],
+                        membership_status=member_data[12],
+                        invitations=member_data[13],
+                        comment=member_data[14],
+                        custom_id=member_data[0]
+                    )
+                else:
+                    add_member(
+                        name=member_data[0],
+                        email=member_data[1],
+                        phone=member_data[2],
+                        age=member_data[3],
+                        gender=member_data[4],
+                        birthdate=member_data[5],
+                        actual_starting_date=member_data[6],
+                        starting_date=member_data[7],
+                        end_date=member_data[8],
+                        membership_packages=member_data[9],
+                        membership_fees=member_data[10],
+                        membership_status=member_data[11],
+                        invitations=member_data[12],
+                        comment=member_data[13]
+                    )
+                inserted += 1
+            except Exception as individual_error:
+                print(f"Error inserting individual member: {individual_error}")
+                continue
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+    
+    return inserted
+
+
 def get_member(member_id):
     return query_db('SELECT * FROM members WHERE id = %s', (member_id,), one=True)
 

@@ -1126,12 +1126,15 @@ def data_management():
                 imported = 0
                 errors = []
                 skipped = 0
-                batch_size = 500  # Larger batch size for faster processing
+                batch_size = 250  # Optimal batch size to prevent timeouts
                 total_rows = len(df)
                 
                 print(f"Starting import of {total_rows} rows in batches of {batch_size}")
                 # Flash initial message
-                flash(f'Starting import of {total_rows} rows. This may take 5-10 minutes. Please wait and do not close this page...', 'success')
+                flash(f'Starting import of {total_rows} rows. This may take 10-15 minutes. Please wait and do not close this page...', 'success')
+                
+                # Import bulk_add_members function
+                from system_app.queries import bulk_add_members
                 
                 # Process in batches to avoid memory/timeout issues
                 for batch_start in range(0, total_rows, batch_size):
@@ -1144,9 +1147,12 @@ def data_management():
                         progress_pct = int((batch_num / total_batches) * 100)
                         print(f"Processing batch {batch_num}/{total_batches} ({progress_pct}%): rows {batch_start+1} to {batch_end}")
                         
-                        # Log progress every 10 batches
-                        if batch_num % 10 == 0 or batch_num == 1:
+                        # Log progress every 5 batches
+                        if batch_num % 5 == 0 or batch_num == 1:
                             print(f"Progress: {progress_pct}% - Imported {imported} rows so far")
+                        
+                        # Collect all rows in this batch for bulk insert
+                        batch_members = []
                         
                         for idx, row in batch_df.iterrows():
                             try:
@@ -1315,44 +1321,94 @@ def data_management():
                                 if membership_packages:
                                     invitations = calculate_invitations(membership_packages)
                                 
-                                # Add member with custom_id if provided
-                                add_member(
-                                    name=name,
-                                    email=email,
-                                    phone=phone,
-                                    age=age,
-                                    gender=gender,
-                                    birthdate=birthdate,
-                                    actual_starting_date=actual_starting_date,
-                                    starting_date=starting_date,
-                                    end_date=end_date,
-                                    membership_packages=membership_packages,
-                                    membership_fees=membership_fees,
-                                    membership_status=membership_status,
-                                    invitations=invitations,
-                                    comment=comment,
-                                    custom_id=custom_id
-                                )
-                                imported += 1
+                                # Add to batch list for bulk insert
+                                if custom_id is not None:
+                                    batch_members.append((
+                                        custom_id, name, email, phone, age, gender, birthdate,
+                                        actual_starting_date, starting_date, end_date,
+                                        membership_packages, membership_fees, membership_status,
+                                        invitations, comment
+                                    ))
+                                else:
+                                    batch_members.append((
+                                        name, email, phone, age, gender, birthdate,
+                                        actual_starting_date, starting_date, end_date,
+                                        membership_packages, membership_fees, membership_status,
+                                        invitations, comment
+                                    ))
+                                
                             except Exception as e:
                                 error_msg = str(e)
                                 # Truncate long error messages
                                 if len(error_msg) > 100:
                                     error_msg = error_msg[:100] + "..."
                                 errors.append(f"Row {idx + 2}: {error_msg}")  # +2 because Excel rows start at 1 and we have header
-                                print(f"Error importing row {idx + 2}: {e}")
+                                print(f"Error processing row {idx + 2}: {e}")
                                 # Continue processing next row even if this one fails
                                 continue
                         
+                        # Bulk insert the entire batch at once
+                        if batch_members:
+                            try:
+                                batch_imported = bulk_add_members(batch_members)
+                                imported += batch_imported
+                                print(f"Batch {batch_num}: Successfully imported {batch_imported} members")
+                            except Exception as bulk_error:
+                                print(f"Bulk insert failed for batch {batch_num}: {bulk_error}")
+                                errors.append(f"Batch {batch_num} bulk insert failed: {str(bulk_error)[:100]}")
+                                # Fall back to individual inserts for this batch
+                                print(f"Falling back to individual inserts for batch {batch_num}...")
+                                for member_data in batch_members:
+                                    try:
+                                        if len(member_data) == 15:  # Has custom_id
+                                            add_member(
+                                                name=member_data[1],
+                                                email=member_data[2],
+                                                phone=member_data[3],
+                                                age=member_data[4],
+                                                gender=member_data[5],
+                                                birthdate=member_data[6],
+                                                actual_starting_date=member_data[7],
+                                                starting_date=member_data[8],
+                                                end_date=member_data[9],
+                                                membership_packages=member_data[10],
+                                                membership_fees=member_data[11],
+                                                membership_status=member_data[12],
+                                                invitations=member_data[13],
+                                                comment=member_data[14],
+                                                custom_id=member_data[0]
+                                            )
+                                        else:  # No custom_id
+                                            add_member(
+                                                name=member_data[0],
+                                                email=member_data[1],
+                                                phone=member_data[2],
+                                                age=member_data[3],
+                                                gender=member_data[4],
+                                                birthdate=member_data[5],
+                                                actual_starting_date=member_data[6],
+                                                starting_date=member_data[7],
+                                                end_date=member_data[8],
+                                                membership_packages=member_data[9],
+                                                membership_fees=member_data[10],
+                                                membership_status=member_data[11],
+                                                invitations=member_data[12],
+                                                comment=member_data[13]
+                                            )
+                                        imported += 1
+                                    except Exception as individual_error:
+                                        errors.append(f"Row in batch {batch_num}: {str(individual_error)[:100]}")
+                                        continue
+                        
                         # Log batch completion
-                        if batch_num % 5 == 0:  # Log every 5 batches to reduce console spam
+                        if batch_num % 3 == 0:  # Log every 3 batches
                             progress = int((imported/total_rows)*100) if total_rows > 0 else 0
                             print(f"Batch {batch_num}/{total_batches} completed. Imported so far: {imported} rows ({progress}%)")
                         
-                        # Minimal delay - only every 20 batches to speed up processing
+                        # Small delay every 10 batches to prevent overwhelming
                         import time
-                        if batch_num % 20 == 0:
-                            time.sleep(0.05)  # Very short delay
+                        if batch_num % 10 == 0:
+                            time.sleep(0.1)  # Small delay
                         
                     except Exception as batch_error:
                         # If entire batch fails, log it but continue with next batch
