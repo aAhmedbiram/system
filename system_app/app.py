@@ -566,7 +566,7 @@ def attendance_table():
                 SELECT a.*, m.comment 
                 FROM attendance a 
                 LEFT JOIN members m ON a.member_id = m.id 
-                ORDER BY a.num DESC
+                ORDER BY a.num ASC
                 LIMIT %s OFFSET %s
             """, (per_page, offset))
             return render_template("attendance_table.html", 
@@ -596,7 +596,7 @@ def attendance_table():
             SELECT a.*, m.comment 
             FROM attendance a 
             LEFT JOIN members m ON a.member_id = m.id 
-            ORDER BY a.num DESC
+            ORDER BY a.num ASC
             LIMIT %s OFFSET %s
         """, (per_page, offset))
         return render_template("attendance_table.html", 
