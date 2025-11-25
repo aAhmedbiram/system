@@ -13,6 +13,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email_validator import validate_email, EmailNotValidError
 import re
+import secrets
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -189,11 +191,16 @@ def login():
         
         try:
             user = query_db(
-                'SELECT id, username, password FROM users WHERE username = %s',
+                'SELECT id, username, password, email_verified FROM users WHERE username = %s',
                 (username,), one=True
             )
             # Fix: check_password_hash takes (hash, password) not (password, hash)
             if user and check_password_hash(user['password'], password):
+                # Check if email is verified
+                if not user.get('email_verified', False):
+                    flash('Please verify your email address before logging in. Check your inbox for the verification link.', 'error')
+                    return render_template('login.html')
+                
                 session['user_id'] = user['id']
                 session['username'] = user['username']
                 session.permanent = True  # Enable permanent session
@@ -215,7 +222,78 @@ def logout():
     flash('Logout successful', 'success')
     return redirect(url_for('login'))
 
+def validate_strong_password(password):
+    """Validate password strength - must have uppercase, lowercase, number, and special char"""
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter"
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter"
+    if not re.search(r'[0-9]', password):
+        return False, "Password must contain at least one number"
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character (!@#$%^&*)"
+    return True, "Password is strong"
+
+def send_verification_email(email, username, verification_token):
+    """Send email verification link to user"""
+    try:
+        sender_email = 'rival.gym1@gmail.com'
+        sender_password = os.environ.get('GMAIL_APP_PASSWORD', 'kshbfyznimlxhiqr')
+        
+        if not sender_password:
+            print("Warning: Gmail password not configured. Email verification will not be sent.")
+            return False
+        
+        # Get base URL (for verification link)
+        base_url = request.host_url.rstrip('/')
+        verification_url = f"{base_url}/verify_email/{verification_token}"
+        
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = email
+        msg['Subject'] = 'Verify Your Email - Rival Gym System'
+        
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h2 style="color: #4caf50;">Welcome to Rival Gym System, {username}!</h2>
+                <p>Thank you for signing up. Please verify your email address by clicking the button below:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{verification_url}" style="background-color: #4caf50; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Verify Email Address</a>
+                </div>
+                <p style="color: #666; font-size: 12px;">Or copy and paste this link into your browser:</p>
+                <p style="color: #666; font-size: 12px; word-break: break-all;">{verification_url}</p>
+                <p style="color: #666; font-size: 12px; margin-top: 20px;">This link will expire in 24 hours.</p>
+                <p style="color: #666; font-size: 12px;">If you didn't create this account, please ignore this email.</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(body, 'html'))
+        
+        # Send email
+        smtp_server = 'smtp.gmail.com'
+        try:
+            server = smtplib.SMTP(smtp_server, 587, timeout=30)
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+            server.quit()
+            return True
+        except Exception as e:
+            print(f"Error sending verification email: {e}")
+            return False
+    except Exception as e:
+        print(f"Error preparing verification email: {e}")
+        return False
+
 @app.route('/signup', methods=['GET', 'POST'])
+@csrf.exempt  # Exempt signup from CSRF (public endpoint)
 def signup():
     # If already logged in, redirect to index
     if 'user_id' in session:
@@ -231,9 +309,27 @@ def signup():
             flash('All fields are required!', 'error')
             return render_template('signup.html')
         
-        # Validate password length
-        if len(password) < 6:
-            flash('Password must be at least 6 characters!', 'error')
+        # Validate username format
+        if not re.match(r'^[a-zA-Z0-9_]+$', username):
+            flash('Username can only contain letters, numbers, and underscores!', 'error')
+            return render_template('signup.html')
+        
+        if len(username) < 3 or len(username) > 30:
+            flash('Username must be between 3 and 30 characters!', 'error')
+            return render_template('signup.html')
+        
+        # Validate email format
+        try:
+            validation = validate_email(email)
+            email = validation.email
+        except EmailNotValidError as e:
+            flash(f'Invalid email address: {str(e)}', 'error')
+            return render_template('signup.html')
+        
+        # Validate strong password
+        is_valid, error_msg = validate_strong_password(password)
+        if not is_valid:
+            flash(error_msg, 'error')
             return render_template('signup.html')
         
         # Check if username already exists
@@ -254,18 +350,76 @@ def signup():
             flash('Email already in use!', 'error')
             return render_template('signup.html')
         
+        # Generate verification token
+        verification_token = secrets.token_urlsafe(32)
+        token_expires = datetime.now() + timedelta(hours=24)
+        
         # Hash password and create user
         hashed_password = generate_password_hash(password)
         try:
             query_db(
-                'INSERT INTO users (username, email, password) VALUES (%s, %s, %s)',
-                (username, email, hashed_password), commit=True
+                'INSERT INTO users (username, email, password, email_verified, verification_token, token_expires) VALUES (%s, %s, %s, %s, %s, %s)',
+                (username, email, hashed_password, False, verification_token, token_expires), commit=True
             )
-            flash('Account created successfully! Please log in.', 'success')
+            
+            # Send verification email
+            email_sent = send_verification_email(email, username, verification_token)
+            
+            if email_sent:
+                flash('Account created successfully! Please check your email to verify your account before logging in.', 'success')
+            else:
+                flash('Account created, but verification email could not be sent. Please contact support.', 'error')
+            
             return redirect(url_for('login'))
         except Exception as e:
-            flash(f'Error: {str(e)}', 'error')
+            print(f"Error creating user: {e}")
+            flash(f'Error creating account: {str(e)}', 'error')
     return render_template('signup.html')
+
+@app.route('/verify_email/<token>')
+def verify_email(token):
+    """Verify user email with token"""
+    try:
+        # Find user with this token
+        user = query_db(
+            'SELECT id, username, email_verified, token_expires FROM users WHERE verification_token = %s',
+            (token,), one=True
+        )
+        
+        if not user:
+            return render_template('verify_email.html', success=False, error_message='Invalid verification token.')
+        
+        # Check if already verified
+        if user.get('email_verified', False):
+            return render_template('verify_email.html', success=True, error_message='Email already verified.')
+        
+        # Check if token expired
+        token_expires = user.get('token_expires')
+        if token_expires:
+            if datetime.now() > token_expires:
+                # Generate new token
+                new_token = secrets.token_urlsafe(32)
+                new_expires = datetime.now() + timedelta(hours=24)
+                query_db(
+                    'UPDATE users SET verification_token = %s, token_expires = %s WHERE id = %s',
+                    (new_token, new_expires, user['id']), commit=True
+                )
+                # Resend email
+                user_email = query_db('SELECT email, username FROM users WHERE id = %s', (user['id'],), one=True)
+                if user_email:
+                    send_verification_email(user_email['email'], user_email['username'], new_token)
+                return render_template('verify_email.html', success=False, error_message='Verification link expired. A new verification email has been sent to your inbox.')
+        
+        # Verify email
+        query_db(
+            'UPDATE users SET email_verified = TRUE, verification_token = NULL, token_expires = NULL WHERE id = %s',
+            (user['id'],), commit=True
+        )
+        
+        return render_template('verify_email.html', success=True)
+    except Exception as e:
+        print(f"Error verifying email: {e}")
+        return render_template('verify_email.html', success=False, error_message='An error occurred during verification.')
 
 # @app.route("/home")
 # def index():

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification - Rival Gym System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 80px 20px 20px 20px;
+            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        .container {
+            background: rgba(34, 34, 34, 0.95);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+        }
+        
+        .success-icon {
+            font-size: 64px;
+            color: #4caf50;
+            margin-bottom: 20px;
+        }
+        
+        .error-icon {
+            font-size: 64px;
+            color: #f44336;
+            margin-bottom: 20px;
+        }
+        
+        h2 {
+            color: #4caf50;
+            margin-bottom: 20px;
+        }
+        
+        .error h2 {
+            color: #f44336;
+        }
+        
+        p {
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            display: inline-block;
+            background-color: #4caf50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Rival Gym System - Email Verification</h1>
+    </header>
+    
+    <div class="container {% if error %}error{% endif %}">
+        {% if success %}
+            <div class="success-icon">✅</div>
+            <h2>Email Verified Successfully!</h2>
+            <p>Your email address has been verified. You can now log in to your account.</p>
+            <a href="{{ url_for('login') }}" class="btn">Go to Login</a>
+        {% else %}
+            <div class="error-icon">❌</div>
+            <h2>Verification Failed</h2>
+            <p>{{ error_message or 'Invalid or expired verification link. Please request a new verification email.' }}</p>
+            <a href="{{ url_for('login') }}" class="btn">Go to Login</a>
+        {% endif %}
+    </div>
+</body>
+</html>
+

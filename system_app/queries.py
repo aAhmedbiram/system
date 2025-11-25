@@ -72,6 +72,20 @@ def create_table():
             cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS comment TEXT')
         except:
             pass
+        
+        # Add email verification columns to users table if they don't exist
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE')
+        except:
+            pass
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT')
+        except:
+            pass
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS token_expires TIMESTAMP')
+        except:
+            pass
 
         cr.execute('''
             CREATE TABLE IF NOT EXISTS attendance (
@@ -91,7 +105,10 @@ def create_table():
                 id SERIAL PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
                 email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL
+                password TEXT NOT NULL,
+                email_verified BOOLEAN DEFAULT FALSE,
+                verification_token TEXT,
+                token_expires TIMESTAMP
             )
         ''')
 

@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up</title>
+    <title>Sign Up - Rival Gym System</title>
     
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 80px 20px 20px 20px;
-            background: #111;
+            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
             color: #fff;
             display: flex;
             align-items: center;
@@ -48,7 +48,7 @@
             border: 1px solid #444;
             text-align: center;
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             transition: all 0.3s;
         }
         
@@ -72,22 +72,101 @@
             text-align: left;
         }
         
+        .input-wrapper {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        
         input {
             width: 100%;
-            padding: 12px;
-            margin-bottom: 16px;
+            padding: 12px 40px 12px 12px;
             background: #222;
             border: 1px solid #444;
             border-radius: 6px;
             color: white;
             font-size: 16px;
             box-sizing: border-box;
+            transition: all 0.3s;
         }
         
         input:focus {
             outline: none;
             border-color: #4caf50;
             box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 5px;
+            transition: color 0.3s;
+        }
+        
+        .password-toggle:hover {
+            color: #4caf50;
+        }
+        
+        .password-strength {
+            margin-top: 5px;
+            height: 4px;
+            background: #222;
+            border-radius: 2px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .password-strength-bar {
+            height: 100%;
+            width: 0%;
+            transition: all 0.3s;
+            border-radius: 2px;
+        }
+        
+        .password-strength-bar.weak {
+            width: 33%;
+            background: #f44336;
+        }
+        
+        .password-strength-bar.medium {
+            width: 66%;
+            background: #ff9800;
+        }
+        
+        .password-strength-bar.strong {
+            width: 100%;
+            background: #4caf50;
+        }
+        
+        .password-requirements {
+            margin-top: 8px;
+            font-size: 12px;
+            text-align: left;
+            color: #888;
+        }
+        
+        .password-requirements ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .password-requirements li {
+            margin: 3px 0;
+            transition: color 0.3s;
+        }
+        
+        .password-requirements li.valid {
+            color: #4caf50;
+        }
+        
+        .password-requirements li.invalid {
+            color: #888;
         }
         
         button {
@@ -104,9 +183,15 @@
             margin-top: 10px;
         }
         
-        button:hover {
+        button:hover:not(:disabled) {
             background-color: #66d66a;
             transform: scale(1.03);
+        }
+        
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+            opacity: 0.6;
         }
         
         .flash-message {
@@ -152,6 +237,17 @@
             color: #fff;
         }
         
+        .info-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4caf50;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #4caf50;
+            text-align: left;
+        }
+        
     </style>
 
     
@@ -162,7 +258,7 @@
         <h1>Rival Gym System - Sign Up</h1>
     </header>
 
-    <form action="/signup" method="post">
+    <form action="/signup" method="post" id="signupForm">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -172,22 +268,102 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <h2>Sign Up</h2>
+        <h2>Create Account</h2>
+        
+        <div class="info-box">
+            <strong>🔒 Security Features:</strong> Strong password required, email verification will be sent after signup.
+        </div>
+        
         <label for="username">Username</label>
-        <input type="text" id="username" name="username" required>
+        <input type="text" id="username" name="username" required minlength="3" maxlength="30" pattern="[a-zA-Z0-9_]+" title="Only letters, numbers, and underscores allowed">
 
         <label for="email">Email</label>
         <input type="email" id="email" name="email" required>
 
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" required>
-
+        <div class="input-wrapper">
+            <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+            <button type="button" class="password-toggle" id="togglePassword" aria-label="Toggle password visibility">
+                👁️
+            </button>
+        </div>
         
-        <button type="submit">Sign Up</button>
-        <p>Already have account!  <a class="back-login" href="login" role="button">login</a></p>
+        <div class="password-strength">
+            <div class="password-strength-bar" id="strengthBar"></div>
+        </div>
+        
+        <div class="password-requirements" id="passwordRequirements">
+            <strong>Password must contain:</strong>
+            <ul>
+                <li class="invalid" id="req-length">At least 8 characters</li>
+                <li class="invalid" id="req-uppercase">One uppercase letter</li>
+                <li class="invalid" id="req-lowercase">One lowercase letter</li>
+                <li class="invalid" id="req-number">One number</li>
+                <li class="invalid" id="req-special">One special character (!@#$%^&*)</li>
+            </ul>
+        </div>
+        
+        <button type="submit" id="submitBtn" disabled>Sign Up</button>
+        <p>Already have account?  <a class="back-login" href="login" role="button">Login</a></p>
         
     </form>
 
+    <script>
+        const passwordInput = document.getElementById('password');
+        const togglePassword = document.getElementById('togglePassword');
+        const strengthBar = document.getElementById('strengthBar');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        // Password visibility toggle
+        togglePassword.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            togglePassword.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+        
+        // Password strength checker
+        passwordInput.addEventListener('input', function() {
+            const password = passwordInput.value;
+            checkPasswordStrength(password);
+        });
+        
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            let requirements = {
+                length: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /[0-9]/.test(password),
+                special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+            };
+            
+            // Update requirement indicators
+            document.getElementById('req-length').className = requirements.length ? 'valid' : 'invalid';
+            document.getElementById('req-uppercase').className = requirements.uppercase ? 'valid' : 'invalid';
+            document.getElementById('req-lowercase').className = requirements.lowercase ? 'valid' : 'invalid';
+            document.getElementById('req-number').className = requirements.number ? 'valid' : 'invalid';
+            document.getElementById('req-special').className = requirements.special ? 'valid' : 'invalid';
+            
+            // Calculate strength
+            Object.values(requirements).forEach(req => {
+                if (req) strength++;
+            });
+            
+            // Update strength bar
+            strengthBar.className = 'password-strength-bar';
+            if (strength <= 2) {
+                strengthBar.classList.add('weak');
+            } else if (strength <= 4) {
+                strengthBar.classList.add('medium');
+            } else {
+                strengthBar.classList.add('strong');
+            }
+            
+            // Enable/disable submit button
+            const allValid = Object.values(requirements).every(req => req === true);
+            submitBtn.disabled = !allValid;
+        }
+    </script>
 </body>
 
 </html>
