@@ -1126,10 +1126,12 @@ def data_management():
                 imported = 0
                 errors = []
                 skipped = 0
-                batch_size = 200  # Increased batch size for better performance
+                batch_size = 500  # Larger batch size for faster processing
                 total_rows = len(df)
                 
                 print(f"Starting import of {total_rows} rows in batches of {batch_size}")
+                # Flash initial message
+                flash(f'Starting import of {total_rows} rows. This may take 5-10 minutes. Please wait and do not close this page...', 'success')
                 
                 # Process in batches to avoid memory/timeout issues
                 for batch_start in range(0, total_rows, batch_size):
@@ -1139,7 +1141,12 @@ def data_management():
                         
                         batch_num = batch_start//batch_size + 1
                         total_batches = (total_rows + batch_size - 1) // batch_size
-                        print(f"Processing batch {batch_num}/{total_batches}: rows {batch_start+1} to {batch_end}")
+                        progress_pct = int((batch_num / total_batches) * 100)
+                        print(f"Processing batch {batch_num}/{total_batches} ({progress_pct}%): rows {batch_start+1} to {batch_end}")
+                        
+                        # Log progress every 10 batches
+                        if batch_num % 10 == 0 or batch_num == 1:
+                            print(f"Progress: {progress_pct}% - Imported {imported} rows so far")
                         
                         for idx, row in batch_df.iterrows():
                             try:
@@ -1338,11 +1345,14 @@ def data_management():
                                 continue
                         
                         # Log batch completion
-                        print(f"Batch {batch_num} completed. Imported so far: {imported} rows")
+                        if batch_num % 5 == 0:  # Log every 5 batches to reduce console spam
+                            progress = int((imported/total_rows)*100) if total_rows > 0 else 0
+                            print(f"Batch {batch_num}/{total_batches} completed. Imported so far: {imported} rows ({progress}%)")
                         
-                        # Small delay between batches to prevent overwhelming the database
+                        # Minimal delay - only every 20 batches to speed up processing
                         import time
-                        time.sleep(0.05)  # Reduced delay for faster processing
+                        if batch_num % 20 == 0:
+                            time.sleep(0.05)  # Very short delay
                         
                     except Exception as batch_error:
                         # If entire batch fails, log it but continue with next batch

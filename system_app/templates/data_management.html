@@ -316,20 +316,74 @@
                 </table>
             </div>
 
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" id="importForm" onsubmit="showLoading()">
                 <input type="hidden" name="action" value="import_excel">
                 <div class="form-group">
                     <label for="excel_file">Select Excel File:</label>
                     <input type="file" id="excel_file" name="excel_file" accept=".xlsx,.xls" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Import Members from Excel</button>
+                <button type="submit" class="btn btn-primary" id="importBtn">Import Members from Excel</button>
             </form>
+            
+            <!-- Loading Overlay -->
+            <div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
+                <div style="background: #222; padding: 40px; border-radius: 12px; text-align: center; max-width: 500px;">
+                    <div style="color: #4caf50; font-size: 24px; margin-bottom: 20px;">⏳ Processing Import...</div>
+                    <div style="color: #fff; font-size: 18px; margin-bottom: 20px;" id="loadingMessage">Reading Excel file and preparing import...</div>
+                    <div style="width: 100%; background: #444; border-radius: 10px; height: 30px; overflow: hidden; margin-bottom: 10px;">
+                        <div id="progressBar" style="background: #4caf50; height: 100%; width: 0%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;"></div>
+                    </div>
+                    <div style="color: #888; font-size: 14px;">Please do not close this page. This may take several minutes for large files.</div>
+                </div>
+            </div>
         </div>
 
         <div style="text-align: center;">
             <a href="{{ url_for('index') }}" class="back-btn">Back to Home</a>
         </div>
     </div>
+
+    <script>
+        function showLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            const btn = document.getElementById('importBtn');
+            const form = document.getElementById('importForm');
+            
+            if (overlay && btn) {
+                overlay.style.display = 'flex';
+                btn.disabled = true;
+                btn.textContent = 'Importing... Please Wait';
+                
+                // Update message periodically
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 2;
+                    if (progress > 95) progress = 95; // Don't go to 100% until done
+                    
+                    const progressBar = document.getElementById('progressBar');
+                    const message = document.getElementById('loadingMessage');
+                    
+                    if (progressBar) {
+                        progressBar.style.width = progress + '%';
+                        progressBar.textContent = progress + '%';
+                    }
+                    
+                    if (message && progress < 30) {
+                        message.textContent = 'Reading Excel file and mapping columns...';
+                    } else if (message && progress < 60) {
+                        message.textContent = 'Processing rows and importing data...';
+                    } else if (message && progress < 90) {
+                        message.textContent = 'Finalizing import and saving to database...';
+                    }
+                }, 2000); // Update every 2 seconds
+                
+                // Clear interval when page unloads (import completes)
+                window.addEventListener('beforeunload', () => {
+                    clearInterval(interval);
+                });
+            }
+        }
+    </script>
 </body>
 </html>
 
