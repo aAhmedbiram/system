@@ -91,6 +91,26 @@
             box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
         }
 
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
+            font-family: Arial, sans-serif;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
         button,
         .add-new-member-button,
         .search-member-id-button,
@@ -213,6 +233,9 @@
                     <option value="6 Months">
                     <option value="12 Months">
                 </datalist>
+
+                <label for="edit_comment">Comment:</label>
+                <textarea id="edit_comment" name="edit_comment" rows="3" placeholder="Enter any comments about this member">{{ member.comment or '' }}</textarea>
 
                 <button type="submit">Save Changes</button>
             </form>

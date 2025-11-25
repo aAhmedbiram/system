@@ -30,13 +30,20 @@ def create_table():
                 membership_packages TEXT,
                 membership_fees REAL,
                 membership_status TEXT,
-                invitations INTEGER DEFAULT 0
+                invitations INTEGER DEFAULT 0,
+                comment TEXT
             )
         ''')
         
         # Add invitations column if it doesn't exist (for existing databases)
         try:
             cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS invitations INTEGER DEFAULT 0')
+        except:
+            pass
+        
+        # Add comment column if it doesn't exist (for existing databases)
+        try:
+            cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS comment TEXT')
         except:
             pass
 
@@ -157,30 +164,30 @@ def query_db(query, args=(), one=False, commit=False):
 def add_member(name, email, phone, age, gender, birthdate,
             actual_starting_date, starting_date, end_date,
             membership_packages, membership_fees, membership_status,
-            custom_id=None, invitations=0):
+            custom_id=None, invitations=0, comment=None):
     try:
         if custom_id is not None:
             result = query_db('''
                 INSERT INTO members 
                 (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 custom_id, name, email, phone, age, gender, birthdate, actual_starting_date,
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment
             ), one=True, commit=True)
             return result['id']
         else:
             result = query_db('''
                 INSERT INTO members 
                 (name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 name, email, phone, age, gender, birthdate, actual_starting_date,
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment
             ), one=True, commit=True)
             return result['id']
     except Exception as e:
@@ -374,10 +381,10 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
 
 
 def get_all_invitations():
-    """Get all invitation records ordered by most recent"""
+    """Get all invitation records ordered by ID ascending"""
     return query_db('''
         SELECT * FROM invitations 
-        ORDER BY used_date DESC
+        ORDER BY id ASC
     ''')
 
 
@@ -386,5 +393,5 @@ def get_member_invitations(member_id):
     return query_db('''
         SELECT * FROM invitations 
         WHERE member_id = %s 
-        ORDER BY used_date DESC
+        ORDER BY id ASC
     ''', (member_id,))

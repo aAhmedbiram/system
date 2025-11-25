@@ -17,7 +17,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
-    add_member, get_member, update_member,
+    add_member, get_member, update_member, delete_member,
     add_attendance, get_all_logs, get_member_logs,
     use_invitation, get_all_invitations, get_member_invitations
 )
@@ -349,6 +349,7 @@ def edit_member(member_id):
             fees = membership_fees(user_input)
             status = compare_dates(end_date) or "Unknown"
             invitations = calculate_invitations(user_input)
+            comment = request.form.get("edit_comment", "").strip()
 
             # Get username from session for logging
             username = session.get('username', 'Unknown')
@@ -359,13 +360,33 @@ def edit_member(member_id):
                 starting_date=starting_date, end_date=end_date,
                 membership_packages=f"{numeric_value} {unit}",
                 membership_fees=fees, membership_status=status,
-                invitations=invitations,
+                invitations=invitations, comment=comment,
                 edited_by=username
             )
             flash("Member updated successfully!", "success")
         except Exception as e:
             flash(f"Error updating member: {str(e)}", "error")
         return redirect(url_for("index"))
+
+@app.route("/delete_member/<int:member_id>", methods=["POST"])
+@login_required
+def delete_member_route(member_id):
+    """Delete a member"""
+    try:
+        member = get_member(member_id)
+        if not member:
+            flash("Member not found!", "error")
+            return redirect(url_for("all_members"))
+        
+        member_name = member.get('name', 'Unknown')
+        delete_member(member_id)
+        flash(f"Member {member_name} (ID: {member_id}) deleted successfully!", "success")
+    except Exception as e:
+        print(f"Error in delete_member route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error deleting member: {str(e)}", "error")
+    return redirect(url_for("all_members"))
 
 @app.route("/show_member_data", methods=["POST"])
 @login_required

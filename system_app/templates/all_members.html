@@ -101,6 +101,24 @@
             color: #fff;
         }
 
+        /* Fixed column widths */
+        th:nth-child(1), td:nth-child(1) { width: 80px; } /* Member ID */
+        th:nth-child(2), td:nth-child(2) { width: 120px; } /* Name */
+        th:nth-child(3), td:nth-child(3) { width: 150px; } /* Email */
+        th:nth-child(4), td:nth-child(4) { width: 120px; } /* Phone */
+        th:nth-child(5), td:nth-child(5) { width: 60px; } /* Age */
+        th:nth-child(6), td:nth-child(6) { width: 80px; } /* Gender */
+        th:nth-child(7), td:nth-child(7) { width: 120px; } /* Actual start */
+        th:nth-child(8), td:nth-child(8) { width: 120px; } /* Start date */
+        th:nth-child(9), td:nth-child(9) { width: 120px; } /* End date */
+        th:nth-child(10), td:nth-child(10) { width: 120px; } /* Package */
+        th:nth-child(11), td:nth-child(11) { width: 80px; } /* Fees */
+        th:nth-child(12), td:nth-child(12) { width: 80px; } /* Status */
+        th:nth-child(13), td:nth-child(13) { width: 100px; } /* Invitations */
+        th:nth-child(14), td:nth-child(14) { width: 200px; min-width: 200px; } /* Comment */
+        th:nth-child(15), td:nth-child(15) { width: 100px; } /* Edit */
+        th:nth-child(16), td:nth-child(16) { width: 100px; } /* Delete */
+
         th {
             background-color: #333;
             color: #4caf50;
@@ -154,6 +172,34 @@
             text-decoration: none;
             box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
         }
+
+        .delete-link {
+            background-color: #e53935;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .delete-link:hover {
+            background-color: #f44336;
+            transform: scale(1.05);
+            text-decoration: none;
+            box-shadow: 0 4px 8px rgba(229, 57, 53, 0.4);
+        }
+
+        .comment-cell {
+            text-align: left;
+            word-wrap: break-word;
+            max-width: 200px;
+            font-size: 13px;
+        }
     </style>
 </head>
 
@@ -185,14 +231,17 @@
         <th onclick="sortTable(10)">Fees ▲▼</th>
         <th onclick="sortTable(11)">Status ▲▼</th>
         <th onclick="sortTable(12)">Invitations ▲▼</th>
-        <th>Action</th>
+        <th onclick="sortTable(13)">Comment ▲▼</th>
+        <th>Edit</th>
+        <th>Delete</th>
     </tr>
 
     <!-- filter row -->
     <tr class="filter-row">
-        {% for i in range(13) %}
+        {% for i in range(14) %}
             <th><input type="text" onkeyup="filterTable({{i}})" placeholder="Search"></th>
         {% endfor %}
+        <th></th>
         <th></th>
     </tr>
     </thead>
@@ -213,8 +262,16 @@
         <td>{{ member.membership_fees }}</td>
         <td>{{ member.membership_status }}</td>
         <td style="color: #ffd43b; font-weight: bold;">{{ member.invitations or 0 }}</td>
+        <td class="comment-cell">{{ member.comment or '-' }}</td>
         <td><a class="edit-link"
                 href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a></td>
+        <td>
+            <form method="POST" action="{{ url_for('delete_member_route', member_id=member.id) }}" 
+                  onsubmit="return confirm('Are you sure you want to delete {{ member.name }}? This action cannot be undone!');" 
+                  style="display: inline;">
+                <button type="submit" class="delete-link" style="border: none; cursor: pointer;">Delete</button>
+            </form>
+        </td>
     </tr>
     {% endfor %}
     </tbody>
