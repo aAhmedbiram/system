@@ -329,6 +329,40 @@ def all_members():
         return render_template("all_members.html", members_data=[], page=1, total_pages=1, total_count=0)
 
 # === Edit member ===
+def format_date_for_input(date_str):
+    """Convert date from various formats to YYYY-MM-DD for HTML date input"""
+    if not date_str or date_str == 'None' or date_str == '':
+        return ''
+    
+    try:
+        from datetime import datetime
+        
+        # Try different date formats
+        date_formats = [
+            '%m/%d/%Y',           # mm/dd/yyyy (birthdate format)
+            '%d/%m/%Y',           # dd/mm/yyyy (starting_date format)
+            '%A, %B %d, %Y',      # Monday, November 25, 2025 (actual_starting_date format)
+            '%Y-%m-%d',           # Already in correct format
+            '%Y-%m-%d %H:%M:%S',  # With time
+            '%m-%d-%Y',           # mm-dd-yyyy
+            '%d-%m-%Y',           # dd-mm-yyyy
+        ]
+        
+        for fmt in date_formats:
+            try:
+                dt = datetime.strptime(str(date_str).strip(), fmt)
+                return dt.strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        
+        # If all formats fail, try to parse as-is
+        print(f"Warning: Could not parse date format: {date_str}")
+        return ''
+    except Exception as e:
+        print(f"Error formatting date {date_str}: {e}")
+        return ''
+
+
 @app.route("/edit_member/<int:member_id>", methods=["GET", "POST"])
 @login_required
 def edit_member(member_id):
@@ -338,6 +372,16 @@ def edit_member(member_id):
             if not member:
                 flash("Member not found!", "error")
                 return redirect(url_for("index"))
+            
+            # Format dates for HTML date input (YYYY-MM-DD format)
+            # get_member returns a RealDictRow which is dict-like, but we'll convert to ensure we can modify
+            if member:
+                member_dict = dict(member) if hasattr(member, 'keys') else member
+                member_dict['birthdate'] = format_date_for_input(member_dict.get('birthdate'))
+                member_dict['actual_starting_date'] = format_date_for_input(member_dict.get('actual_starting_date'))
+                member_dict['starting_date'] = format_date_for_input(member_dict.get('starting_date'))
+                member = member_dict
+            
             return render_template("edit_member.html", member=member)
         except Exception as e:
             print(f"Error in edit_member GET route: {e}")
