@@ -7,10 +7,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import pool
 from functools import wraps
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from email_validator import validate_email, EmailNotValidError
 import re
 import secrets
@@ -281,10 +277,8 @@ def login():
             )
             # Fix: check_password_hash takes (hash, password) not (password, hash)
             if user and check_password_hash(user['password'], password):
-                # Check if email is verified
-                if not user.get('email_verified', False):
-                    flash('Please verify your email address before logging in. Check your inbox for the verification link.', 'error')
-                    return render_template('login.html')
+                # Email verification is now optional (auto-verified on signup)
+                # No need to check email_verified anymore
                 
                 session['user_id'] = user['id']
                 session['username'] = user['username']
@@ -321,180 +315,6 @@ def validate_strong_password(password):
         return False, "Password must contain at least one special character (!@#$%^&*)"
     return True, "Password is strong"
 
-def send_verification_email(email, username, verification_token):
-    """Send email verification link to user"""
-    try:
-        sender_email = 'rival.gym1@gmail.com'
-        sender_password = os.environ.get('GMAIL_APP_PASSWORD', 'kshbfyznimlxhiqr')
-        
-        if not sender_password or sender_password == '':
-            print("ERROR: Gmail password not configured. Email verification will not be sent.")
-            print("Please set GMAIL_APP_PASSWORD environment variable with your Gmail App Password.")
-            return False
-        
-        # Get base URL (for verification link) - handle both local and production
-        try:
-            # Try to get from request context first
-            from flask import has_request_context
-            if has_request_context():
-                # Check if behind proxy (Railway, etc.)
-                try:
-                    forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
-                    is_secure = False
-                    try:
-                        is_secure = request.is_secure if hasattr(request, 'is_secure') else False
-                    except:
-                        pass
-                    
-                    if forwarded_proto == 'https' or is_secure:
-                        base_url = f"https://{request.host}"
-                    else:
-                        base_url = request.host_url.rstrip('/')
-                except AttributeError:
-                    try:
-                        base_url = request.host_url.rstrip('/')
-                    except:
-                        base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
-                except Exception as req_err:
-                    print(f"Error accessing request: {req_err}")
-                    base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
-            else:
-                # No request context, use environment variable
-                base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
-        except Exception as e:
-            print(f"Error getting base URL: {e}")
-            import traceback
-            traceback.print_exc()
-            # Fallback to environment variable or default
-            base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
-        
-        verification_url = f"{base_url}/verify_email/{verification_token}"
-        
-        # Create email
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = email
-        msg['Subject'] = 'Verify Your Email - Rival Gym System'
-        
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-            <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                <h2 style="color: #4caf50;">Welcome to Rival Gym System, {username}!</h2>
-                <p>Thank you for signing up. Please verify your email address by clicking the button below:</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{verification_url}" style="background-color: #4caf50; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Verify Email Address</a>
-                </div>
-                <p style="color: #666; font-size: 12px;">Or copy and paste this link into your browser:</p>
-                <p style="color: #666; font-size: 12px; word-break: break-all;">{verification_url}</p>
-                <p style="color: #666; font-size: 12px; margin-top: 20px;">This link will expire in 24 hours.</p>
-                <p style="color: #666; font-size: 12px;">If you didn't create this account, please ignore this email.</p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(body, 'html'))
-        
-        # Send email with improved error handling
-        smtp_server = 'smtp.gmail.com'
-        last_error = None
-        
-        # Method 1: Try port 587 with TLS (most common)
-        try:
-            print(f"Attempting to send email via {smtp_server}:587 (TLS)...")
-            context = ssl.create_default_context()
-            # Allow unverified certificates if needed (for development)
-            # context.check_hostname = False
-            # context.verify_mode = ssl.CERT_NONE
-            
-            server = smtplib.SMTP(smtp_server, 587, timeout=30)
-            server.set_debuglevel(0)  # Set to 1 for verbose debugging
-            
-            # Enable debug output
-            print("Starting TLS...")
-            server.starttls(context=context)
-            
-            print(f"Logging in as {sender_email}...")
-            server.login(sender_email, sender_password)
-            
-            print(f"Sending email to {email}...")
-            server.send_message(msg)
-            server.quit()
-            
-            print(f"✓ Verification email sent successfully to {email} via port 587 (TLS)")
-            return True
-            
-        except smtplib.SMTPAuthenticationError as auth_err:
-            last_error = f"SMTP Authentication Error: {auth_err}"
-            print(f"✗ Authentication failed on port 587: {auth_err}")
-            print("  → Make sure you're using a Gmail App Password, not your regular password.")
-            print("  → Enable 2-Step Verification and generate an App Password at:")
-            print("     https://myaccount.google.com/apppasswords")
-        except smtplib.SMTPConnectError as conn_err:
-            last_error = f"SMTP Connection Error: {conn_err}"
-            print(f"✗ Connection failed on port 587: {conn_err}")
-            print("  → Check your internet connection and firewall settings.")
-        except smtplib.SMTPServerDisconnected as disc_err:
-            last_error = f"SMTP Server Disconnected: {disc_err}"
-            print(f"✗ Server disconnected on port 587: {disc_err}")
-        except Exception as e1:
-            last_error = f"Error on port 587: {type(e1).__name__}: {e1}"
-            print(f"✗ Error with port 587: {type(e1).__name__}: {e1}")
-        
-        # Method 2: Try port 465 with SSL (fallback)
-        try:
-            print(f"\nAttempting to send email via {smtp_server}:465 (SSL)...")
-            context = ssl.create_default_context()
-            # Allow unverified certificates if needed (for development)
-            # context.check_hostname = False
-            # context.verify_mode = ssl.CERT_NONE
-            
-            server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30, context=context)
-            server.set_debuglevel(0)  # Set to 1 for verbose debugging
-            
-            print(f"Logging in as {sender_email}...")
-            server.login(sender_email, sender_password)
-            
-            print(f"Sending email to {email}...")
-            server.send_message(msg)
-            server.quit()
-            
-            print(f"✓ Verification email sent successfully to {email} via port 465 (SSL)")
-            return True
-            
-        except smtplib.SMTPAuthenticationError as auth_err:
-            last_error = f"SMTP Authentication Error: {auth_err}"
-            print(f"✗ Authentication failed on port 465: {auth_err}")
-            print("  → Make sure you're using a Gmail App Password, not your regular password.")
-            print("  → Enable 2-Step Verification and generate an App Password at:")
-            print("     https://myaccount.google.com/apppasswords")
-        except smtplib.SMTPConnectError as conn_err:
-            last_error = f"SMTP Connection Error: {conn_err}"
-            print(f"✗ Connection failed on port 465: {conn_err}")
-        except Exception as e2:
-            last_error = f"Error on port 465: {type(e2).__name__}: {e2}"
-            print(f"✗ Error with port 465: {type(e2).__name__}: {e2}")
-        
-        # All methods failed
-        print(f"\n✗ Failed to send verification email to {email}")
-        print(f"  Last error: {last_error}")
-        print("\nTroubleshooting steps:")
-        print("1. Verify Gmail App Password is correct (not regular password)")
-        print("2. Enable 2-Step Verification: https://myaccount.google.com/security")
-        print("3. Generate App Password: https://myaccount.google.com/apppasswords")
-        print("4. Check firewall/network settings")
-        print("5. Verify Gmail account is not locked")
-        
-        import traceback
-        traceback.print_exc()
-        return False
-        
-    except Exception as e:
-        print(f"✗ Error preparing verification email: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
 
 @app.route('/signup', methods=['GET', 'POST'])
 @csrf.exempt  # Exempt signup from CSRF (public endpoint)
@@ -566,32 +386,13 @@ def signup():
                 (username, email, hashed_password, False, verification_token, token_expires), commit=True
             )
             
-            # Send verification email
-            try:
-                email_sent = send_verification_email(email, username, verification_token)
-            except Exception as email_error:
-                print(f"Error in send_verification_email: {email_error}")
-                import traceback
-                traceback.print_exc()
-                email_sent = False
+            # Auto-verify email (no email sending)
+            query_db(
+                'UPDATE users SET email_verified = TRUE WHERE id = (SELECT id FROM users WHERE username = %s ORDER BY id DESC LIMIT 1)',
+                (username,), commit=True
+            )
             
-            if email_sent:
-                flash('Account created successfully! Please check your email to verify your account before logging in.', 'success')
-            else:
-                # Get base URL for manual verification link
-                try:
-                    if request.headers.get('X-Forwarded-Proto') == 'https' or (hasattr(request, 'is_secure') and request.is_secure):
-                        base_url = f"https://{request.host}"
-                    else:
-                        base_url = request.host_url.rstrip('/')
-                except:
-                    base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
-                
-                manual_link = f"{base_url}/verify_email/{verification_token}"
-                flash(f'Account created! However, verification email could not be sent. Please verify manually: {manual_link}', 'error')
-                print(f"MANUAL VERIFICATION TOKEN for {username} ({email}): {verification_token}")
-                print(f"Manual verification link: {manual_link}")
-            
+            flash('Account created successfully! You can now log in.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             print(f"Error creating user: {e}")
@@ -626,11 +427,12 @@ def verify_email(token):
                     'UPDATE users SET verification_token = %s, token_expires = %s WHERE id = %s',
                     (new_token, new_expires, user['id']), commit=True
                 )
-                # Resend email
-                user_email = query_db('SELECT email, username FROM users WHERE id = %s', (user['id'],), one=True)
-                if user_email:
-                    send_verification_email(user_email['email'], user_email['username'], new_token)
-                return render_template('verify_email.html', success=False, error_message='Verification link expired. A new verification email has been sent to your inbox.')
+                # Auto-verify since we're not sending emails
+                query_db(
+                    'UPDATE users SET email_verified = TRUE, verification_token = NULL, token_expires = NULL WHERE id = %s',
+                    (user['id'],), commit=True
+                )
+                return render_template('verify_email.html', success=True, error_message='Verification link expired. Your account has been automatically verified.')
         
         # Verify email
         query_db(
@@ -687,26 +489,13 @@ def resend_verification():
             (verification_token, token_expires, user['id']), commit=True
         )
         
-        # Send verification email
-        email_sent = send_verification_email(email, user['username'], verification_token)
+        # Auto-verify since we're not sending emails
+        query_db(
+            'UPDATE users SET email_verified = TRUE, verification_token = NULL, token_expires = NULL WHERE id = %s',
+            (user['id'],), commit=True
+        )
         
-        if email_sent:
-            flash('Verification email sent successfully! Please check your inbox.', 'success')
-        else:
-            # Get base URL for manual verification link
-            try:
-                if request.headers.get('X-Forwarded-Proto') == 'https' or request.is_secure:
-                    base_url = f"https://{request.host}"
-                else:
-                    base_url = request.host_url.rstrip('/')
-            except:
-                base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
-            
-            manual_link = f"{base_url}/verify_email/{verification_token}"
-            flash(f'Could not send email. Manual verification link: {manual_link}', 'error')
-            print(f"MANUAL VERIFICATION TOKEN for {user['username']} ({email}): {verification_token}")
-            print(f"Manual verification link: {manual_link}")
-        
+        flash('Your email has been verified! You can now log in.', 'success')
         return redirect(url_for('login'))
     
     return render_template('resend_verification.html')
@@ -1398,202 +1187,6 @@ def logs():
         flash(f"Error loading logs: {str(e)}", "error")
         return render_template('logs.html', logs_data=[], member_id=None, member_name=None, page=1, total_pages=1, total_count=0)
 
-@app.route('/send_email', methods=['GET', 'POST'])
-@rino_required
-def send_email():
-    try:
-        if request.method == 'POST':
-            message = request.form.get('message', '').strip()
-            
-            if not message:
-                flash('Message cannot be empty!', 'error')
-                return render_template('send_email.html')
-            
-            try:
-                # Get all member emails from database
-                print("DEBUG: Querying database for member emails...")
-                members = query_db('SELECT email, name FROM members WHERE email IS NOT NULL AND email != \'\'')
-                
-                # Debug: Check what we got
-                print(f"DEBUG: Query returned: {type(members)}")
-                print(f"DEBUG: Found {len(members) if members else 0} members with emails")
-                if members and len(members) > 0:
-                    print(f"DEBUG: First member: {members[0]}")
-                    print(f"DEBUG: First member type: {type(members[0])}")
-                    print(f"DEBUG: First member keys: {members[0].keys() if hasattr(members[0], 'keys') else 'N/A'}")
-                
-                if not members or len(members) == 0:
-                    flash('No member emails found in the database!', 'error')
-                    return render_template('send_email.html')
-                
-                # Email configuration
-                sender_email = 'rival.gym1@gmail.com'
-                sender_password = os.environ.get('GMAIL_APP_PASSWORD', 'kshbfyznimlxhiqr')
-                
-                if not sender_password:
-                    flash('Email password not configured!', 'error')
-                    return render_template('send_email.html')
-                
-                # Setup SMTP server - try both ports
-                smtp_server = 'smtp.gmail.com'
-                
-                # Send email to each member
-                sent_count = 0
-                failed_emails = []
-                invalid_emails = []
-                server = None
-                
-                try:
-                    print("DEBUG: Attempting to connect to SMTP server...")
-                    # Try port 587 with STARTTLS first
-                    try:
-                        print("DEBUG: Trying port 587 with STARTTLS...")
-                        server = smtplib.SMTP(smtp_server, 587, timeout=30)
-                        server.starttls()
-                        print("DEBUG: STARTTLS successful, logging in...")
-                        server.login(sender_email, sender_password)
-                        print("DEBUG: Successfully logged in via port 587")
-                    except (smtplib.SMTPException, OSError, ConnectionError, Exception) as e:
-                        print(f"DEBUG: Port 587 failed: {e}, trying port 465 with SSL...")
-                        if server:
-                            try:
-                                server.quit()
-                            except:
-                                pass
-                        # Fallback to port 465 with SSL
-                        try:
-                            import ssl
-                            context = ssl.create_default_context()
-                            server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30, context=context)
-                            print("DEBUG: SSL connection successful, logging in...")
-                            server.login(sender_email, sender_password)
-                            print("DEBUG: Successfully logged in via port 465")
-                        except (OSError, ConnectionError, Exception) as ssl_error:
-                            # Network is completely unreachable
-                            error_msg = f'Cannot connect to Gmail SMTP server. Network error: {str(ssl_error)}. '
-                            error_msg += 'This might be due to firewall restrictions or network configuration. '
-                            error_msg += 'Please check your server\'s network settings or contact your hosting provider.'
-                            print(f"CRITICAL: Both ports failed. Last error: {ssl_error}")
-                            import traceback
-                            traceback.print_exc()
-                            raise Exception(error_msg)
-                    
-                    for idx, member in enumerate(members):
-                        recipient_email = None
-                        normalized_email = None
-                        try:
-                            # Handle both dict and object access
-                            if isinstance(member, dict):
-                                recipient_email = member.get('email') or member.get('Email')
-                            else:
-                                recipient_email = getattr(member, 'email', None) or getattr(member, 'Email', None)
-                            
-                            if not recipient_email:
-                                print(f"DEBUG: Member {idx} has no email field: {member}")
-                                continue
-                            
-                            recipient_email = str(recipient_email).strip()
-                            if not recipient_email:
-                                continue
-
-                            try:
-                                validation = validate_email(recipient_email, check_deliverability=False)
-                                normalized_email = validation.email
-                            except EmailNotValidError as invalid_err:
-                                print(f"VALIDATION ERROR: {recipient_email} skipped ({invalid_err})")
-                                invalid_emails.append(f"{recipient_email} ({invalid_err})")
-                                continue
-                                
-                            print(f"DEBUG: Sending email {idx+1}/{len(members)} to {normalized_email}")
-                            
-                            # Create a new message for each recipient
-                            msg = MIMEMultipart()
-                            msg['From'] = sender_email
-                            msg['To'] = normalized_email
-                            msg['Subject'] = 'Message from Rival Gym'
-                            msg.attach(MIMEText(message, 'plain'))
-                            
-                            server.sendmail(sender_email, normalized_email, msg.as_string())
-                            sent_count += 1
-                            print(f"DEBUG: Successfully sent to {normalized_email}")
-                        except Exception as e:
-                            email_addr = normalized_email if 'normalized_email' in locals() else (recipient_email if recipient_email else 'unknown')
-                            print(f"ERROR: Failed to send email to {email_addr}: {e}")
-                            import traceback
-                            traceback.print_exc()
-                            if recipient_email:
-                                failed_emails.append(email_addr)
-                    
-                    if server:
-                        server.quit()
-                    
-                    if sent_count > 0:
-                        success_msg = f'Message sent successfully to {sent_count} member(s)!'
-                        if failed_emails:
-                            success_msg += f' Failed to send to {len(failed_emails)} email(s).'
-                        flash(success_msg, 'success')
-                        if invalid_emails:
-                            preview = ', '.join(invalid_emails[:5])
-                            more = '' if len(invalid_emails) <= 5 else ' ...'
-                            flash(f'Skipped {len(invalid_emails)} invalid email(s): {preview}{more}', 'error')
-                    else:
-                        failure_msg = 'Failed to send emails to all recipients!'
-                        if invalid_emails:
-                            failure_msg += f' Additionally, {len(invalid_emails)} invalid email(s) were skipped.'
-                        flash(failure_msg, 'error')
-                        
-                except smtplib.SMTPAuthenticationError as e:
-                    error_msg = f'Email authentication failed: {str(e)}. Please check GMAIL_APP_PASSWORD.'
-                    print(f"SMTP Auth Error: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    flash(error_msg, 'error')
-                except (OSError, ConnectionError) as e:
-                    error_msg = f'Network connection error: {str(e)}. '
-                    error_msg += 'The server cannot reach Gmail\'s SMTP server. This might be due to: '
-                    error_msg += '1) Firewall blocking outbound SMTP connections, '
-                    error_msg += '2) Network configuration issues, or '
-                    error_msg += '3) Server restrictions. Please contact your hosting provider or check firewall settings.'
-                    print(f"Network Error: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    flash(error_msg, 'error')
-                except smtplib.SMTPException as e:
-                    error_msg = f'SMTP error occurred: {str(e)}'
-                    print(f"SMTP Error: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    flash(error_msg, 'error')
-                except Exception as e:
-                    error_msg = f'Error sending emails: {str(e)}'
-                    print(f"General SMTP Error: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    flash(error_msg, 'error')
-                finally:
-                    if server:
-                        try:
-                            server.quit()
-                        except:
-                            pass
-                    
-            except Exception as e:
-                error_msg = f'Database error: {str(e)}'
-                print(f"Database Error: {e}")
-                import traceback
-                traceback.print_exc()
-                flash(error_msg, 'error')
-        
-        return render_template('send_email.html')
-        
-    except Exception as e:
-        # Catch absolutely everything to prevent internal server error
-        error_msg = f'Unexpected error: {str(e)}'
-        print(f"CRITICAL ERROR in send_email: {e}")
-        import traceback
-        traceback.print_exc()
-        flash(error_msg, 'error')
-        return render_template('send_email.html')
 
 
 @app.route('/data_management', methods=['GET', 'POST'])
