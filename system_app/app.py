@@ -1,18 +1,47 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g,jsonify
-from datetime import datetime
+from flask_wtf.csrf import CSRFProtect
+from datetime import datetime, timedelta
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2 import pool
 from functools import wraps
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email_validator import validate_email, EmailNotValidError
+import re
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
+
+# Security: Use strong secret key from environment (required in production)
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    import secrets
+    secret_key = secrets.token_hex(32)
+    print("WARNING: SECRET_KEY not set in environment. Using generated key (not secure for production!)")
+app.secret_key = secret_key
+
+# Enable CSRF protection
+csrf = CSRFProtect(app)
+
+# Secure session configuration
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # HTTPS only in production
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # 24 hour session timeout
+
+# Security headers
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
 
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
 from .queries import (
@@ -83,6 +112,42 @@ def index():
                             members_data=[])
 
 
+# Rate limiting for login (simple in-memory implementation)
+_login_attempts = {}
+_MAX_LOGIN_ATTEMPTS = 5
+_LOGIN_LOCKOUT_TIME = timedelta(minutes=15)
+
+def check_rate_limit(ip_address):
+    """Check if IP is rate limited"""
+    now = datetime.now()
+    if ip_address in _login_attempts:
+        attempts, lockout_until = _login_attempts[ip_address]
+        if lockout_until and now < lockout_until:
+            return False, f"Too many login attempts. Please try again after {lockout_until.strftime('%H:%M:%S')}"
+        # Reset if lockout expired
+        if lockout_until and now >= lockout_until:
+            del _login_attempts[ip_address]
+    return True, None
+
+def record_failed_login(ip_address):
+    """Record a failed login attempt"""
+    now = datetime.now()
+    if ip_address not in _login_attempts:
+        _login_attempts[ip_address] = [1, None]
+    else:
+        attempts, _ = _login_attempts[ip_address]
+        attempts += 1
+        if attempts >= _MAX_LOGIN_ATTEMPTS:
+            lockout_until = now + _LOGIN_LOCKOUT_TIME
+            _login_attempts[ip_address] = [attempts, lockout_until]
+        else:
+            _login_attempts[ip_address] = [attempts, None]
+
+def clear_login_attempts(ip_address):
+    """Clear login attempts on successful login"""
+    if ip_address in _login_attempts:
+        del _login_attempts[ip_address]
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     # If already logged in, redirect to index
@@ -90,11 +155,35 @@ def login():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
+        # Get client IP for rate limiting
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        if isinstance(ip_address, str) and ',' in ip_address:
+            ip_address = ip_address.split(',')[0].strip()
+        
+        # Check rate limit
+        allowed, error_msg = check_rate_limit(ip_address)
+        if not allowed:
+            flash(error_msg, 'error')
+            return render_template('login.html')
+        
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         
+        # Input validation
         if not username or not password:
             flash('All fields are required!', 'error')
+            return render_template('login.html')
+        
+        # Sanitize username (alphanumeric and underscore only)
+        if not re.match(r'^[a-zA-Z0-9_]+$', username):
+            flash('Invalid username format!', 'error')
+            record_failed_login(ip_address)
+            return render_template('login.html')
+        
+        # Limit input length
+        if len(username) > 50 or len(password) > 200:
+            flash('Input too long!', 'error')
+            record_failed_login(ip_address)
             return render_template('login.html')
         
         try:
@@ -102,15 +191,20 @@ def login():
                 'SELECT id, username, password FROM users WHERE username = %s',
                 (username,), one=True
             )
+            # Fix: check_password_hash takes (hash, password) not (password, hash)
             if user and check_password_hash(user['password'], password):
                 session['user_id'] = user['id']
                 session['username'] = user['username']
+                session.permanent = True  # Enable permanent session
+                clear_login_attempts(ip_address)
                 flash('Login successful!', 'success')
                 return redirect(url_for('index'))
             else:
+                record_failed_login(ip_address)
                 flash('Username or password is incorrect!', 'error')
         except Exception as e:
-            flash(f'Database error: {str(e)}', 'error')
+            print(f"Login error: {e}")
+            flash('Database error. Please try again later.', 'error')
     return render_template('login.html')
 
 @app.route('/logout')

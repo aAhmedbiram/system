@@ -3,12 +3,38 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import IntegrityError
+from psycopg2 import pool
 from datetime import date
+import threading
 
 # === Read DATABASE_URL ===
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGURL")
 if not DATABASE_URL:
     raise Exception("DATABASE_URL not found. Make sure it's set in Railway Variables.")
+
+# === Connection Pool for Performance ===
+# Create a connection pool to reuse connections instead of creating new ones
+_connection_pool = None
+_pool_lock = threading.Lock()
+
+def get_connection_pool():
+    """Get or create database connection pool"""
+    global _connection_pool
+    if _connection_pool is None:
+        with _pool_lock:
+            if _connection_pool is None:
+                try:
+                    _connection_pool = psycopg2.pool.ThreadedConnectionPool(
+                        minconn=1,
+                        maxconn=20,  # Maximum 20 connections in pool
+                        dsn=DATABASE_URL,
+                        sslmode='require'
+                    )
+                    print("Database connection pool created successfully")
+                except Exception as e:
+                    print(f"Error creating connection pool: {e}")
+                    _connection_pool = None
+    return _connection_pool
 
 # === Create tables (once on startup) ===
 def create_table():
@@ -146,13 +172,33 @@ def create_table():
         conn.close()
 
 
-# === Execute queries - Final solution: new connection every time ===
+# === Execute queries - Using connection pool for better performance ===
 def query_db(query, args=(), one=False, commit=False):
+    """Execute query using connection pool for better performance"""
+    pool = get_connection_pool()
     conn = None
     cur = None
+    
+    # Fallback to direct connection if pool fails
+    if pool is None:
+        try:
+            conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        except Exception as e:
+            print(f"Error creating direct connection: {e}")
+            raise e
+    else:
+        try:
+            conn = pool.getconn()
+        except Exception as e:
+            print(f"Error getting connection from pool: {e}")
+            # Fallback to direct connection
+            try:
+                conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+            except Exception as fallback_error:
+                print(f"Fallback connection also failed: {fallback_error}")
+                raise fallback_error
+    
     try:
-        # Every query = new connection → no stale connection ever
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(query, args)
 
@@ -160,7 +206,6 @@ def query_db(query, args=(), one=False, commit=False):
             conn.commit()
 
         # Only fetch results if the query returns rows (SELECT or INSERT/UPDATE with RETURNING)
-        # Check if query is a SELECT or has RETURNING clause
         query_upper = query.strip().upper()
         if query_upper.startswith('SELECT') or 'RETURNING' in query_upper:
             rv = cur.fetchall()
@@ -185,7 +230,16 @@ def query_db(query, args=(), one=False, commit=False):
         if cur:
             cur.close()
         if conn:
-            conn.close()
+            if pool:
+                # Return connection to pool
+                try:
+                    pool.putconn(conn)
+                except Exception as e:
+                    print(f"Error returning connection to pool: {e}")
+                    conn.close()  # Close if can't return to pool
+            else:
+                # Direct connection - close it
+                conn.close()
 
 
 # === Rest of functions (as they are, because they're excellent) ===
