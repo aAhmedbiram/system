@@ -17,10 +17,11 @@ app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
-    add_member, get_member, update_member, delete_member, delete_all_data,
+    add_member, get_member, update_member, delete_member,
     add_attendance, get_all_logs, get_member_logs,
     use_invitation, get_all_invitations, get_member_invitations
 )
+from .queries import delete_all_data as delete_all_data_from_db
 
 # Initialize database tables on startup
 with app.app_context():
@@ -614,9 +615,9 @@ def attendance_table():
 
 
 
-@app.route('/delete_all_data', methods=['POST'])
+@app.route('/delete_attendance_data', methods=['POST'])
 @login_required
-def delete_all_data():
+def delete_attendance_data():
     try:
         print("\n--- DEBUG: Starting transfer and clear process ---")
 
@@ -1021,7 +1022,7 @@ def data_management():
         
         if action == 'delete_all':
             try:
-                delete_all_data()
+                delete_all_data_from_db()
                 flash('All data deleted successfully! You can now import your Excel file.', 'success')
             except Exception as e:
                 print(f"Error deleting all data: {e}")
