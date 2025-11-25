@@ -43,6 +43,93 @@ def set_security_headers(response):
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
+# === Global Error Handlers for Debugging ===
+@app.before_request
+def log_request_info():
+    """Log request information for debugging"""
+    try:
+        print(f"\n{'='*80}")
+        print(f"REQUEST: {request.method} {request.path}")
+        print(f"Remote Addr: {request.remote_addr}")
+        print(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
+        if request.method == 'POST':
+            print(f"Form Data Keys: {list(request.form.keys())}")
+        print(f"{'='*80}\n")
+    except Exception as e:
+        print(f"Error in log_request_info: {e}")
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 Internal Server Errors with detailed logging"""
+    import traceback
+    error_trace = traceback.format_exc()
+    
+    print(f"\n{'='*80}")
+    print("INTERNAL SERVER ERROR (500)")
+    print(f"{'='*80}")
+    print(f"Error Type: {type(error).__name__}")
+    print(f"Error Message: {str(error)}")
+    print(f"\nFull Traceback:")
+    print(error_trace)
+    print(f"{'='*80}\n")
+    
+    # Try to get more context
+    try:
+        print(f"Request Method: {request.method}")
+        print(f"Request Path: {request.path}")
+        print(f"Request URL: {request.url}")
+        if request.method == 'POST':
+            print(f"Form Data: {dict(request.form)}")
+    except:
+        pass
+    
+    # Return user-friendly error page
+    return render_template('error.html', 
+                          error_code=500,
+                          error_message="An internal server error occurred. Please check the console logs for details."), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    """Handle 404 Not Found Errors"""
+    print(f"404 Error: {request.path}")
+    return render_template('error.html', 
+                          error_code=404,
+                          error_message="The page you're looking for doesn't exist."), 404
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Catch all unhandled exceptions"""
+    import traceback
+    error_trace = traceback.format_exc()
+    
+    print(f"\n{'='*80}")
+    print("UNHANDLED EXCEPTION")
+    print(f"{'='*80}")
+    print(f"Exception Type: {type(e).__name__}")
+    print(f"Exception Message: {str(e)}")
+    print(f"\nFull Traceback:")
+    print(error_trace)
+    print(f"{'='*80}\n")
+    
+    # Try to get request context
+    try:
+        print(f"Request Method: {request.method if request else 'N/A'}")
+        print(f"Request Path: {request.path if request else 'N/A'}")
+    except:
+        pass
+    
+    # Return 500 error page
+    return render_template('error.html', 
+                          error_code=500,
+                          error_message=f"An error occurred: {str(e)}"), 500
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """Handle CSRF token errors"""
+    print(f"CSRF Error: {e.description}")
+    flash('CSRF token missing or invalid. Please try again.', 'error')
+    return redirect(request.url or url_for('index'))
+
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
@@ -2341,8 +2428,31 @@ def process_offer_with_pattern_matching(offer_text):
         traceback.print_exc()
         return None
 
+# === Debug Route (for testing) ===
+@app.route('/debug/test')
+def debug_test():
+    """Test route to verify the app is working"""
+    try:
+        return jsonify({
+            'status': 'ok',
+            'message': 'Application is running',
+            'database_connected': bool(query_db('SELECT 1', one=True)),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'error_type': type(e).__name__
+        }), 500
+
 # === Run application ===
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
+    print(f"\n{'='*80}")
+    print("Starting Flask Application...")
+    print(f"Debug Mode: True")
+    print(f"Port: {port}")
+    print(f"{'='*80}\n")
     app.run(host='0.0.0.0', port=port, debug=True)
 

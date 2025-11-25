@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error {{ error_code }} - Rival Gym System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 80px 20px 20px 20px;
+            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        .error-container {
+            background: rgba(34, 34, 34, 0.95);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        .error-code {
+            font-size: 72px;
+            font-weight: bold;
+            color: #e53935;
+            margin: 20px 0;
+        }
+        
+        .error-message {
+            font-size: 18px;
+            color: #fff;
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+        
+        .error-details {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: monospace;
+            font-size: 14px;
+            color: #ccc;
+            border: 1px solid #444;
+        }
+        
+        .back-button {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        
+        .back-button:hover {
+            background-color: #66d66a;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Rival Gym System - Error</h1>
+    </header>
+    
+    <div class="error-container">
+        <div class="error-code">{{ error_code }}</div>
+        <div class="error-message">{{ error_message }}</div>
+        
+        {% if error_code == 500 %}
+        <div class="error-details">
+            <strong>What happened?</strong><br>
+            An internal server error occurred. This usually means:<br>
+            • A bug in the application code<br>
+            • A database connection issue<br>
+            • A missing configuration<br>
+            • An unexpected input that wasn't handled<br><br>
+            <strong>What to do?</strong><br>
+            • Check the server console logs for detailed error information<br>
+            • Try refreshing the page<br>
+            • Contact support if the problem persists
+        </div>
+        {% endif %}
+        
+        <a href="{{ url_for('index') }}" class="back-button">Go Back to Home</a>
+    </div>
+</body>
+</html>
+
