@@ -1212,6 +1212,118 @@ def data_management():
         traceback.print_exc()
         return render_template('data_management.html', member_count=0, attendance_count=0)
 
+@app.route('/offers', methods=['GET', 'POST'])
+@login_required
+def offers():
+    """Page for creating and processing offers with AI"""
+    if request.method == 'POST':
+        try:
+            offer_text = request.form.get('offer_text', '').strip()
+            if not offer_text:
+                flash('Please enter an offer description!', 'error')
+                return render_template('offers.html', offer_data=None)
+            
+            # Process offer with AI
+            structured_data = process_offer_with_ai(offer_text)
+            
+            if structured_data:
+                return render_template('offers.html', offer_data=structured_data)
+            else:
+                flash('Failed to process offer. Please try again.', 'error')
+                return render_template('offers.html', offer_data=None)
+                
+        except Exception as e:
+            print(f"Error processing offer: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f'Error processing offer: {str(e)}', 'error')
+            return render_template('offers.html', offer_data=None)
+    
+    # GET request
+    return render_template('offers.html', offer_data=None)
+
+
+def process_offer_with_ai(offer_text):
+    """Process offer text with AI and return structured data"""
+    try:
+        import json
+        import re
+        
+        # Simple AI-like processing using pattern matching and extraction
+        # This can be replaced with actual AI API call (OpenAI, etc.)
+        
+        structured_offer = {}
+        
+        # Extract duration (e.g., "3 months", "6 months", "1 year")
+        duration_match = re.search(r'(\d+)\s*(month|months|year|years|week|weeks)', offer_text, re.IGNORECASE)
+        if duration_match:
+            structured_offer['Duration'] = f"{duration_match.group(1)} {duration_match.group(2)}"
+        
+        # Extract price (e.g., "$300", "300 dollars", "AED 500")
+        price_match = re.search(r'[\$€£AED]?\s*(\d+(?:\.\d+)?)', offer_text, re.IGNORECASE)
+        if price_match:
+            currency = re.search(r'[\$€£AED]', offer_text, re.IGNORECASE)
+            currency_symbol = currency.group(0) if currency else '$'
+            structured_offer['Price'] = f"{currency_symbol}{price_match.group(1)}"
+        
+        # Extract features/benefits
+        features = []
+        if re.search(r'personal training|pt session', offer_text, re.IGNORECASE):
+            pt_match = re.search(r'(\d+)\s*(personal training|pt)', offer_text, re.IGNORECASE)
+            if pt_match:
+                features.append(f"{pt_match.group(1)} Personal Training Sessions")
+            else:
+                features.append("Personal Training Sessions")
+        
+        if re.search(r'nutrition|diet', offer_text, re.IGNORECASE):
+            features.append("Nutrition Consultation")
+        
+        if re.search(r'gym access|access', offer_text, re.IGNORECASE):
+            features.append("Full Gym Access")
+        
+        if features:
+            structured_offer['Features'] = ', '.join(features)
+        
+        # Extract validity/expiry date
+        date_patterns = [
+            r'valid until (\w+ \d{1,2},? \d{4})',
+            r'until (\w+ \d{1,2},? \d{4})',
+            r'expires? (\w+ \d{1,2},? \d{4})',
+            r'until (\d{1,2}/\d{1,2}/\d{4})',
+            r'valid until (\d{1,2}-\d{1,2}-\d{4})',
+        ]
+        for pattern in date_patterns:
+            date_match = re.search(pattern, offer_text, re.IGNORECASE)
+            if date_match:
+                structured_offer['Valid Until'] = date_match.group(1)
+                break
+        
+        # Extract membership type
+        if re.search(r'new member', offer_text, re.IGNORECASE):
+            structured_offer['Eligibility'] = "New Members Only"
+        elif re.search(r'existing member|current member', offer_text, re.IGNORECASE):
+            structured_offer['Eligibility'] = "Existing Members Only"
+        else:
+            structured_offer['Eligibility'] = "All Members"
+        
+        # Extract offer type
+        if re.search(r'special|promo|discount|deal', offer_text, re.IGNORECASE):
+            structured_offer['Offer Type'] = "Special Promotion"
+        else:
+            structured_offer['Offer Type'] = "Standard Offer"
+        
+        # Add description
+        structured_offer['Description'] = offer_text[:200] + ('...' if len(offer_text) > 200 else '')
+        
+        # Return as list of one item for table display
+        return [structured_offer]
+        
+    except Exception as e:
+        print(f"Error in process_offer_with_ai: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
 # === Run application ===
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

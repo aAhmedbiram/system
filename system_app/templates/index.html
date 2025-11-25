@@ -295,6 +295,7 @@
         <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance Table</a>
         <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
         <a class="attendance-btn" href="{{ url_for('invitations') }}" style="background-color: #9c27b0;">Invitations</a>
+        <a class="attendance-btn" href="{{ url_for('offers') }}" style="background-color: #ff9800;">Offers</a>
         {% if session.username == 'rino' %}
         <a class="send-email-btn" href="{{ url_for('send_email') }}">Send Email to Members</a>
         <a class="send-email-btn" href="{{ url_for('data_management') }}" style="background-color: #f44336;">Data Management</a>
