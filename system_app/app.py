@@ -9,6 +9,7 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email_validator import validate_email, EmailNotValidError
 
 # Also add this line to use DATABASE_URL
 from system_app.queries import DATABASE_URL
@@ -562,6 +563,7 @@ def send_email():
                 # Send email to each member
                 sent_count = 0
                 failed_emails = []
+                invalid_emails = []
                 server = None
                 
                 try:
@@ -601,6 +603,7 @@ def send_email():
                     
                     for idx, member in enumerate(members):
                         recipient_email = None
+                        normalized_email = None
                         try:
                             # Handle both dict and object access
                             if isinstance(member, dict):
@@ -615,26 +618,34 @@ def send_email():
                             recipient_email = str(recipient_email).strip()
                             if not recipient_email:
                                 continue
+
+                            try:
+                                validation = validate_email(recipient_email, check_deliverability=False)
+                                normalized_email = validation.email
+                            except EmailNotValidError as invalid_err:
+                                print(f"VALIDATION ERROR: {recipient_email} skipped ({invalid_err})")
+                                invalid_emails.append(f"{recipient_email} ({invalid_err})")
+                                continue
                                 
-                            print(f"DEBUG: Sending email {idx+1}/{len(members)} to {recipient_email}")
+                            print(f"DEBUG: Sending email {idx+1}/{len(members)} to {normalized_email}")
                             
                             # Create a new message for each recipient
                             msg = MIMEMultipart()
                             msg['From'] = sender_email
-                            msg['To'] = recipient_email
+                            msg['To'] = normalized_email
                             msg['Subject'] = 'Message from Rival Gym'
                             msg.attach(MIMEText(message, 'plain'))
                             
-                            server.sendmail(sender_email, recipient_email, msg.as_string())
+                            server.sendmail(sender_email, normalized_email, msg.as_string())
                             sent_count += 1
-                            print(f"DEBUG: Successfully sent to {recipient_email}")
+                            print(f"DEBUG: Successfully sent to {normalized_email}")
                         except Exception as e:
-                            email_addr = recipient_email if recipient_email else 'unknown'
+                            email_addr = normalized_email if 'normalized_email' in locals() else (recipient_email if recipient_email else 'unknown')
                             print(f"ERROR: Failed to send email to {email_addr}: {e}")
                             import traceback
                             traceback.print_exc()
                             if recipient_email:
-                                failed_emails.append(recipient_email)
+                                failed_emails.append(email_addr)
                     
                     if server:
                         server.quit()
@@ -644,8 +655,15 @@ def send_email():
                         if failed_emails:
                             success_msg += f' Failed to send to {len(failed_emails)} email(s).'
                         flash(success_msg, 'success')
+                        if invalid_emails:
+                            preview = ', '.join(invalid_emails[:5])
+                            more = '' if len(invalid_emails) <= 5 else ' ...'
+                            flash(f'Skipped {len(invalid_emails)} invalid email(s): {preview}{more}', 'error')
                     else:
-                        flash('Failed to send emails to all recipients!', 'error')
+                        failure_msg = 'Failed to send emails to all recipients!'
+                        if invalid_emails:
+                            failure_msg += f' Additionally, {len(invalid_emails)} invalid email(s) were skipped.'
+                        flash(failure_msg, 'error')
                         
                 except smtplib.SMTPAuthenticationError as e:
                     error_msg = f'Email authentication failed: {str(e)}. Please check GMAIL_APP_PASSWORD.'
