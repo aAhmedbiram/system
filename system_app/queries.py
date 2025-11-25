@@ -271,19 +271,21 @@ def delete_all_data():
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cur = conn.cursor()
     try:
-        # Delete in order to respect foreign key constraints
-        # Tables with CASCADE will be deleted automatically when members are deleted
-        cur.execute('TRUNCATE TABLE invitations RESTART IDENTITY CASCADE')
-        cur.execute('TRUNCATE TABLE member_logs RESTART IDENTITY CASCADE')
-        cur.execute('TRUNCATE TABLE attendance RESTART IDENTITY CASCADE')
-        cur.execute('TRUNCATE TABLE attendance_backup RESTART IDENTITY CASCADE')
+        # Truncate members table first with CASCADE - this will automatically
+        # delete all child tables (attendance, member_logs, invitations) due to CASCADE
         cur.execute('TRUNCATE TABLE members RESTART IDENTITY CASCADE')
         
+        # Truncate attendance_backup separately (it has no foreign keys to members)
+        cur.execute('TRUNCATE TABLE attendance_backup RESTART IDENTITY')
+        
         conn.commit()
+        print("All data deleted successfully!")
         return True
     except Exception as e:
         conn.rollback()
         print(f"Error deleting all data: {e}")
+        import traceback
+        traceback.print_exc()
         raise e
     finally:
         cur.close()
