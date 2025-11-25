@@ -11,16 +11,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email_validator import validate_email, EmailNotValidError
 
-# Also add this line to use DATABASE_URL
-from system_app.queries import DATABASE_URL
-from flask import session
-
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates
 from .queries import (
-    create_table, query_db, check_name_exists, check_id_exists,
+    DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member,
     add_attendance
 )
