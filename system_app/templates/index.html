@@ -241,6 +241,7 @@
             <br><br><br><br><br><br><br><br><br>
             <div class="center-box">
                 <a class="all-members-btn" href="{{ url_for('all_members') }}">View All Members</a>
+                <a class="all-members-btn" href="{{ url_for('logs') }}" style="margin-top: 10px;">View Edit Logs</a>
             </div>
         </section>
 
@@ -293,6 +294,7 @@
     <div class="bottom-buttons">
         <a class="attendance-btn" href="{{ url_for('attendance_table')}}">Attendance Table</a>
         <a class="attendance-backup-btn" href="/attendance_backup">Attendance Backup</a>
+        <a class="attendance-btn" href="{{ url_for('logs') }}" style="background-color: #ff9800;">Edit Logs</a>
         {% if session.username == 'rino' %}
         <a class="send-email-btn" href="{{ url_for('send_email') }}">Send Email to Members</a>
         {% endif %}

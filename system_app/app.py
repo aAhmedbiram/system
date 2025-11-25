@@ -18,7 +18,7 @@ from .func import calculate_age, calculate_end_date, membership_fees, compare_da
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member,
-    add_attendance
+    add_attendance, get_all_logs, get_member_logs
 )
 
 # Initialize database tables on startup
@@ -346,12 +346,16 @@ def edit_member(member_id):
             fees = membership_fees(user_input)
             status = compare_dates(end_date) or "Unknown"
 
+            # Get username from session for logging
+            username = session.get('username', 'Unknown')
+
             update_member(member_id,
                 name=name, email=email, phone=phone, age=age, gender=gender,
                 birthdate=birthdate, actual_starting_date=actual_starting_date,
                 starting_date=starting_date, end_date=end_date,
                 membership_packages=f"{numeric_value} {unit}",
-                membership_fees=fees, membership_status=status
+                membership_fees=fees, membership_status=status,
+                edited_by=username
             )
             flash("Member updated successfully!", "success")
         except Exception as e:
@@ -600,6 +604,31 @@ def attendance_backup_table():
 @login_required
 def success():
     return render_template('success.html')
+
+@app.route('/logs')
+@login_required
+def logs():
+    """Display all member edit logs"""
+    try:
+        member_id = request.args.get('member_id', type=int)
+        if member_id:
+            logs_data = get_member_logs(member_id)
+            member = get_member(member_id)
+            member_name = member['name'] if member else f"Member ID {member_id}"
+        else:
+            logs_data = get_all_logs()
+            member_name = None
+        
+        return render_template('logs.html', 
+                             logs_data=logs_data or [], 
+                             member_id=member_id,
+                             member_name=member_name)
+    except Exception as e:
+        print(f"Error in logs route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading logs: {str(e)}", "error")
+        return render_template('logs.html', logs_data=[], member_id=None, member_name=None)
 
 @app.route('/send_email', methods=['GET', 'POST'])
 @rino_required

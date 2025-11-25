@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Logs - Rival Gym System</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #fff;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        h2 {
+            color: #4caf50;
+            margin-bottom: 10px;
+        }
+
+        .index-btn {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .index-btn:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+
+        .filter-btn {
+            background-color: #2196F3;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+            margin-left: 10px;
+        }
+
+        .filter-btn:hover {
+            background-color: #42a5f5;
+            transform: scale(1.03);
+        }
+
+        .table-container {
+            max-height: 80vh;
+            border: 1px solid #444;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #222;
+            min-width: 800px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            border: 1px solid #444;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+            color: #4caf50;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+
+        tr:hover {
+            background-color: #333;
+        }
+
+        .old-value {
+            color: #ff6b6b;
+            text-decoration: line-through;
+        }
+
+        .new-value {
+            color: #51cf66;
+            font-weight: bold;
+        }
+
+        .field-name {
+            color: #ffd43b;
+            font-weight: bold;
+            text-transform: capitalize;
+        }
+
+        .member-name {
+            color: #74c0fc;
+            font-weight: bold;
+        }
+
+        .edited-by {
+            color: #ff8787;
+        }
+
+        .edit-time {
+            color: #adb5bd;
+            font-size: 0.9em;
+        }
+
+        .no-logs {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+            font-size: 18px;
+        }
+
+        .filter-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #222;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .filter-section input {
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #333;
+            color: #fff;
+            font-size: 16px;
+            width: 200px;
+        }
+
+        .filter-section button {
+            padding: 10px 20px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+
+        .filter-section button:hover {
+            background-color: #42a5f5;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Rival Gym System - Edit Logs</h1>
+    </header>
+
+    <section>
+        <a href="{{ url_for('index') }}" class="index-btn">← Back to Home</a>
+        {% if member_name %}
+        <a href="{{ url_for('logs') }}" class="filter-btn">Show All Logs</a>
+        {% endif %}
+
+        <h2>{% if member_name %}Edit Logs for {{ member_name }} (ID: {{ member_id }}){% else %}All Member Edit Logs{% endif %}</h2>
+
+        <div class="filter-section">
+            <form method="GET" action="{{ url_for('logs') }}" style="display: inline-block;">
+                <input type="number" name="member_id" placeholder="Filter by Member ID" value="{{ member_id or '' }}">
+                <button type="submit">Filter</button>
+            </form>
+        </div>
+
+        <div class="table-container">
+            {% if logs_data %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Member ID</th>
+                        <th>Member Name</th>
+                        <th>Field Changed</th>
+                        <th>Old Value</th>
+                        <th>New Value</th>
+                        <th>Edited By</th>
+                        <th>Edit Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs_data %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.member_id }}</td>
+                        <td class="member-name">{{ log.member_name }}</td>
+                        <td class="field-name">{{ log.field_name }}</td>
+                        <td class="old-value">{{ log.old_value or '(empty)' }}</td>
+                        <td class="new-value">{{ log.new_value or '(empty)' }}</td>
+                        <td class="edited-by">{{ log.edited_by }}</td>
+                        <td class="edit-time">
+                            {% if log.edit_time %}
+                                {% if log.edit_time is string %}
+                                    {{ log.edit_time }}
+                                {% else %}
+                                    {{ log.edit_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                                {% endif %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-logs">
+                <p>No edit logs found{% if member_id %} for this member{% endif %}.</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</body>
+
+</html>
+

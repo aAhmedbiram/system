@@ -68,6 +68,19 @@ def create_table():
             )
         ''')
 
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS member_logs (
+                id SERIAL PRIMARY KEY,
+                member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+                member_name TEXT,
+                field_name TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                edited_by TEXT,
+                edit_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         conn.commit()
         print("PostgreSQL tables created successfully!")
     except Exception as e:
@@ -162,10 +175,34 @@ def get_member(member_id):
 def update_member(member_id, **kwargs):
     if not kwargs:
         return
+    # Get old values before updating
+    old_member = get_member(member_id)
+    if not old_member:
+        return
+    
+    # Update the member
     fields = [f"{k} = %s" for k in kwargs.keys()]
     values = list(kwargs.values()) + [member_id]
     query = f"UPDATE members SET {', '.join(fields)} WHERE id = %s"
     query_db(query, tuple(values), commit=True)
+    
+    # Log the changes
+    from datetime import datetime
+    edited_by = kwargs.get('edited_by', 'Unknown')
+    member_name = old_member.get('name', 'Unknown')
+    
+    for field, new_value in kwargs.items():
+        if field == 'edited_by':
+            continue  # Skip logging the edited_by field itself
+        old_value = old_member.get(field)
+        
+        # Convert values to strings for comparison
+        old_str = str(old_value) if old_value is not None else ''
+        new_str = str(new_value) if new_value is not None else ''
+        
+        # Only log if value actually changed
+        if old_str != new_str:
+            add_member_log(member_id, member_name, field, old_str, new_str, edited_by)
 
 
 def delete_member(member_id):
@@ -241,3 +278,40 @@ def check_name_exists(name):
 def check_id_exists(member_id):
     result = query_db('SELECT 1 FROM members WHERE id = %s LIMIT 1', (member_id,), one=True)
     return result is not None          # ← correct like this
+
+
+# === Logging functions ===
+def add_member_log(member_id, member_name, field_name, old_value, new_value, edited_by):
+    """Add a log entry for a member edit"""
+    try:
+        query_db('''
+            INSERT INTO member_logs 
+            (member_id, member_name, field_name, old_value, new_value, edited_by)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (member_id, member_name, field_name, old_value, new_value, edited_by), commit=True)
+    except Exception as e:
+        print(f"Error adding log: {e}")
+        # Don't raise - logging failure shouldn't break the update
+
+
+def get_member_logs(member_id=None):
+    """Get logs for a specific member or all logs"""
+    if member_id:
+        return query_db('''
+            SELECT * FROM member_logs 
+            WHERE member_id = %s 
+            ORDER BY edit_time DESC
+        ''', (member_id,))
+    else:
+        return query_db('''
+            SELECT * FROM member_logs 
+            ORDER BY edit_time DESC
+        ''')
+
+
+def get_all_logs():
+    """Get all logs ordered by most recent first"""
+    return query_db('''
+        SELECT * FROM member_logs 
+        ORDER BY edit_time DESC
+    ''')
