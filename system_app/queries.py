@@ -29,9 +29,16 @@ def create_table():
                 end_date TEXT,
                 membership_packages TEXT,
                 membership_fees REAL,
-                membership_status TEXT
+                membership_status TEXT,
+                invitations INTEGER DEFAULT 0
             )
         ''')
+        
+        # Add invitations column if it doesn't exist (for existing databases)
+        try:
+            cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS invitations INTEGER DEFAULT 0')
+        except:
+            pass
 
         cr.execute('''
             CREATE TABLE IF NOT EXISTS attendance (
@@ -78,6 +85,19 @@ def create_table():
                 new_value TEXT,
                 edited_by TEXT,
                 edit_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS invitations (
+                id SERIAL PRIMARY KEY,
+                member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+                member_name TEXT NOT NULL,
+                friend_name TEXT NOT NULL,
+                friend_phone TEXT,
+                friend_email TEXT,
+                used_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                used_by TEXT
             )
         ''')
 
@@ -137,30 +157,30 @@ def query_db(query, args=(), one=False, commit=False):
 def add_member(name, email, phone, age, gender, birthdate,
             actual_starting_date, starting_date, end_date,
             membership_packages, membership_fees, membership_status,
-            custom_id=None):
+            custom_id=None, invitations=0):
     try:
         if custom_id is not None:
             result = query_db('''
                 INSERT INTO members 
                 (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 custom_id, name, email, phone, age, gender, birthdate, actual_starting_date,
-                starting_date, end_date, membership_packages, membership_fees, membership_status
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations
             ), one=True, commit=True)
             return result['id']
         else:
             result = query_db('''
                 INSERT INTO members 
                 (name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 name, email, phone, age, gender, birthdate, actual_starting_date,
-                starting_date, end_date, membership_packages, membership_fees, membership_status
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations
             ), one=True, commit=True)
             return result['id']
     except Exception as e:
@@ -317,3 +337,54 @@ def get_all_logs():
         SELECT * FROM member_logs 
         ORDER BY id ASC
     ''')
+
+
+# === Invitation functions ===
+def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None, used_by=None):
+    """Use one invitation from a member and record the friend's information"""
+    try:
+        # Get member info
+        member = get_member(member_id)
+        if not member:
+            raise ValueError(f"Member with ID {member_id} not found")
+        
+        # Check if member has available invitations
+        current_invitations = member.get('invitations', 0) or 0
+        if current_invitations <= 0:
+            raise ValueError(f"Member {member['name']} (ID: {member_id}) has no available invitations")
+        
+        # Record the invitation usage
+        query_db('''
+            INSERT INTO invitations 
+            (member_id, member_name, friend_name, friend_phone, friend_email, used_by)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (member_id, member['name'], friend_name, friend_phone, friend_email, used_by), commit=True)
+        
+        # Deduct one invitation from member
+        query_db('''
+            UPDATE members 
+            SET invitations = invitations - 1 
+            WHERE id = %s
+        ''', (member_id,), commit=True)
+        
+        return True
+    except Exception as e:
+        print(f"Error using invitation: {e}")
+        raise e
+
+
+def get_all_invitations():
+    """Get all invitation records ordered by most recent"""
+    return query_db('''
+        SELECT * FROM invitations 
+        ORDER BY used_date DESC
+    ''')
+
+
+def get_member_invitations(member_id):
+    """Get all invitations used by a specific member"""
+    return query_db('''
+        SELECT * FROM invitations 
+        WHERE member_id = %s 
+        ORDER BY used_date DESC
+    ''', (member_id,))

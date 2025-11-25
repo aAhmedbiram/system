@@ -184,12 +184,13 @@
         <th onclick="sortTable(9)">Package ▲▼</th>
         <th onclick="sortTable(10)">Fees ▲▼</th>
         <th onclick="sortTable(11)">Status ▲▼</th>
+        <th onclick="sortTable(12)">Invitations ▲▼</th>
         <th>Action</th>
     </tr>
 
     <!-- filter row -->
     <tr class="filter-row">
-        {% for i in range(12) %}
+        {% for i in range(13) %}
             <th><input type="text" onkeyup="filterTable({{i}})" placeholder="Search"></th>
         {% endfor %}
         <th></th>
@@ -211,6 +212,7 @@
         <td>{{ member.membership_packages }}</td>
         <td>{{ member.membership_fees }}</td>
         <td>{{ member.membership_status }}</td>
+        <td style="color: #ffd43b; font-weight: bold;">{{ member.invitations or 0 }}</td>
         <td><a class="edit-link"
                 href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a></td>
     </tr>

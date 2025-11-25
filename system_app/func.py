@@ -54,3 +54,31 @@ def compare_dates(end_date_str):
         return "Unknown"
 
 
+def calculate_invitations(package_name):
+    """Returns number of invitations based on package: 1 Month = 1, 2 Months = 2, etc."""
+    if not package_name:
+        return 0
+    
+    package_name = package_name.strip()
+    # Extract number from package name (e.g., "1 Month" -> 1, "2 Months" -> 2)
+    try:
+        # Split by space and get first part
+        parts = package_name.split()
+        if parts:
+            number = int(parts[0])
+            return number
+    except (ValueError, IndexError):
+        pass
+    
+    # Fallback mapping
+    invitations_map = {
+        "1 Month": 1,
+        "2 Months": 2,
+        "3 Months": 3,
+        "4 Months": 4,
+        "6 Months": 6,
+        "12 Months": 12
+    }
+    return invitations_map.get(package_name, 0)
+
+

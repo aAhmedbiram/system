@@ -14,11 +14,12 @@ from email_validator import validate_email, EmailNotValidError
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_fallback')
 
-from .func import calculate_age, calculate_end_date, membership_fees, compare_dates
+from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member,
-    add_attendance, get_all_logs, get_member_logs
+    add_attendance, get_all_logs, get_member_logs,
+    use_invitation, get_all_invitations, get_member_invitations
 )
 
 # Initialize database tables on startup
@@ -229,6 +230,7 @@ def add_member_route():
         member_end_date = calculate_end_date(member_starting_date, numeric_value) or ""
         member_membership_fees = membership_fees(user_input)
         member_membership_status = compare_dates(member_end_date) or "Unknown"
+        member_invitations = calculate_invitations(user_input)
 
         # --- 1. Check for duplicates ---
         existing = query_db('''
@@ -254,7 +256,8 @@ def add_member_route():
             member_birthdate, member_actual_starting_date, member_starting_date,
             member_end_date, f"{numeric_value} {unit}", member_membership_fees,
             member_membership_status,
-            custom_id=new_member_id
+            custom_id=new_member_id,
+            invitations=member_invitations
         )
 
         # --- Format date ---
@@ -345,6 +348,7 @@ def edit_member(member_id):
             end_date = calculate_end_date(starting_date, numeric_value) or ""
             fees = membership_fees(user_input)
             status = compare_dates(end_date) or "Unknown"
+            invitations = calculate_invitations(user_input)
 
             # Get username from session for logging
             username = session.get('username', 'Unknown')
@@ -355,6 +359,7 @@ def edit_member(member_id):
                 starting_date=starting_date, end_date=end_date,
                 membership_packages=f"{numeric_value} {unit}",
                 membership_fees=fees, membership_status=status,
+                invitations=invitations,
                 edited_by=username
             )
             flash("Member updated successfully!", "success")
@@ -604,6 +609,65 @@ def attendance_backup_table():
 @login_required
 def success():
     return render_template('success.html')
+
+@app.route('/invitations', methods=['GET', 'POST'])
+@login_required
+def invitations():
+    """Handle invitation usage"""
+    if request.method == 'POST':
+        try:
+            member_id_str = request.form.get('member_id', '').strip()
+            friend_name = request.form.get('friend_name', '').strip().capitalize()
+            friend_phone = request.form.get('friend_phone', '').strip()
+            friend_email = request.form.get('friend_email', '').strip().lower()
+            
+            if not member_id_str or not friend_name:
+                flash('Member ID and friend name are required!', 'error')
+                return redirect(url_for('invitations'))
+            
+            try:
+                member_id = int(member_id_str)
+            except ValueError:
+                flash('Invalid member ID!', 'error')
+                return redirect(url_for('invitations'))
+            
+            # Verify member exists
+            member = get_member(member_id)
+            if not member:
+                flash(f'Member with ID {member_id} not found!', 'error')
+                return redirect(url_for('invitations'))
+            
+            # Get username for logging
+            username = session.get('username', 'Unknown')
+            
+            # Use the invitation
+            use_invitation(member_id, friend_name, friend_phone, friend_email, username)
+            
+            flash(f'Invitation used successfully! {member["name"]} now has {member.get("invitations", 0) - 1} invitation(s) remaining.', 'success')
+            return redirect(url_for('invitations'))
+            
+        except ValueError as e:
+            flash(str(e), 'error')
+            return redirect(url_for('invitations'))
+        except Exception as e:
+            print(f"Error in invitations POST route: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error using invitation: {str(e)}", "error")
+            return redirect(url_for('invitations'))
+    
+    # GET request - show invitations page
+    try:
+        invitations_data = get_all_invitations()
+        return render_template('invitations.html', 
+                             invitations_data=invitations_data or [],
+                             members_data=query_db('SELECT id, name, invitations FROM members ORDER BY id ASC') or [])
+    except Exception as e:
+        print(f"Error in invitations GET route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading invitations: {str(e)}", "error")
+        return render_template('invitations.html', invitations_data=[], members_data=[])
 
 @app.route('/logs')
 @login_required
