@@ -14,14 +14,12 @@ from email.mime.multipart import MIMEMultipart
 from email_validator import validate_email, EmailNotValidError
 import re
 import secrets
-from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
 # Security: Use strong secret key from environment (required in production)
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    import secrets
     secret_key = secrets.token_hex(32)
     print("WARNING: SECRET_KEY not set in environment. Using generated key (not secure for production!)")
 app.secret_key = secret_key
@@ -247,11 +245,40 @@ def send_verification_email(email, username, verification_token):
             return False
         
         # Get base URL (for verification link) - handle both local and production
-        if request.is_secure:
-            base_url = f"https://{request.host}"
-        else:
-            # For Railway/production, use environment variable or request host
-            base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
+        try:
+            # Try to get from request context first
+            from flask import has_request_context
+            if has_request_context():
+                # Check if behind proxy (Railway, etc.)
+                try:
+                    forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
+                    is_secure = False
+                    try:
+                        is_secure = request.is_secure if hasattr(request, 'is_secure') else False
+                    except:
+                        pass
+                    
+                    if forwarded_proto == 'https' or is_secure:
+                        base_url = f"https://{request.host}"
+                    else:
+                        base_url = request.host_url.rstrip('/')
+                except AttributeError:
+                    try:
+                        base_url = request.host_url.rstrip('/')
+                    except:
+                        base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
+                except Exception as req_err:
+                    print(f"Error accessing request: {req_err}")
+                    base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
+            else:
+                # No request context, use environment variable
+                base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
+        except Exception as e:
+            print(f"Error getting base URL: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to environment variable or default
+            base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
         
         verification_url = f"{base_url}/verify_email/{verification_token}"
         
@@ -392,12 +419,30 @@ def signup():
             )
             
             # Send verification email
-            email_sent = send_verification_email(email, username, verification_token)
+            try:
+                email_sent = send_verification_email(email, username, verification_token)
+            except Exception as email_error:
+                print(f"Error in send_verification_email: {email_error}")
+                import traceback
+                traceback.print_exc()
+                email_sent = False
             
             if email_sent:
                 flash('Account created successfully! Please check your email to verify your account before logging in.', 'success')
             else:
-                flash('Account created, but verification email could not be sent. Please contact support.', 'error')
+                # Get base URL for manual verification link
+                try:
+                    if request.headers.get('X-Forwarded-Proto') == 'https' or (hasattr(request, 'is_secure') and request.is_secure):
+                        base_url = f"https://{request.host}"
+                    else:
+                        base_url = request.host_url.rstrip('/')
+                except:
+                    base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
+                
+                manual_link = f"{base_url}/verify_email/{verification_token}"
+                flash(f'Account created! However, verification email could not be sent. Please verify manually: {manual_link}', 'error')
+                print(f"MANUAL VERIFICATION TOKEN for {username} ({email}): {verification_token}")
+                print(f"Manual verification link: {manual_link}")
             
             return redirect(url_for('login'))
         except Exception as e:
@@ -500,8 +545,19 @@ def resend_verification():
         if email_sent:
             flash('Verification email sent successfully! Please check your inbox.', 'success')
         else:
-            flash(f'Could not send email. Manual verification link: {request.host_url}verify_email/{verification_token}', 'error')
+            # Get base URL for manual verification link
+            try:
+                if request.headers.get('X-Forwarded-Proto') == 'https' or request.is_secure:
+                    base_url = f"https://{request.host}"
+                else:
+                    base_url = request.host_url.rstrip('/')
+            except:
+                base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
+            
+            manual_link = f"{base_url}/verify_email/{verification_token}"
+            flash(f'Could not send email. Manual verification link: {manual_link}', 'error')
             print(f"MANUAL VERIFICATION TOKEN for {user['username']} ({email}): {verification_token}")
+            print(f"Manual verification link: {manual_link}")
         
         return redirect(url_for('login'))
     
