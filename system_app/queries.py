@@ -91,8 +91,15 @@ def query_db(query, args=(), one=False, commit=False):
         if commit:
             conn.commit()
 
-        rv = cur.fetchall()
-        return (rv[0] if rv else None) if one else rv
+        # Only fetch results if the query returns rows (SELECT or INSERT/UPDATE with RETURNING)
+        # Check if query is a SELECT or has RETURNING clause
+        query_upper = query.strip().upper()
+        if query_upper.startswith('SELECT') or 'RETURNING' in query_upper:
+            rv = cur.fetchall()
+            return (rv[0] if rv else None) if one else rv
+        else:
+            # For INSERT/UPDATE/DELETE without RETURNING, return None or empty list
+            return None if one else []
 
     except IntegrityError as e:
         print(f"DB Integrity Error: {e}")
