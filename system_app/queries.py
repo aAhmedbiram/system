@@ -180,7 +180,14 @@ def update_member(member_id, **kwargs):
     if not old_member:
         return
     
-    # Update the member
+    # Extract edited_by for logging (it's not a column in members table)
+    edited_by = kwargs.pop('edited_by', 'Unknown')
+    member_name = old_member.get('name', 'Unknown')
+    
+    # Update the member (edited_by is now removed from kwargs)
+    if not kwargs:  # If only edited_by was passed, nothing to update
+        return
+    
     fields = [f"{k} = %s" for k in kwargs.keys()]
     values = list(kwargs.values()) + [member_id]
     query = f"UPDATE members SET {', '.join(fields)} WHERE id = %s"
@@ -188,12 +195,7 @@ def update_member(member_id, **kwargs):
     
     # Log the changes
     from datetime import datetime
-    edited_by = kwargs.get('edited_by', 'Unknown')
-    member_name = old_member.get('name', 'Unknown')
-    
     for field, new_value in kwargs.items():
-        if field == 'edited_by':
-            continue  # Skip logging the edited_by field itself
         old_value = old_member.get(field)
         
         # Convert values to strings for comparison
