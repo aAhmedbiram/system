@@ -1277,57 +1277,72 @@ You understand:
 
 Be thorough, accurate, and extract every piece of valuable information. Think like a human business analyst would."""
 
-        user_prompt = f"""You are an expert at extracting EXACT information from gym membership offers. Be PRECISE and ACCURATE.
+        user_prompt = f"""You are ChatGPT-level intelligent at extracting information. Read the text word-by-word and extract EXACTLY what is written.
 
-Analyze this offer text carefully:
+OFFER TEXT TO ANALYZE:
 "{offer_text}"
 
-CRITICAL RULES:
-1. PRICE: Extract the EXACT number mentioned. If it says "1200", the price is 1200 (or $1200 if currency context suggests). Do NOT extract partial words or letters.
-2. ELIGIBILITY: If text says "for old members and new members" or "for old and new members", the eligibility is "All Members" or "Old Members and New Members". If it says "for old members" only, it's "Existing Members Only". If it says "for new members" only, it's "New Members Only".
-3. DURATION: Extract the exact duration mentioned (e.g., "4 months" not "4 month")
-4. DATES: If it says "until this month end" or "until end of month", calculate the actual last day of the current month.
+STEP-BY-STEP EXTRACTION PROCESS:
 
-Extract and return a JSON object with these fields (use null only if truly not available):
+STEP 1 - FIND THE PRICE:
+- Look for numbers followed by currency symbols ($, €, £, AED) OR numbers after words like "for", "price", "cost"
+- Example: "for 1200$" → price is "1200" or "$1200"
+- Example: "4 months for 1200" → price is "1200" 
+- Example: "$500 membership" → price is "500" or "$500"
+- CRITICAL: Extract the COMPLETE number. If you see "1200", extract "1200" NOT "120" or "4" or any partial number.
+- If multiple numbers exist, the price is usually the LARGEST number or the number near "for"/"price"/"cost"
 
-1. title: A compelling title for the offer
-2. duration: EXACT duration mentioned (e.g., "4 months", "6 months", "1 year")
-3. price: EXACT price number mentioned - extract the FULL number, not partial text. If "1200" is mentioned, price should be "1200" or "$1200" (add currency if context suggests)
-4. original_price: Original price if this is a discount
-5. discount_amount: Discount amount if applicable
-6. discount_percentage: Discount percentage if mentioned
-7. savings: Customer savings
-8. features: All features/benefits included
-9. number_of_sessions: Personal training sessions count
-10. session_duration: Session duration if mentioned
-11. valid_from: When offer starts
-12. valid_until: When offer expires - if "end of month" or "this month end", calculate actual date (format: YYYY-MM-DD or readable date)
-13. eligibility: EXACT eligibility - if text says "old members and new members", return "All Members" or "Old Members and New Members". Be precise!
-14. offer_type: Type (Limited Time Offer, Special Promotion, etc.)
-15. payment_options: Payment plans if mentioned
-16. restrictions: Any limitations
-17. terms_and_conditions: Terms and conditions
-18. additional_benefits: Extra perks
-19. cancellation_policy: Cancellation terms
-20. description: Professional summary
-21. target_audience: Who this is for
-22. urgency_indicators: Urgency cues
-23. comparison_value: Value proposition
+STEP 2 - FIND THE DURATION:
+- Look for patterns like "X months", "X month", "X years", etc.
+- Always use plural: "4 months" not "4 month"
+- Example: "4 months" → duration: "4 months"
 
-EXAMPLES:
-- Input: "4 months for 1200 for old members and new members until this month end"
-  - duration: "4 months"
-  - price: "1200" or "$1200"
-  - eligibility: "All Members" or "Old Members and New Members"
-  - valid_until: Calculate actual end of current month date
+STEP 3 - FIND ELIGIBILITY:
+- "for new members only" → "New Members Only"
+- "for old members and new members" → "All Members" or "Old Members and New Members"
+- "for old members" or "for existing members" → "Existing Members Only"
+- "for new and old members" → "All Members"
 
-- Input: "3 months membership $500"
-  - duration: "3 months"
-  - price: "$500"
+STEP 4 - FIND VALIDITY:
+- "until end of month" or "until this month end" → Calculate actual last day of current month
+- "until [date]" → Use that exact date
+- "valid until [date]" → Use that exact date
 
-Be EXTREMELY careful with number extraction. Extract the COMPLETE number, not partial text.
+Now extract and return JSON with these fields:
 
-Return ONLY valid JSON object, no markdown, no explanations."""
+{{
+  "title": "Compelling title",
+  "duration": "EXACT duration from text (e.g., '4 months')",
+  "price": "EXACT price number from text (e.g., '1200' or '$1200') - MUST match what's in the text",
+  "original_price": "Original price if discount mentioned",
+  "discount_amount": "Discount amount if applicable",
+  "discount_percentage": "Discount % if mentioned",
+  "savings": "Customer savings",
+  "features": ["List of features"],
+  "number_of_sessions": "Number of PT sessions if mentioned",
+  "session_duration": "Session duration",
+  "valid_from": "Start date",
+  "valid_until": "End date - calculate if 'end of month' mentioned",
+  "eligibility": "EXACT eligibility from text",
+  "offer_type": "Limited Time Offer" if has expiry, else "Standard Offer",
+  "payment_options": "Payment plans",
+  "restrictions": "Limitations",
+  "terms_and_conditions": "Terms",
+  "additional_benefits": "Extra perks",
+  "cancellation_policy": "Cancellation terms",
+  "description": "Summary",
+  "target_audience": "Target group",
+  "urgency_indicators": "Urgency cues",
+  "comparison_value": "Value proposition"
+}}
+
+VERIFICATION CHECKLIST before returning:
+✓ Price matches the number in the text (not a partial number)
+✓ Duration is plural (e.g., "4 months" not "4 month")
+✓ Eligibility matches what's written in text
+✓ All numbers are complete, not partial
+
+Return ONLY the JSON object, nothing else."""
 
         # Try GPT-4 first (smarter), fallback to GPT-3.5-turbo
         models_to_try = ["gpt-4", "gpt-4-turbo-preview", "gpt-3.5-turbo"]
@@ -1368,27 +1383,51 @@ Return ONLY valid JSON object, no markdown, no explanations."""
         
         structured_offer = json.loads(ai_response)
         
-        # Post-process and validate extracted data
+        # Post-process and validate extracted data with AGGRESSIVE error correction
         import re
         from datetime import datetime, timedelta
         import calendar
         
-        # Fix price extraction if it looks wrong
-        if 'price' in structured_offer and structured_offer['price']:
+        # AGGRESSIVE PRICE FIX - Extract directly from text if AI got it wrong
+        if 'price' in structured_offer:
             price_str = str(structured_offer['price']).strip()
-            # If price contains letters that shouldn't be there, extract just the number
-            if re.search(r'[a-zA-Z]', price_str) and not any(c in price_str for c in ['$', '€', '£', 'AED']):
-                # Extract numbers from the original text
-                numbers = re.findall(r'\d+', offer_text)
-                if numbers:
-                    # Find the number that's likely the price (usually the largest or most prominent)
-                    # Look for numbers near "for" or price-related words
-                    price_context = re.search(r'(?:for|price|cost|pay)\s*(\d+)', offer_text, re.IGNORECASE)
-                    if price_context:
-                        structured_offer['price'] = price_context.group(1)
-                    elif len(numbers) >= 2:
-                        # If multiple numbers, the larger one is usually the price
-                        structured_offer['price'] = max(numbers, key=int)
+            # Remove currency symbols for comparison
+            price_clean = re.sub(r'[\$€£AED\s]', '', price_str)
+            
+            # Find ALL numbers in the text
+            numbers_in_text = re.findall(r'\d+', offer_text)
+            
+            # Try multiple patterns to find the price
+            price_patterns = [
+                r'(?:for|price|cost|pay|only)\s*(\d+)',
+                r'(\d+)\s*\$',
+                r'\$\s*(\d+)',
+                r'(\d+)\s*(?:dollars|AED|euros|pounds)',
+                r'(\d+)\s*(?:until|for|members)',
+            ]
+            
+            extracted_price = None
+            for pattern in price_patterns:
+                match = re.search(pattern, offer_text, re.IGNORECASE)
+                if match:
+                    candidate = match.group(1)
+                    # Prefer larger numbers (prices are usually larger than durations)
+                    if not extracted_price or int(candidate) > int(extracted_price):
+                        extracted_price = candidate
+            
+            # If we found a price in text
+            if extracted_price:
+                # If AI's price is wrong (too small, doesn't match, or is clearly wrong)
+                if not price_clean or int(price_clean) != int(extracted_price):
+                    if not price_clean or int(price_clean) < int(extracted_price) // 2:
+                        print(f"Price correction: AI said '{price_str}' but text has '{extracted_price}', using text value")
+                        structured_offer['price'] = extracted_price
+            elif numbers_in_text:
+                # If AI price is clearly wrong (like "$4" when text has "1200"), use largest number
+                largest_num = max(numbers_in_text, key=int)
+                if not price_clean or (price_clean.isdigit() and int(price_clean) < int(largest_num) // 5):
+                    print(f"Price correction: AI said '{price_str}' but largest number in text is '{largest_num}', using it")
+                    structured_offer['price'] = largest_num
         
         # Fix eligibility if it's wrong
         if 'eligibility' in structured_offer:
