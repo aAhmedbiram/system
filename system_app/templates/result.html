@@ -146,6 +146,7 @@
                             <th>Membership packages</th>
                             <th>Membership fees</th>
                             <th>Membership status</th>
+                            <th>Comment</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -163,6 +164,7 @@
                             <td>{{ member_data.membership_packages }}</td>
                             <td>{{ member_data.membership_fees }}</td>
                             <td>{{ member_data.membership_status }}</td>
+                            <td style="text-align: left; max-width: 200px; word-wrap: break-word;">{{ member_data.comment or '-' }}</td>
                             <td>
                                 <a class="edit-link" href="{{ url_for('edit_member', member_id=member_data.id) }}">Edit</a>
                             </td>

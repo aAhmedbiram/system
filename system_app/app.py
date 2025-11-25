@@ -533,7 +533,12 @@ def attendance_table():
                 flash(f"Error loading member: {str(e)}", "error")
 
         try:
-            data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+            data = query_db("""
+                SELECT a.*, m.comment 
+                FROM attendance a 
+                LEFT JOIN members m ON a.member_id = m.id 
+                ORDER BY a.num ASC
+            """)
             return render_template("attendance_table.html", members_data=data or [])
         except Exception as e:
             print(f"Error loading attendance data: {e}")
@@ -543,7 +548,12 @@ def attendance_table():
             return render_template("attendance_table.html", members_data=[])
 
     try:
-        data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+        data = query_db("""
+            SELECT a.*, m.comment 
+            FROM attendance a 
+            LEFT JOIN members m ON a.member_id = m.id 
+            ORDER BY a.num ASC
+        """)
         return render_template("attendance_table.html", members_data=data or [])
     except Exception as e:
         print(f"Error loading attendance data: {e}")

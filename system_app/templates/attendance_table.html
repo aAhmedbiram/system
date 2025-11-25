@@ -198,6 +198,30 @@
             font-size: 26px;
             color: #666;
         }
+
+        .edit-link {
+            color: #4caf50;
+            text-decoration: none;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 6px;
+            background: rgba(76, 175, 80, 0.2);
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .edit-link:hover {
+            color: #66d66a;
+            background: rgba(76, 175, 80, 0.4);
+            transform: scale(1.05);
+        }
+
+        .comment-cell {
+            text-align: left;
+            max-width: 200px;
+            word-wrap: break-word;
+            white-space: normal;
+        }
     </style>
 </head>
 <body>
@@ -241,6 +265,8 @@
                     <th>Time</th>
                     <th>Date</th>
                     <th>Day</th>
+                    <th>Comment</th>
+                    <th>Edit</th>
                 </tr>
             </thead>
             <tbody>
@@ -254,6 +280,10 @@
                     <td>{{ member.attendance_time }}</td>
                     <td>{{ member.attendance_date }}</td>
                     <td>{{ member.day }}</td>
+                    <td class="comment-cell">{{ member.comment or '-' }}</td>
+                    <td>
+                        <a class="edit-link" href="{{ url_for('edit_member', member_id=member.member_id) }}">Edit</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
