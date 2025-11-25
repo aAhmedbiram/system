@@ -21,8 +21,13 @@ from .queries import (
     add_attendance
 )
 
+# Initialize database tables on startup
 with app.app_context():
-    create_table()
+    try:
+        create_table()
+    except Exception as e:
+        print(f"Warning: Could not create tables on startup: {e}")
+        print("Tables may already exist or database connection failed.")
 
 
 # === Authentication Decorator ===
@@ -59,11 +64,20 @@ def rino_required(f):
 @login_required
 def index():
     # Don't do any flash here ever
-    attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
-    members_data = query_db('SELECT * FROM members ORDER BY id DESC')
-    return render_template("index.html", 
-                        attendance_data=attendance_data, 
-                        members_data=members_data)
+    try:
+        attendance_data = query_db('SELECT * FROM attendance ORDER BY num ASC')
+        members_data = query_db('SELECT * FROM members ORDER BY id DESC')
+        return render_template("index.html", 
+                            attendance_data=attendance_data or [], 
+                            members_data=members_data or [])
+    except Exception as e:
+        print(f"Error in index route: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty data instead of crashing
+        return render_template("index.html", 
+                            attendance_data=[], 
+                            members_data=[])
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -165,9 +179,19 @@ def signup():
 @login_required
 def search_by_name():
     if request.method == 'POST':
-        name = request.form['name'].strip().capitalize()
-        member = query_db('SELECT * FROM members WHERE name = %s', (name,), one=True)
-        return render_template('result.html', name=name, data=member)
+        name = request.form.get('name', '').strip().capitalize()
+        if not name:
+            flash('Please enter a name to search!', 'error')
+            return render_template('search.html')
+        try:
+            member = query_db('SELECT * FROM members WHERE name = %s', (name,), one=True)
+            return render_template('result.html', name=name, data=member)
+        except Exception as e:
+            print(f"Error in search_by_name route: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error searching for member: {str(e)}", "error")
+            return render_template('search.html')
     return render_template('search.html')
 
 
@@ -271,19 +295,33 @@ def add_member_done():
 @app.route("/all_members")
 @login_required
 def all_members():
-    members_data = query_db('SELECT * FROM members ORDER BY id ASC')
-    return render_template("all_members.html", members_data=members_data)
+    try:
+        members_data = query_db('SELECT * FROM members ORDER BY id ASC')
+        return render_template("all_members.html", members_data=members_data or [])
+    except Exception as e:
+        print(f"Error in all_members route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading members: {str(e)}", "error")
+        return render_template("all_members.html", members_data=[])
 
 # === Edit member ===
 @app.route("/edit_member/<int:member_id>", methods=["GET", "POST"])
 @login_required
 def edit_member(member_id):
     if request.method == "GET":
-        member = get_member(member_id)
-        if not member:
-            flash("Member not found!", "error")
+        try:
+            member = get_member(member_id)
+            if not member:
+                flash("Member not found!", "error")
+                return redirect(url_for("index"))
+            return render_template("edit_member.html", member=member)
+        except Exception as e:
+            print(f"Error in edit_member GET route: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error loading member: {str(e)}", "error")
             return redirect(url_for("index"))
-        return render_template("edit_member.html", member=member)
 
     elif request.method == "POST":
         try:
@@ -329,15 +367,32 @@ def show_member_data():
     except:
         flash("Invalid member ID!", "error")
         return redirect(url_for("index"))
-    member_data = get_member(member_id)
-    return render_template("show_member_data.html", member_data=member_data)
+    try:
+        member_data = get_member(member_id)
+        if not member_data:
+            flash("Member not found!", "error")
+            return redirect(url_for("index"))
+        return render_template("show_member_data.html", member_data=member_data)
+    except Exception as e:
+        print(f"Error in show_member_data route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading member data: {str(e)}", "error")
+        return redirect(url_for("index"))
 
 @app.route("/search_by_mobile_number", methods=["POST"])
 @login_required
 def search_by_mobile_number():
     phone = request.form.get("member_phone", "").strip()
-    member_data = query_db('SELECT * FROM members WHERE phone = %s', (phone,), one=True)
-    return render_template("result_phone.html", member_data=member_data)
+    try:
+        member_data = query_db('SELECT * FROM members WHERE phone = %s', (phone,), one=True)
+        return render_template("result_phone.html", member_data=member_data)
+    except Exception as e:
+        print(f"Error in search_by_mobile_number route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error searching for member: {str(e)}", "error")
+        return render_template("result_phone.html", member_data=None)
 
 @app.route("/result_phone", methods=["POST"])
 @login_required
@@ -348,8 +403,15 @@ def result_phone():
 @login_required
 def result():
     name = request.form.get("member_name", "").strip().capitalize()
-    member_data = query_db('SELECT * FROM members WHERE name = %s', (name,), one=True)
-    return render_template("result.html", member_data=member_data)
+    try:
+        member_data = query_db('SELECT * FROM members WHERE name = %s', (name,), one=True)
+        return render_template("result.html", member_data=member_data)
+    except Exception as e:
+        print(f"Error in result route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error searching for member: {str(e)}", "error")
+        return render_template("result.html", member_data=None)
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
@@ -372,24 +434,26 @@ def change_password():
             return render_template('change_password.html')
         
         # Get user from session
-        user_id = session.get('user_id')
-        user = query_db('SELECT * FROM users WHERE id = %s', (user_id,), one=True)
-        
-        if user and check_password_hash(user['password'], old_password):
-            query_db(
-                'UPDATE users SET password = %s WHERE id = %s',
-                (generate_password_hash(new_password), user_id), commit=True
-            )
-            flash('Password changed successfully!', 'success')
-            return redirect(url_for('success'))
-        else:
-            flash('Old password is incorrect!', 'error')
+        try:
+            user_id = session.get('user_id')
+            user = query_db('SELECT * FROM users WHERE id = %s', (user_id,), one=True)
+            
+            if user and check_password_hash(user['password'], old_password):
+                query_db(
+                    'UPDATE users SET password = %s WHERE id = %s',
+                    (generate_password_hash(new_password), user_id), commit=True
+                )
+                flash('Password changed successfully!', 'success')
+                return redirect(url_for('success'))
+            else:
+                flash('Old password is incorrect!', 'error')
+        except Exception as e:
+            print(f"Error in change_password route: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error changing password: {str(e)}", "error")
     return render_template('change_password.html')
 
-
-from datetime import datetime
-
-from flask import g
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
 @login_required
@@ -400,43 +464,63 @@ def attendance_table():
             flash("Enter a valid member ID!", "error")
         else:
             member_id = int(member_id_str)
-            member = query_db(
-                "SELECT name, end_date, membership_status FROM members WHERE id = %s", 
-                (member_id,), one=True
-            )
+            try:
+                member = query_db(
+                    "SELECT name, end_date, membership_status FROM members WHERE id = %s", 
+                    (member_id,), one=True
+                )
 
-            if not member:
-                flash(f"Member ID {member_id} not found!", "error")
-            else:
-                # Try to record attendance within try-except
-                try:
-                    # Make sure the member hasn't already been recorded today
-                    today = datetime.now().strftime("%Y-%m-%d")
-                    already = query_db(
-                        "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", 
-                        (member_id, today), one=True
-                    )
-
-                    if already:
-                        flash(f"{member['name']} already came today!", "success")
-                    else:
-                        add_attendance(
-                            member_id,
-                            member['name'],
-                            member['end_date'],
-                            member['membership_status']
+                if not member:
+                    flash(f"Member ID {member_id} not found!", "error")
+                else:
+                    # Try to record attendance within try-except
+                    try:
+                        # Make sure the member hasn't already been recorded today
+                        today = datetime.now().strftime("%Y-%m-%d")
+                        already = query_db(
+                            "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", 
+                            (member_id, today), one=True
                         )
-                        flash(f"Attendance for {member['name']} recorded successfully!", "success")
 
-                except Exception as e:
-                    print("Error adding attendance:", e)
-                    # flash(f"Error recording attendance: {str(e)}", "error")
+                        if already:
+                            flash(f"{member['name']} already came today!", "success")
+                        else:
+                            add_attendance(
+                                member_id,
+                                member['name'],
+                                member['end_date'],
+                                member['membership_status']
+                            )
+                            flash(f"Attendance for {member['name']} recorded successfully!", "success")
 
+                    except Exception as e:
+                        print("Error adding attendance:", e)
+                        flash(f"Error recording attendance: {str(e)}", "error")
+            except Exception as e:
+                print(f"Error querying member in attendance_table: {e}")
+                import traceback
+                traceback.print_exc()
+                flash(f"Error loading member: {str(e)}", "error")
+
+        try:
+            data = query_db("SELECT * FROM attendance ORDER BY num ASC")
+            return render_template("attendance_table.html", members_data=data or [])
+        except Exception as e:
+            print(f"Error loading attendance data: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error loading attendance: {str(e)}", "error")
+            return render_template("attendance_table.html", members_data=[])
+
+    try:
         data = query_db("SELECT * FROM attendance ORDER BY num ASC")
-        return render_template("attendance_table.html", members_data=data)
-
-    data = query_db("SELECT * FROM attendance ORDER BY num ASC")
-    return render_template("attendance_table.html", members_data=data)
+        return render_template("attendance_table.html", members_data=data or [])
+    except Exception as e:
+        print(f"Error loading attendance data: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading attendance: {str(e)}", "error")
+        return render_template("attendance_table.html", members_data=[])
 
 
 
