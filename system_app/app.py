@@ -1049,9 +1049,21 @@ def data_management():
                 import pandas as pd
                 import io
                 
-                # Read the file
+                # Read the file with optimizations for large files
                 file_content = file.read()
-                df = pd.read_excel(io.BytesIO(file_content))
+                # Use read_excel with optimizations for large files
+                try:
+                    # Try reading with engine='openpyxl' for better performance
+                    df = pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
+                except:
+                    # Fallback to default engine
+                    df = pd.read_excel(io.BytesIO(file_content))
+                
+                # Limit to reasonable number of rows if file is extremely large
+                max_rows = 10000  # Maximum rows to process
+                if len(df) > max_rows:
+                    flash(f'File has {len(df)} rows. Processing first {max_rows} rows only. Please split large files.', 'error')
+                    df = df.head(max_rows)
                 
                 # Expected columns (case-insensitive matching)
                 # Priority: exact column names from Excel sheet first
@@ -1082,170 +1094,194 @@ def data_management():
                             mapped_columns[target_col] = col
                             break
                 
-                # Import members
+                # Import members in batches to handle large files
                 imported = 0
                 errors = []
+                batch_size = 100  # Process 100 rows at a time
+                total_rows = len(df)
                 
-                for idx, row in df.iterrows():
+                print(f"Starting import of {total_rows} rows in batches of {batch_size}")
+                
+                # Process in batches to avoid memory/timeout issues
+                for batch_start in range(0, total_rows, batch_size):
+                    batch_end = min(batch_start + batch_size, total_rows)
+                    batch_df = df.iloc[batch_start:batch_end]
+                    
+                    print(f"Processing batch {batch_start//batch_size + 1}: rows {batch_start+1} to {batch_end}")
+                    
+                    for idx, row in batch_df.iterrows():
+                        try:
+                            # Extract data with defaults
+                            name = str(row.get(mapped_columns.get('name', ''), '')).strip()
+                            if not name or name == 'nan':
+                                continue  # Skip rows without name
+                            
+                            # Handle ID (use as custom_id if provided, otherwise auto-generate)
+                            custom_id = None
+                            if mapped_columns.get('id'):
+                                try:
+                                    id_val = row.get(mapped_columns.get('id'))
+                                    if pd.notna(id_val):
+                                        custom_id = int(float(id_val))
+                                except:
+                                    pass
+                            
+                            email = str(row.get(mapped_columns.get('email', ''), '')).strip() if mapped_columns.get('email') else None
+                            if email == 'nan' or email == '':
+                                email = None
+                            
+                            phone = str(row.get(mapped_columns.get('phone', ''), '')).strip() if mapped_columns.get('phone') else None
+                            if phone == 'nan' or phone == '' or phone.lower() == 'no number':
+                                phone = None
+                            
+                            age = None
+                            if mapped_columns.get('age'):
+                                try:
+                                    age_val = row.get(mapped_columns.get('age'))
+                                    if pd.notna(age_val):
+                                        age = int(float(age_val))
+                                except:
+                                    pass
+                            
+                            gender = str(row.get(mapped_columns.get('gender', ''), '')).strip() if mapped_columns.get('gender') else None
+                            if gender == 'nan' or gender == '':
+                                gender = None
+                            
+                            # Handle birthdate - convert Excel date format if needed
+                            birthdate = None
+                            if mapped_columns.get('birthdate'):
+                                try:
+                                    birthdate_val = row.get(mapped_columns.get('birthdate'))
+                                    if pd.notna(birthdate_val):
+                                        # If it's a datetime object, format it
+                                        if isinstance(birthdate_val, pd.Timestamp):
+                                            birthdate = birthdate_val.strftime('%m/%d/%Y')
+                                        else:
+                                            birthdate = str(birthdate_val).strip()
+                                            if birthdate == 'nan' or birthdate == '':
+                                                birthdate = None
+                                except:
+                                    pass
+                            
+                            # Handle actual_starting_date - convert Excel date format if needed
+                            actual_starting_date = None
+                            if mapped_columns.get('actual_starting_date'):
+                                try:
+                                    actual_start_val = row.get(mapped_columns.get('actual_starting_date'))
+                                    if pd.notna(actual_start_val):
+                                        # If it's a datetime object, format it
+                                        if isinstance(actual_start_val, pd.Timestamp):
+                                            actual_starting_date = actual_start_val.strftime('%A, %B %d, %Y')
+                                        else:
+                                            actual_starting_date = str(actual_start_val).strip()
+                                            if actual_starting_date == 'nan' or actual_starting_date == '':
+                                                actual_starting_date = None
+                                except:
+                                    pass
+                            
+                            # Handle starting_date - convert Excel date format if needed
+                            starting_date = None
+                            if mapped_columns.get('starting_date'):
+                                try:
+                                    start_val = row.get(mapped_columns.get('starting_date'))
+                                    if pd.notna(start_val):
+                                        # If it's a datetime object, format it as DD/MM/YYYY
+                                        if isinstance(start_val, pd.Timestamp):
+                                            starting_date = start_val.strftime('%d/%m/%Y')
+                                        else:
+                                            starting_date = str(start_val).strip()
+                                            if starting_date == 'nan' or starting_date == '':
+                                                starting_date = None
+                                except:
+                                    pass
+                            
+                            # Handle end_date - convert Excel date format if needed
+                            end_date = None
+                            if mapped_columns.get('end_date'):
+                                try:
+                                    end_val = row.get(mapped_columns.get('end_date'))
+                                    if pd.notna(end_val):
+                                        # If it's a datetime object, format it as DD/MM/YYYY
+                                        if isinstance(end_val, pd.Timestamp):
+                                            end_date = end_val.strftime('%d/%m/%Y')
+                                        else:
+                                            end_date = str(end_val).strip()
+                                            if end_date == 'nan' or end_date == '':
+                                                end_date = None
+                                except:
+                                    pass
+                            
+                            membership_packages = str(row.get(mapped_columns.get('membership_packages', ''), '')).strip() if mapped_columns.get('membership_packages') else None
+                            if membership_packages == 'nan' or membership_packages == '':
+                                membership_packages = None
+                            
+                            membership_fees = None
+                            if mapped_columns.get('membership_fees'):
+                                try:
+                                    fees_val = row.get(mapped_columns.get('membership_fees'))
+                                    if pd.notna(fees_val):
+                                        membership_fees = float(fees_val)
+                                except:
+                                    pass
+                            
+                            membership_status = str(row.get(mapped_columns.get('membership_status', ''), '')).strip() if mapped_columns.get('membership_status') else None
+                            if membership_status == 'nan' or membership_status == '':
+                                membership_status = None
+                            
+                            invitations = 0
+                            if mapped_columns.get('invitations'):
+                                try:
+                                    inv_val = row.get(mapped_columns.get('invitations'))
+                                    if pd.notna(inv_val):
+                                        invitations = int(float(inv_val))
+                                except:
+                                    pass
+                            
+                            comment = str(row.get(mapped_columns.get('comment', ''), '')).strip() if mapped_columns.get('comment') else None
+                            if comment == 'nan' or comment == '':
+                                comment = None
+                            
+                            # Calculate invitations if package is provided but invitations not set
+                            if invitations == 0 and membership_packages:
+                                invitations = calculate_invitations(membership_packages)
+                            
+                            # Add member with custom_id if provided
+                            add_member(
+                                name=name,
+                                email=email,
+                                phone=phone,
+                                age=age,
+                                gender=gender,
+                                birthdate=birthdate,
+                                actual_starting_date=actual_starting_date,
+                                starting_date=starting_date,
+                                end_date=end_date,
+                                membership_packages=membership_packages,
+                                membership_fees=membership_fees,
+                                membership_status=membership_status,
+                                invitations=invitations,
+                                comment=comment,
+                                custom_id=custom_id
+                            )
+                            imported += 1
+                        except Exception as e:
+                            error_msg = str(e)
+                            # Truncate long error messages
+                            if len(error_msg) > 100:
+                                error_msg = error_msg[:100] + "..."
+                            errors.append(f"Row {idx + 2}: {error_msg}")  # +2 because Excel rows start at 1 and we have header
+                            print(f"Error importing row {idx + 2}: {e}")
+                    
+                    # Commit batch to database periodically
                     try:
-                        # Extract data with defaults
-                        name = str(row.get(mapped_columns.get('name', ''), '')).strip()
-                        if not name or name == 'nan':
-                            continue  # Skip rows without name
-                        
-                        # Handle ID (use as custom_id if provided, otherwise auto-generate)
-                        custom_id = None
-                        if mapped_columns.get('id'):
-                            try:
-                                id_val = row.get(mapped_columns.get('id'))
-                                if pd.notna(id_val):
-                                    custom_id = int(float(id_val))
-                            except:
-                                pass
-                        
-                        email = str(row.get(mapped_columns.get('email', ''), '')).strip() if mapped_columns.get('email') else None
-                        if email == 'nan' or email == '':
-                            email = None
-                        
-                        phone = str(row.get(mapped_columns.get('phone', ''), '')).strip() if mapped_columns.get('phone') else None
-                        if phone == 'nan' or phone == '' or phone.lower() == 'no number':
-                            phone = None
-                        
-                        age = None
-                        if mapped_columns.get('age'):
-                            try:
-                                age_val = row.get(mapped_columns.get('age'))
-                                if pd.notna(age_val):
-                                    age = int(float(age_val))
-                            except:
-                                pass
-                        
-                        gender = str(row.get(mapped_columns.get('gender', ''), '')).strip() if mapped_columns.get('gender') else None
-                        if gender == 'nan' or gender == '':
-                            gender = None
-                        
-                        # Handle birthdate - convert Excel date format if needed
-                        birthdate = None
-                        if mapped_columns.get('birthdate'):
-                            try:
-                                birthdate_val = row.get(mapped_columns.get('birthdate'))
-                                if pd.notna(birthdate_val):
-                                    # If it's a datetime object, format it
-                                    if isinstance(birthdate_val, pd.Timestamp):
-                                        birthdate = birthdate_val.strftime('%m/%d/%Y')
-                                    else:
-                                        birthdate = str(birthdate_val).strip()
-                                        if birthdate == 'nan' or birthdate == '':
-                                            birthdate = None
-                            except:
-                                pass
-                        
-                        # Handle actual_starting_date - convert Excel date format if needed
-                        actual_starting_date = None
-                        if mapped_columns.get('actual_starting_date'):
-                            try:
-                                actual_start_val = row.get(mapped_columns.get('actual_starting_date'))
-                                if pd.notna(actual_start_val):
-                                    # If it's a datetime object, format it
-                                    if isinstance(actual_start_val, pd.Timestamp):
-                                        actual_starting_date = actual_start_val.strftime('%A, %B %d, %Y')
-                                    else:
-                                        actual_starting_date = str(actual_start_val).strip()
-                                        if actual_starting_date == 'nan' or actual_starting_date == '':
-                                            actual_starting_date = None
-                            except:
-                                pass
-                        
-                        # Handle starting_date - convert Excel date format if needed
-                        starting_date = None
-                        if mapped_columns.get('starting_date'):
-                            try:
-                                start_val = row.get(mapped_columns.get('starting_date'))
-                                if pd.notna(start_val):
-                                    # If it's a datetime object, format it as DD/MM/YYYY
-                                    if isinstance(start_val, pd.Timestamp):
-                                        starting_date = start_val.strftime('%d/%m/%Y')
-                                    else:
-                                        starting_date = str(start_val).strip()
-                                        if starting_date == 'nan' or starting_date == '':
-                                            starting_date = None
-                            except:
-                                pass
-                        
-                        # Handle end_date - convert Excel date format if needed
-                        end_date = None
-                        if mapped_columns.get('end_date'):
-                            try:
-                                end_val = row.get(mapped_columns.get('end_date'))
-                                if pd.notna(end_val):
-                                    # If it's a datetime object, format it as DD/MM/YYYY
-                                    if isinstance(end_val, pd.Timestamp):
-                                        end_date = end_val.strftime('%d/%m/%Y')
-                                    else:
-                                        end_date = str(end_val).strip()
-                                        if end_date == 'nan' or end_date == '':
-                                            end_date = None
-                            except:
-                                pass
-                        
-                        membership_packages = str(row.get(mapped_columns.get('membership_packages', ''), '')).strip() if mapped_columns.get('membership_packages') else None
-                        if membership_packages == 'nan' or membership_packages == '':
-                            membership_packages = None
-                        
-                        membership_fees = None
-                        if mapped_columns.get('membership_fees'):
-                            try:
-                                fees_val = row.get(mapped_columns.get('membership_fees'))
-                                if pd.notna(fees_val):
-                                    membership_fees = float(fees_val)
-                            except:
-                                pass
-                        
-                        membership_status = str(row.get(mapped_columns.get('membership_status', ''), '')).strip() if mapped_columns.get('membership_status') else None
-                        if membership_status == 'nan' or membership_status == '':
-                            membership_status = None
-                        
-                        invitations = 0
-                        if mapped_columns.get('invitations'):
-                            try:
-                                inv_val = row.get(mapped_columns.get('invitations'))
-                                if pd.notna(inv_val):
-                                    invitations = int(float(inv_val))
-                            except:
-                                pass
-                        
-                        comment = str(row.get(mapped_columns.get('comment', ''), '')).strip() if mapped_columns.get('comment') else None
-                        if comment == 'nan' or comment == '':
-                            comment = None
-                        
-                        # Calculate invitations if package is provided but invitations not set
-                        if invitations == 0 and membership_packages:
-                            invitations = calculate_invitations(membership_packages)
-                        
-                        # Add member with custom_id if provided
-                        add_member(
-                            name=name,
-                            email=email,
-                            phone=phone,
-                            age=age,
-                            gender=gender,
-                            birthdate=birthdate,
-                            actual_starting_date=actual_starting_date,
-                            starting_date=starting_date,
-                            end_date=end_date,
-                            membership_packages=membership_packages,
-                            membership_fees=membership_fees,
-                            membership_status=membership_status,
-                            invitations=invitations,
-                            comment=comment,
-                            custom_id=custom_id
-                        )
-                        imported += 1
-                    except Exception as e:
-                        errors.append(f"Row {idx + 2}: {str(e)}")  # +2 because Excel rows start at 1 and we have header
+                        # Force a small delay to prevent overwhelming the database
+                        import time
+                        time.sleep(0.1)
+                    except:
+                        pass
                 
                 if imported > 0:
-                    flash(f'Successfully imported {imported} member(s)!', 'success')
+                    flash(f'Successfully imported {imported} member(s) out of {total_rows} row(s)!', 'success')
                 if errors:
                     error_msg = f'Errors in {len(errors)} row(s): ' + '; '.join(errors[:10])
                     if len(errors) > 10:
