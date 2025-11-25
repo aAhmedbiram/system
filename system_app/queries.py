@@ -271,18 +271,11 @@ def delete_all_data():
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cur = conn.cursor()
     try:
-        # Explicitly truncate all tables to ensure everything is deleted
-        # Order matters: child tables first, then parent tables
+        # Use CASCADE to truncate members table and all child tables that reference it
+        # This will automatically truncate: attendance, member_logs, invitations
+        cur.execute('TRUNCATE TABLE members RESTART IDENTITY CASCADE')
         
-        # Truncate child tables that reference members
-        cur.execute('TRUNCATE TABLE invitations RESTART IDENTITY')
-        cur.execute('TRUNCATE TABLE member_logs RESTART IDENTITY')
-        cur.execute('TRUNCATE TABLE attendance RESTART IDENTITY')
-        
-        # Truncate members table (parent table)
-        cur.execute('TRUNCATE TABLE members RESTART IDENTITY')
-        
-        # Truncate attendance_backup (no foreign keys)
+        # Truncate attendance_backup separately (it has no foreign keys to members)
         cur.execute('TRUNCATE TABLE attendance_backup RESTART IDENTITY')
         
         conn.commit()
