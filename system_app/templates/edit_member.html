@@ -167,6 +167,27 @@
             background: #222;
             color: white;
         }
+
+        .back-btn {
+            display: inline-block;
+            background-color: #666;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-top: 20px;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .back-btn:hover {
+            background-color: #777;
+            transform: scale(1.03);
+        }
     </style>
 </head>
 <body>
@@ -239,6 +260,9 @@
 
                 <button type="submit">Save Changes</button>
             </form>
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="{{ url_for('index') }}" class="back-btn">Back to Home</a>
+            </div>
         </section>
     </div>
 
