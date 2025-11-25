@@ -621,8 +621,8 @@ def invitations():
             friend_phone = request.form.get('friend_phone', '').strip()
             friend_email = request.form.get('friend_email', '').strip().lower()
             
-            if not member_id_str or not friend_name:
-                flash('Member ID and friend name are required!', 'error')
+            if not member_id_str or not friend_name or not friend_phone:
+                flash('Member ID, friend name, and friend phone are required!', 'error')
                 return redirect(url_for('invitations'))
             
             try:

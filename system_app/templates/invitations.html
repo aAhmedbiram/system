@@ -203,6 +203,27 @@
         .member-info strong {
             color: #4caf50;
         }
+
+        .download-btn {
+            background-color: #2196F3;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+            margin-left: 10px;
+        }
+
+        .download-btn:hover {
+            background-color: #42a5f5;
+            transform: scale(1.03);
+        }
     </style>
 </head>
 
@@ -251,8 +272,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="friend_phone">Friend Phone (Optional):</label>
-                    <input type="text" id="friend_phone" name="friend_phone" 
+                    <label for="friend_phone">Friend Phone:</label>
+                    <input type="text" id="friend_phone" name="friend_phone" required
                            placeholder="Enter friend's phone number">
                 </div>
 
@@ -267,6 +288,9 @@
         </div>
 
         <h2>Invitation Usage History</h2>
+        {% if invitations_data %}
+        <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
+        {% endif %}
         <div class="table-container">
             {% if invitations_data %}
             <table id="invitationsTable">
@@ -342,6 +366,40 @@
                 memberInfo.style.display = 'none';
                 memberNotFound.style.display = 'block';
             }
+        }
+
+        /* DOWNLOAD CSV */
+        function downloadCSV() {
+            let table = document.getElementById("invitationsTable");
+            if (!table) {
+                alert("No data to download");
+                return;
+            }
+            
+            let rows = table.querySelectorAll("tr");
+            let csv = "";
+
+            rows.forEach((row) => {
+                let cols = row.querySelectorAll("th, td");
+                let rowData = [];
+                cols.forEach((col) => {
+                    // Get text content and clean it up
+                    let text = col.innerText || col.textContent || "";
+                    // Remove line breaks and extra spaces, replace commas with spaces
+                    text = text.replace(/\n/g, " ").replace(/,/g, " ").replace(/\s+/g, " ").trim();
+                    rowData.push('"' + text + '"');
+                });
+                csv += rowData.join(",") + "\n";
+            });
+
+            let blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "invitation_usage_history.csv";
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     </script>
 </body>
