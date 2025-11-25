@@ -241,7 +241,8 @@ def send_verification_email(email, username, verification_token):
         sender_password = os.environ.get('GMAIL_APP_PASSWORD', 'kshbfyznimlxhiqr')
         
         if not sender_password or sender_password == '':
-            print("Warning: Gmail password not configured. Email verification will not be sent.")
+            print("ERROR: Gmail password not configured. Email verification will not be sent.")
+            print("Please set GMAIL_APP_PASSWORD environment variable with your Gmail App Password.")
             return False
         
         # Get base URL (for verification link) - handle both local and production
@@ -308,42 +309,102 @@ def send_verification_email(email, username, verification_token):
         
         msg.attach(MIMEText(body, 'html'))
         
-        # Send email
+        # Send email with improved error handling
         smtp_server = 'smtp.gmail.com'
+        last_error = None
+        
+        # Method 1: Try port 587 with TLS (most common)
         try:
-            # Try port 587 first (TLS)
-            try:
-                server = smtplib.SMTP(smtp_server, 587, timeout=30)
-                server.starttls(context=ssl.create_default_context())
-                server.login(sender_email, sender_password)
-                server.send_message(msg)
-                server.quit()
-                print(f"Verification email sent successfully to {email}")
-                return True
-            except Exception as e1:
-                print(f"Error with port 587: {e1}")
-                # Try port 465 (SSL) as fallback
-                try:
-                    context = ssl.create_default_context()
-                    server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30, context=context)
-                    server.login(sender_email, sender_password)
-                    server.send_message(msg)
-                    server.quit()
-                    print(f"Verification email sent successfully to {email} (via SSL)")
-                    return True
-                except Exception as e2:
-                    print(f"Error with port 465: {e2}")
-                    print(f"Failed to send verification email to {email}")
-                    import traceback
-                    traceback.print_exc()
-                    return False
-        except Exception as e:
-            print(f"Error sending verification email: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+            print(f"Attempting to send email via {smtp_server}:587 (TLS)...")
+            context = ssl.create_default_context()
+            # Allow unverified certificates if needed (for development)
+            # context.check_hostname = False
+            # context.verify_mode = ssl.CERT_NONE
+            
+            server = smtplib.SMTP(smtp_server, 587, timeout=30)
+            server.set_debuglevel(0)  # Set to 1 for verbose debugging
+            
+            # Enable debug output
+            print("Starting TLS...")
+            server.starttls(context=context)
+            
+            print(f"Logging in as {sender_email}...")
+            server.login(sender_email, sender_password)
+            
+            print(f"Sending email to {email}...")
+            server.send_message(msg)
+            server.quit()
+            
+            print(f"✓ Verification email sent successfully to {email} via port 587 (TLS)")
+            return True
+            
+        except smtplib.SMTPAuthenticationError as auth_err:
+            last_error = f"SMTP Authentication Error: {auth_err}"
+            print(f"✗ Authentication failed on port 587: {auth_err}")
+            print("  → Make sure you're using a Gmail App Password, not your regular password.")
+            print("  → Enable 2-Step Verification and generate an App Password at:")
+            print("     https://myaccount.google.com/apppasswords")
+        except smtplib.SMTPConnectError as conn_err:
+            last_error = f"SMTP Connection Error: {conn_err}"
+            print(f"✗ Connection failed on port 587: {conn_err}")
+            print("  → Check your internet connection and firewall settings.")
+        except smtplib.SMTPServerDisconnected as disc_err:
+            last_error = f"SMTP Server Disconnected: {disc_err}"
+            print(f"✗ Server disconnected on port 587: {disc_err}")
+        except Exception as e1:
+            last_error = f"Error on port 587: {type(e1).__name__}: {e1}"
+            print(f"✗ Error with port 587: {type(e1).__name__}: {e1}")
+        
+        # Method 2: Try port 465 with SSL (fallback)
+        try:
+            print(f"\nAttempting to send email via {smtp_server}:465 (SSL)...")
+            context = ssl.create_default_context()
+            # Allow unverified certificates if needed (for development)
+            # context.check_hostname = False
+            # context.verify_mode = ssl.CERT_NONE
+            
+            server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30, context=context)
+            server.set_debuglevel(0)  # Set to 1 for verbose debugging
+            
+            print(f"Logging in as {sender_email}...")
+            server.login(sender_email, sender_password)
+            
+            print(f"Sending email to {email}...")
+            server.send_message(msg)
+            server.quit()
+            
+            print(f"✓ Verification email sent successfully to {email} via port 465 (SSL)")
+            return True
+            
+        except smtplib.SMTPAuthenticationError as auth_err:
+            last_error = f"SMTP Authentication Error: {auth_err}"
+            print(f"✗ Authentication failed on port 465: {auth_err}")
+            print("  → Make sure you're using a Gmail App Password, not your regular password.")
+            print("  → Enable 2-Step Verification and generate an App Password at:")
+            print("     https://myaccount.google.com/apppasswords")
+        except smtplib.SMTPConnectError as conn_err:
+            last_error = f"SMTP Connection Error: {conn_err}"
+            print(f"✗ Connection failed on port 465: {conn_err}")
+        except Exception as e2:
+            last_error = f"Error on port 465: {type(e2).__name__}: {e2}"
+            print(f"✗ Error with port 465: {type(e2).__name__}: {e2}")
+        
+        # All methods failed
+        print(f"\n✗ Failed to send verification email to {email}")
+        print(f"  Last error: {last_error}")
+        print("\nTroubleshooting steps:")
+        print("1. Verify Gmail App Password is correct (not regular password)")
+        print("2. Enable 2-Step Verification: https://myaccount.google.com/security")
+        print("3. Generate App Password: https://myaccount.google.com/apppasswords")
+        print("4. Check firewall/network settings")
+        print("5. Verify Gmail account is not locked")
+        
+        import traceback
+        traceback.print_exc()
+        return False
+        
     except Exception as e:
-        print(f"Error preparing verification email: {e}")
+        print(f"✗ Error preparing verification email: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         return False
