@@ -998,13 +998,16 @@ def create_invoice(member_id, member_name, invoice_type, package_name=None, amou
         invoice_number = generate_invoice_number()
         invoice_date = datetime.now().date()
         
-        query_db('''
+        result = query_db('''
             INSERT INTO invoices (invoice_number, member_id, member_name, invoice_type, package_name, amount, invoice_date, created_by, notes)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        ''', (invoice_number, member_id, member_name, invoice_type, package_name, amount, invoice_date, created_by, notes), commit=True)
+        ''', (invoice_number, member_id, member_name, invoice_type, package_name, amount, invoice_date, created_by, notes), commit=True, one=True)
         
-        return invoice_number
+        # Return both invoice_number and invoice_id
+        if result:
+            return {'invoice_number': invoice_number, 'invoice_id': result.get('id')}
+        return {'invoice_number': invoice_number, 'invoice_id': None}
     except Exception as e:
         print(f"Error creating invoice: {e}")
         return None
@@ -1021,9 +1024,9 @@ def get_invoice_by_number(invoice_number):
 
 
 def get_all_invoices():
-    """Get all invoices ordered by date"""
+    """Get all invoices ordered by ID ascending"""
     return query_db(
-        'SELECT * FROM invoices ORDER BY invoice_date DESC, invoice_time DESC',
+        'SELECT * FROM invoices ORDER BY id ASC',
         ()
     )
 

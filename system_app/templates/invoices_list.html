@@ -155,6 +155,7 @@
                     <tr>
                         <th>Invoice #</th>
                         <th>Date</th>
+                        <th>Time</th>
                         <th>Member Name</th>
                         <th>Member ID</th>
                         <th>Type</th>
@@ -175,6 +176,17 @@
                                         {{ invoice.invoice_date }}
                                     {% else %}
                                         {{ invoice.invoice_date.strftime('%Y-%m-%d') }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if invoice.invoice_time %}
+                                    {% if invoice.invoice_time is string %}
+                                        {{ invoice.invoice_time }}
+                                    {% else %}
+                                        {{ invoice.invoice_time.strftime('%H:%M:%S') }}
                                     {% endif %}
                                 {% else %}
                                     N/A
@@ -204,7 +216,7 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="9" style="text-align: center; color: #888;">No invoices found</td>
+                            <td colspan="10" style="text-align: center; color: #888;">No invoices found</td>
                         </tr>
                     {% endif %}
                 </tbody>

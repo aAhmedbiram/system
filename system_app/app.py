@@ -620,7 +620,7 @@ def add_member_route():
         
         # Create invoice for new member
         package_name = f"{numeric_value} {unit}".strip()
-        create_invoice(
+        invoice_result = create_invoice(
             member_id=added_id,
             member_name=member_name,
             invoice_type='new_member',
@@ -629,6 +629,16 @@ def add_member_route():
             created_by=username,
             notes=f'New member registration - {package_name}'
         )
+        
+        # Get invoice ID for redirect
+        invoice_id = None
+        if invoice_result and isinstance(invoice_result, dict):
+            invoice_id = invoice_result.get('invoice_id')
+        elif invoice_result:
+            # If it returns just invoice_number, get the invoice by number
+            invoice = get_invoice_by_number(invoice_result)
+            if invoice:
+                invoice_id = invoice.get('id')
 
         # --- Format date ---
         formatted_date = ""
@@ -641,9 +651,14 @@ def add_member_route():
 
         # --- Success ---
         flash("Member added successfully!", "success")
-        return redirect(url_for("add_member_done", 
-                                new_member_id=new_member_id, 
-                                formatted_date=formatted_date))
+        
+        # Redirect to invoice if created, otherwise to add_member_done
+        if invoice_id:
+            return redirect(url_for('view_invoice', invoice_id=invoice_id))
+        else:
+            return redirect(url_for("add_member_done", 
+                                    new_member_id=new_member_id, 
+                                    formatted_date=formatted_date))
 
     except Exception as e:
         flash(f"Error: {str(e)}", "error")
@@ -943,6 +958,7 @@ def edit_member(member_id):
                 # If freeze was used, reset it so they can use it again
                 from datetime import datetime
                 should_reset_freeze = False
+                renewal_invoice_id = None  # Initialize variable for invoice redirect
                 
                 # Check if starting_date changed (reactivation)
                 old_starting_date = old_member_dict.get('starting_date', '')
@@ -970,7 +986,7 @@ def edit_member(member_id):
                                 # Create invoice for renewal
                                 member = get_member(member_id)
                                 if member:
-                                    create_invoice(
+                                    invoice_result = create_invoice(
                                         member_id=member_id,
                                         member_name=member.get('name', 'Unknown'),
                                         invoice_type='renewal',
@@ -979,6 +995,15 @@ def edit_member(member_id):
                                         created_by=username,
                                         notes=f'Membership renewal - {package_name}'
                                     )
+                                    
+                                    # Get invoice ID for redirect
+                                    if invoice_result and isinstance(invoice_result, dict):
+                                        renewal_invoice_id = invoice_result.get('invoice_id')
+                                    elif invoice_result:
+                                        # If it returns just invoice_number, get the invoice by number
+                                        invoice = get_invoice_by_number(invoice_result)
+                                        if invoice:
+                                            renewal_invoice_id = invoice.get('id')
                     except Exception as e:
                         print(f"Error comparing starting dates: {e}")
                 
@@ -1045,6 +1070,9 @@ def edit_member(member_id):
                     # Invitations are already recalculated in update_params, but add message if changed
                     reset_messages.append("Invitations recalculated")
                 
+                # Get renewal invoice ID if it was created (before update_member removes it)
+                renewal_invoice_id = update_params.pop('_renewal_invoice_id', None)
+                
                 update_member(member_id, **update_params)
                 
                 # Show appropriate success message
@@ -1052,6 +1080,12 @@ def edit_member(member_id):
                     flash(f"Member updated successfully! {', '.join(reset_messages)} due to membership reactivation.", "success")
                 else:
                     flash("Member updated successfully!", "success")
+                
+                # Redirect to invoice if renewal invoice was created
+                if renewal_invoice_id:
+                    return redirect(url_for('view_invoice', invoice_id=renewal_invoice_id))
+                else:
+                    return redirect(url_for("index"))
             else:
                 # Member not found, but try to update anyway
                 update_member(member_id,
