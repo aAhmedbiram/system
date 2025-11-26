@@ -656,20 +656,76 @@ def add_member_done():
 @login_required
 def all_members():
     try:
+        # Get search query from request
+        search_query = request.args.get('search', '').strip()
+        
         # Pagination: 50 items per page
         page = request.args.get('page', 1, type=int)
         per_page = 50
         offset = (page - 1) * per_page
         
-        # Get total count for pagination
-        total_count = query_db('SELECT COUNT(*) as count FROM members', one=True)
-        total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
-        
-        # Get paginated data
-        members_data = query_db(
-            'SELECT * FROM members ORDER BY id ASC LIMIT %s OFFSET %s',
-            (per_page, offset)
-        )
+        # Build query with search
+        if search_query:
+            # Search across all columns
+            search_pattern = f'%{search_query}%'
+            base_query = '''
+                SELECT * FROM members 
+                WHERE 
+                    CAST(id AS TEXT) ILIKE %s OR
+                    name ILIKE %s OR
+                    COALESCE(email, '') ILIKE %s OR
+                    COALESCE(phone, '') ILIKE %s OR
+                    CAST(age AS TEXT) ILIKE %s OR
+                    COALESCE(gender, '') ILIKE %s OR
+                    COALESCE(actual_starting_date, '') ILIKE %s OR
+                    COALESCE(starting_date, '') ILIKE %s OR
+                    COALESCE(end_date, '') ILIKE %s OR
+                    COALESCE(membership_packages, '') ILIKE %s OR
+                    CAST(membership_fees AS TEXT) ILIKE %s OR
+                    COALESCE(membership_status, '') ILIKE %s OR
+                    CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s OR
+                    COALESCE(comment, '') ILIKE %s
+                ORDER BY id ASC
+            '''
+            count_query = '''
+                SELECT COUNT(*) as count FROM members 
+                WHERE 
+                    CAST(id AS TEXT) ILIKE %s OR
+                    name ILIKE %s OR
+                    COALESCE(email, '') ILIKE %s OR
+                    COALESCE(phone, '') ILIKE %s OR
+                    CAST(age AS TEXT) ILIKE %s OR
+                    COALESCE(gender, '') ILIKE %s OR
+                    COALESCE(actual_starting_date, '') ILIKE %s OR
+                    COALESCE(starting_date, '') ILIKE %s OR
+                    COALESCE(end_date, '') ILIKE %s OR
+                    COALESCE(membership_packages, '') ILIKE %s OR
+                    CAST(membership_fees AS TEXT) ILIKE %s OR
+                    COALESCE(membership_status, '') ILIKE %s OR
+                    CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s OR
+                    COALESCE(comment, '') ILIKE %s
+            '''
+            search_params = (search_pattern,) * 14
+            count_params = (search_pattern,) * 14
+            
+            # Get total count for pagination
+            total_count = query_db(count_query, count_params, one=True)
+            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+            
+            # Get paginated data with search
+            members_data = query_db(
+                base_query + f' LIMIT %s OFFSET %s',
+                search_params + (per_page, offset)
+            )
+        else:
+            # No search - get all members
+            total_count = query_db('SELECT COUNT(*) as count FROM members', one=True)
+            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+            
+            members_data = query_db(
+                'SELECT * FROM members ORDER BY id ASC LIMIT %s OFFSET %s',
+                (per_page, offset)
+            )
         
         # Process members to add is_expired flag for freeze button logic
         from datetime import datetime
@@ -715,7 +771,8 @@ def all_members():
                             members_data=processed_members,
                             page=page,
                             total_pages=total_pages,
-                            total_count=total_count['count'] if total_count else 0)
+                            total_count=total_count['count'] if total_count else 0,
+                            search_query=search_query)
     except Exception as e:
         print(f"Error in all_members route: {e}")
         import traceback

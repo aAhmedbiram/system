@@ -312,14 +312,15 @@
         <th>Delete</th>
     </tr>
 
-    <!-- filter row -->
+    <!-- Global search row -->
     <tr class="filter-row">
-        {% for i in range(14) %}
-            <th><input type="text" onkeyup="filterTable({{i}})" placeholder="Search"></th>
-        {% endfor %}
-        <th></th>
-        <th></th>
-        <th></th>
+        <th colspan="17" style="text-align: center; padding: 15px;">
+            <input type="text" id="globalSearch" placeholder="Search all columns (searches entire database)" 
+                   style="width: 80%; padding: 12px; font-size: 16px; background: #222; border: 1px solid #444; border-radius: 6px; color: white;"
+                   value="{{ search_query or '' }}"
+                   onkeyup="handleGlobalSearch(event)">
+            <button type="button" onclick="clearSearch()" style="padding: 12px 20px; margin-left: 10px; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer;">Clear</button>
+        </th>
     </tr>
     </thead>
 
@@ -403,11 +404,19 @@
     <!-- Pagination -->
     {% if total_pages > 1 %}
     <div class="pagination">
-        <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
-        <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
-        <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total members)</span>
-        <a href="?page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
-        <a href="?page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+        {% if search_query %}
+            <a href="?page=1&search={{ search_query|urlencode }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
+            <a href="?page={{ page - 1 }}&search={{ search_query|urlencode }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
+            <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total members{% if search_query %} matching "{{ search_query }}"{% endif %})</span>
+            <a href="?page={{ page + 1 }}&search={{ search_query|urlencode }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
+            <a href="?page={{ total_pages }}&search={{ search_query|urlencode }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+        {% else %}
+            <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
+            <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
+            <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total members)</span>
+            <a href="?page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
+            <a href="?page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -416,16 +425,33 @@
 <script>
 
     /* FILTER */
-    function filterTable(colIndex) {
-        let input = document.querySelectorAll(".filter-row input")[colIndex];
-        let filter = input.value.toLowerCase();
-        let rows = document.querySelectorAll("#membersTable tbody tr");
-
-        rows.forEach(row => {
-            let cell = row.getElementsByTagName("td")[colIndex];
-            let txt = cell.textContent.toLowerCase();
-            row.style.display = txt.includes(filter) ? "" : "none";
-        });
+    // Global search function - searches entire database
+    let searchTimeout;
+    function handleGlobalSearch(event) {
+        clearTimeout(searchTimeout);
+        const searchValue = event.target.value.trim();
+        
+        // Debounce: wait 500ms after user stops typing
+        searchTimeout = setTimeout(() => {
+            if (searchValue.length > 0 || searchValue.length === 0) {
+                // Redirect to same page with search parameter
+                const url = new URL(window.location.href);
+                if (searchValue.length > 0) {
+                    url.searchParams.set('search', searchValue);
+                } else {
+                    url.searchParams.delete('search');
+                }
+                url.searchParams.set('page', '1'); // Reset to first page on search
+                window.location.href = url.toString();
+            }
+        }, 500);
+    }
+    
+    function clearSearch() {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('search');
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
     }
 
     /* SORT */
