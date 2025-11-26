@@ -510,13 +510,14 @@ def resend_verification():
 @login_required
 def search_by_name():
     if request.method == 'POST':
-        name = request.form.get('name', '').strip().capitalize()
+        name = request.form.get('name', '').strip()
         if not name:
             flash('Please enter a name to search!', 'error')
             return render_template('search.html')
         try:
-            member = query_db('SELECT * FROM members WHERE name = %s', (name,), one=True)
-            return render_template('result.html', name=name, data=member)
+            # Use ILIKE for case-insensitive partial matching
+            member = query_db('SELECT * FROM members WHERE name ILIKE %s', (f'%{name}%',), one=True)
+            return render_template('result.html', member_data=member)
         except Exception as e:
             print(f"Error in search_by_name route: {e}")
             import traceback
@@ -824,9 +825,10 @@ def result_phone():
 @app.route("/result", methods=["POST"])
 @login_required
 def result():
-    name = request.form.get("member_name", "").strip().capitalize()
+    name = request.form.get("member_name", "").strip()
     try:
-        member_data = query_db('SELECT * FROM members WHERE name = %s', (name,), one=True)
+        # Use ILIKE for case-insensitive partial matching
+        member_data = query_db('SELECT * FROM members WHERE name ILIKE %s', (f'%{name}%',), one=True)
         return render_template("result.html", member_data=member_data)
     except Exception as e:
         print(f"Error in result route: {e}")
