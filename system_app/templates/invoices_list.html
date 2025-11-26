@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Invoices - Rival Gym System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #fff;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        .index-btn {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .index-btn:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+
+        .table-container {
+            max-height: 70vh;
+            border: 1px solid #444;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #222;
+            min-width: 1000px;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid #444;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+            color: #4caf50;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+
+        tr:hover {
+            background-color: #333;
+        }
+
+        .action-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 0 5px;
+            background-color: #4caf50;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+            background-color: #66d66a;
+            transform: scale(1.05);
+        }
+
+        .action-btn.secondary {
+            background-color: #2196F3;
+        }
+
+        .action-btn.secondary:hover {
+            background-color: #42a5f5;
+        }
+
+        .invoice-type {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .invoice-type.new_member {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .invoice-type.renewal {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+            font-size: 18px;
+        }
+
+        h2 {
+            color: #4caf50;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Rival Gym System - All Invoices</h1>
+    </header>
+
+    <section>
+        <a href="{{ url_for('index') }}" class="index-btn">← Back to Home</a>
+
+        <h2>All Invoices</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Date</th>
+                        <th>Member Name</th>
+                        <th>Member ID</th>
+                        <th>Type</th>
+                        <th>Package</th>
+                        <th>Amount</th>
+                        <th>Created By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if invoices %}
+                        {% for invoice in invoices %}
+                        <tr>
+                            <td><strong>{{ invoice.invoice_number }}</strong></td>
+                            <td>
+                                {% if invoice.invoice_date %}
+                                    {% if invoice.invoice_date is string %}
+                                        {{ invoice.invoice_date }}
+                                    {% else %}
+                                        {{ invoice.invoice_date.strftime('%Y-%m-%d') }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>{{ invoice.member_name }}</td>
+                            <td>{{ invoice.member_id or 'N/A' }}</td>
+                            <td>
+                                <span class="invoice-type {{ invoice.invoice_type }}">
+                                    {% if invoice.invoice_type == 'new_member' %}
+                                        New Member
+                                    {% elif invoice.invoice_type == 'renewal' %}
+                                        Renewal
+                                    {% else %}
+                                        {{ invoice.invoice_type }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>{{ invoice.package_name or 'N/A' }}</td>
+                            <td><strong>${{ "%.2f"|format(invoice.amount or 0) }}</strong></td>
+                            <td>{{ invoice.created_by or 'N/A' }}</td>
+                            <td>
+                                <a href="{{ url_for('view_invoice', invoice_id=invoice.id) }}" class="action-btn">View</a>
+                                <a href="{{ url_for('download_invoice_pdf', invoice_id=invoice.id) }}" class="action-btn secondary">Download PDF</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" style="text-align: center; color: #888;">No invoices found</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</body>
+</html>
+

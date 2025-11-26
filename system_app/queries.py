@@ -262,6 +262,23 @@ def create_table():
                 edited_by TEXT
             )
         ''')
+        
+        # Create invoices table
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS invoices (
+                id SERIAL PRIMARY KEY,
+                invoice_number TEXT UNIQUE NOT NULL,
+                member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+                member_name TEXT NOT NULL,
+                invoice_type TEXT NOT NULL,
+                package_name TEXT,
+                amount REAL NOT NULL,
+                invoice_date DATE NOT NULL,
+                invoice_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by TEXT,
+                notes TEXT
+            )
+        ''')
 
         # Create indexes for better query performance
         try:
@@ -947,6 +964,68 @@ def get_monthly_total(year=None, month=None):
     except Exception as e:
         print(f"Error getting monthly total: {e}")
         return 0.0
+
+
+def generate_invoice_number():
+    """Generate a unique invoice number"""
+    from datetime import datetime
+    now = datetime.now()
+    prefix = f"INV-{now.year}{now.month:02d}{now.day:02d}-"
+    
+    # Get the last invoice number for today
+    last_invoice = query_db(
+        "SELECT invoice_number FROM invoices WHERE invoice_number LIKE %s ORDER BY id DESC LIMIT 1",
+        (f"{prefix}%",),
+        one=True
+    )
+    
+    if last_invoice:
+        try:
+            last_num = int(last_invoice['invoice_number'].split('-')[-1])
+            new_num = last_num + 1
+        except:
+            new_num = 1
+    else:
+        new_num = 1
+    
+    return f"{prefix}{new_num:04d}"
+
+
+def create_invoice(member_id, member_name, invoice_type, package_name=None, amount=0, created_by=None, notes=None):
+    """Create a new invoice"""
+    try:
+        from datetime import datetime
+        invoice_number = generate_invoice_number()
+        invoice_date = datetime.now().date()
+        
+        query_db('''
+            INSERT INTO invoices (invoice_number, member_id, member_name, invoice_type, package_name, amount, invoice_date, created_by, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        ''', (invoice_number, member_id, member_name, invoice_type, package_name, amount, invoice_date, created_by, notes), commit=True)
+        
+        return invoice_number
+    except Exception as e:
+        print(f"Error creating invoice: {e}")
+        return None
+
+
+def get_invoice(invoice_id):
+    """Get a single invoice by ID"""
+    return query_db('SELECT * FROM invoices WHERE id = %s', (invoice_id,), one=True)
+
+
+def get_invoice_by_number(invoice_number):
+    """Get a single invoice by invoice number"""
+    return query_db('SELECT * FROM invoices WHERE invoice_number = %s', (invoice_number,), one=True)
+
+
+def get_all_invoices():
+    """Get all invoices ordered by date"""
+    return query_db(
+        'SELECT * FROM invoices ORDER BY invoice_date DESC, invoice_time DESC',
+        ()
+    )
 
 
 # === Supplement/Product Management Functions ===

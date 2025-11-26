@@ -136,7 +136,8 @@ from .queries import (
     add_supplement_sale, get_supplement_sales, get_supplement_statistics,
     add_staff, get_staff, get_all_staff, update_staff, delete_staff,
     add_staff_purchase, get_staff_purchases, get_staff_statistics,
-    log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total
+    log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total,
+    create_invoice, get_invoice, get_invoice_by_number, get_all_invoices
 )
 from .queries import delete_all_data as delete_all_data_from_db
 
@@ -616,6 +617,18 @@ def add_member_route():
         }
         log_action('add_member', member_id=added_id, member_name=member_name,
                   action_data=member_data, performed_by=username)
+        
+        # Create invoice for new member
+        package_name = f"{numeric_value} {unit}".strip()
+        create_invoice(
+            member_id=added_id,
+            member_name=member_name,
+            invoice_type='new_member',
+            package_name=package_name,
+            amount=member_membership_fees,
+            created_by=username,
+            notes=f'New member registration - {package_name}'
+        )
 
         # --- Format date ---
         formatted_date = ""
@@ -953,6 +966,19 @@ def edit_member(member_id):
                                     fees=fees,
                                     edited_by=username
                                 )
+                                
+                                # Create invoice for renewal
+                                member = get_member(member_id)
+                                if member:
+                                    create_invoice(
+                                        member_id=member_id,
+                                        member_name=member.get('name', 'Unknown'),
+                                        invoice_type='renewal',
+                                        package_name=package_name,
+                                        amount=fees,
+                                        created_by=username,
+                                        notes=f'Membership renewal - {package_name}'
+                                    )
                     except Exception as e:
                         print(f"Error comparing starting dates: {e}")
                 
@@ -1658,6 +1684,191 @@ def invitations():
         traceback.print_exc()
         flash(f"Error loading invitations: {str(e)}", "error")
         return render_template('invitations.html', invitations_data=[], members_data=[], page=1, total_pages=1, total_count=0)
+
+@app.route('/invoices')
+@login_required
+def invoices_list():
+    """Display all invoices"""
+    try:
+        invoices = get_all_invoices() or []
+        return render_template('invoices_list.html', invoices=invoices)
+    except Exception as e:
+        print(f"Error in invoices_list route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading invoices: {str(e)}", "error")
+        return render_template('invoices_list.html', invoices=[])
+
+@app.route('/invoice/<int:invoice_id>')
+@login_required
+def view_invoice(invoice_id):
+    """Display a single invoice"""
+    try:
+        invoice = get_invoice(invoice_id)
+        if not invoice:
+            flash("Invoice not found!", "error")
+            return redirect(url_for('invoices_list'))
+        
+        # Get member details if member_id exists
+        member = None
+        if invoice.get('member_id'):
+            member = get_member(invoice['member_id'])
+        
+        return render_template('invoice.html', invoice=invoice, member=member)
+    except Exception as e:
+        print(f"Error in view_invoice route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading invoice: {str(e)}", "error")
+        return redirect(url_for('invoices_list'))
+
+@app.route('/invoice/<int:invoice_id>/pdf')
+@login_required
+def download_invoice_pdf(invoice_id):
+    """Download invoice as PDF using reportlab"""
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from io import BytesIO
+        
+        invoice = get_invoice(invoice_id)
+        if not invoice:
+            flash("Invoice not found!", "error")
+            return redirect(url_for('invoices_list'))
+        
+        # Get member details if member_id exists
+        member = None
+        if invoice.get('member_id'):
+            member = get_member(invoice['member_id'])
+        
+        # Create PDF buffer
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#4caf50'),
+            spaceAfter=30,
+        )
+        elements.append(Paragraph("RIVAL GYM", title_style))
+        elements.append(Paragraph("INVOICE", styles['Heading2']))
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Invoice details
+        invoice_date_str = invoice['invoice_date'].strftime('%B %d, %Y') if hasattr(invoice['invoice_date'], 'strftime') else str(invoice['invoice_date'])
+        invoice_data = [
+            ['Invoice Number:', invoice['invoice_number']],
+            ['Date:', invoice_date_str],
+            ['Type:', 'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal'],
+        ]
+        
+        invoice_table = Table(invoice_data, colWidths=[2*inch, 4*inch])
+        invoice_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ]))
+        elements.append(invoice_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Bill To
+        elements.append(Paragraph("<b>Bill To:</b>", styles['Normal']))
+        bill_to_data = [
+            ['Member Name:', invoice['member_name']],
+            ['Member ID:', str(invoice['member_id']) if invoice['member_id'] else 'N/A'],
+        ]
+        if member:
+            if member.get('email'):
+                bill_to_data.append(['Email:', member['email']])
+            if member.get('phone'):
+                bill_to_data.append(['Phone:', member['phone']])
+        
+        bill_to_table = Table(bill_to_data, colWidths=[2*inch, 4*inch])
+        bill_to_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        elements.append(bill_to_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Invoice items
+        elements.append(Paragraph("<b>Invoice Details:</b>", styles['Normal']))
+        items_data = [
+            ['Description', 'Package', 'Amount'],
+            [
+                'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal',
+                invoice['package_name'] or 'N/A',
+                f"${invoice['amount']:.2f}"
+            ]
+        ]
+        
+        items_table = Table(items_data, colWidths=[3*inch, 2*inch, 1*inch])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4caf50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ]))
+        elements.append(items_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Total
+        invoice_amount = float(invoice['amount']) if invoice['amount'] else 0.0
+        total_data = [
+            ['Subtotal:', f"${invoice_amount:.2f}"],
+            ['Tax:', '$0.00'],
+            ['Total:', f"${invoice_amount:.2f}"],
+        ]
+        
+        total_table = Table(total_data, colWidths=[4*inch, 2*inch])
+        total_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 12),
+            ('FONTSIZE', (0, 2), (-1, 2), 16),
+            ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#4caf50')),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 2), (-1, 2), 12),
+            ('LINEABOVE', (0, 2), (-1, 2), 2, colors.HexColor('#4caf50')),
+        ]))
+        elements.append(total_table)
+        
+        # Footer
+        elements.append(Spacer(1, 0.5*inch))
+        elements.append(Paragraph("Thank you for your business!", styles['Normal']))
+        elements.append(Paragraph("This is a computer-generated invoice. No signature required.", styles['Normal']))
+        if invoice.get('created_by'):
+            elements.append(Paragraph(f"Created by: {invoice['created_by']}", styles['Normal']))
+        
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        # Create response
+        from flask import Response
+        response = Response(buffer.read(), mimetype='application/pdf')
+        response.headers['Content-Disposition'] = f'attachment; filename=invoice_{invoice["invoice_number"]}.pdf'
+        return response
+    except Exception as e:
+        print(f"Error generating PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error generating PDF: {str(e)}", "error")
+        return redirect(url_for('view_invoice', invoice_id=invoice_id))
 
 @app.route('/renewal_log')
 @login_required
