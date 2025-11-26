@@ -889,9 +889,9 @@ def log_renewal(member_id, package_name, renewal_date, fees, edited_by=None):
 
 
 def get_renewal_logs():
-    """Get all renewal logs ordered by renewal_date"""
+    """Get all renewal logs ordered by ID ascending"""
     return query_db(
-        'SELECT * FROM renewal_logs ORDER BY renewal_date DESC, renewal_time DESC',
+        'SELECT * FROM renewal_logs ORDER BY id ASC',
         ()
     )
 
