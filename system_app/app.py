@@ -1701,8 +1701,8 @@ def data_management():
                                         id_val = row.get(id_col)
                                         if pd.notna(id_val):
                                             custom_id = int(float(id_val))
-                            except:
-                                pass
+                                    except:
+                                        pass
                                 
                                 # Phone
                                 phone = None
@@ -1744,7 +1744,7 @@ def data_management():
                                         if pd.notna(birthdate_val):
                                             if isinstance(birthdate_val, pd.Timestamp):
                                                 birthdate = birthdate_val.strftime('%m/%d/%Y')
-                            else:
+                                            else:
                                                 birthdate = str(birthdate_val).strip()
                                                 if birthdate == 'nan' or birthdate == '':
                                                     birthdate = None
@@ -1957,7 +1957,7 @@ def data_management():
                 
             except Exception as e:
                 print(f"CRITICAL ERROR importing Excel: {e}")
-                    import traceback
+                import traceback
                 error_trace = traceback.format_exc()
                 print(error_trace)
                 # Show user-friendly error message
@@ -2004,11 +2004,10 @@ def offers():
             else:
                 flash('Failed to process offer. Please try again.', 'error')
                 return render_template('offers.html', offer_data=None)
-                
-                except Exception as e:
+        except Exception as e:
             print(f"Error processing offer: {e}")
-                    import traceback
-                    traceback.print_exc()
+            import traceback
+            traceback.print_exc()
             flash(f'Error processing offer: {str(e)}', 'error')
             return render_template('offers.html', offer_data=None)
     
@@ -2282,8 +2281,8 @@ Return ONLY the JSON object, nothing else."""
         return process_offer_with_pattern_matching(offer_text)
     except Exception as e:
         print(f"Error in process_offer_with_ai: {e}")
-                import traceback
-                traceback.print_exc()
+        import traceback
+        traceback.print_exc()
         # Fall back to pattern matching if OpenAI fails
         return process_offer_with_pattern_matching(offer_text)
 
