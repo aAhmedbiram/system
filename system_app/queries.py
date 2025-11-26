@@ -864,24 +864,36 @@ def add_supplement_sale(supplement_id, supplement_name, quantity, unit_price, to
 
 def get_supplement_sales(limit=100):
     """Get recent supplement sales"""
-    return query_db('''
-        SELECT * FROM supplement_sales 
-        ORDER BY sale_date DESC 
-        LIMIT %s
-    ''', (limit,))
+    try:
+        return query_db('''
+            SELECT * FROM supplement_sales 
+            ORDER BY sale_date DESC 
+            LIMIT %s
+        ''', (limit,))
+    except Exception as e:
+        print(f"Error getting supplement sales: {e}")
+        return []
 
 
 def get_supplement_statistics():
     """Get statistics for supplements"""
     stats = {}
     
-    # Total products
-    total_products = query_db('SELECT COUNT(*) as count FROM supplements', one=True)
-    stats['total_products'] = total_products['count'] if total_products else 0
+    try:
+        # Total products
+        total_products = query_db('SELECT COUNT(*) as count FROM supplements', one=True)
+        stats['total_products'] = total_products['count'] if total_products else 0
+    except Exception as e:
+        print(f"Error getting total products: {e}")
+        stats['total_products'] = 0
     
-    # Low stock items (stock < 10)
-    low_stock = query_db('SELECT COUNT(*) as count FROM supplements WHERE stock_quantity < 10', one=True)
-    stats['low_stock'] = low_stock['count'] if low_stock else 0
+    try:
+        # Low stock items (stock < 10)
+        low_stock = query_db('SELECT COUNT(*) as count FROM supplements WHERE stock_quantity < 10', one=True)
+        stats['low_stock'] = low_stock['count'] if low_stock else 0
+    except Exception as e:
+        print(f"Error getting low stock: {e}")
+        stats['low_stock'] = 0
     
     # Total sales today
     from datetime import datetime
@@ -931,69 +943,93 @@ def get_supplement_statistics():
         stats['month_sales'] = 0
     
     # Total all-time sales
-    total_sales = query_db('''
-        SELECT COALESCE(SUM(total_price), 0) as total 
-        FROM supplement_sales
-    ''', one=True)
-    stats['total_sales'] = float(total_sales['total']) if total_sales else 0
+    try:
+        total_sales = query_db('''
+            SELECT COALESCE(SUM(total_price), 0) as total 
+            FROM supplement_sales
+        ''', one=True)
+        stats['total_sales'] = float(total_sales['total']) if total_sales else 0
+    except Exception as e:
+        print(f"Error getting total sales: {e}")
+        stats['total_sales'] = 0
     
     # Total sales count
-    total_sales_count = query_db('''
-        SELECT COUNT(*) as count 
-        FROM supplement_sales
-    ''', one=True)
-    stats['total_sales_count'] = total_sales_count['count'] if total_sales_count else 0
+    try:
+        total_sales_count = query_db('''
+            SELECT COUNT(*) as count 
+            FROM supplement_sales
+        ''', one=True)
+        stats['total_sales_count'] = total_sales_count['count'] if total_sales_count else 0
+    except Exception as e:
+        print(f"Error getting total sales count: {e}")
+        stats['total_sales_count'] = 0
     
     # Top selling products
-    top_products = query_db('''
-        SELECT supplement_name, SUM(quantity) as total_quantity, SUM(total_price) as total_revenue, COUNT(*) as sales_count
-        FROM supplement_sales
-        GROUP BY supplement_name
-        ORDER BY total_quantity DESC
-        LIMIT 5
-    ''')
-    stats['top_products'] = top_products or []
+    try:
+        top_products = query_db('''
+            SELECT supplement_name, SUM(quantity) as total_quantity, SUM(total_price) as total_revenue, COUNT(*) as sales_count
+            FROM supplement_sales
+            GROUP BY supplement_name
+            ORDER BY total_quantity DESC
+            LIMIT 5
+        ''')
+        stats['top_products'] = top_products or []
+    except Exception as e:
+        print(f"Error getting top products: {e}")
+        stats['top_products'] = []
     
     # Per-product statistics
-    product_stats = query_db('''
-        SELECT 
-            s.id,
-            s.name,
-            s.stock_quantity,
-            s.cost,
-            COALESCE(SUM(sa.quantity), 0) as total_sold,
-            COALESCE(SUM(sa.total_price), 0) as total_revenue,
-            COALESCE(COUNT(sa.id), 0) as sales_count,
-            (s.stock_quantity * s.cost) as inventory_value
-        FROM supplements s
-        LEFT JOIN supplement_sales sa ON s.id = sa.supplement_id
-        GROUP BY s.id, s.name, s.stock_quantity, s.cost
-        ORDER BY s.name ASC
-    ''')
-    stats['product_stats'] = product_stats or []
+    try:
+        product_stats = query_db('''
+            SELECT 
+                s.id,
+                s.name,
+                s.stock_quantity,
+                s.cost,
+                COALESCE(SUM(sa.quantity), 0) as total_sold,
+                COALESCE(SUM(sa.total_price), 0) as total_revenue,
+                COALESCE(COUNT(sa.id), 0) as sales_count,
+                (s.stock_quantity * s.cost) as inventory_value
+            FROM supplements s
+            LEFT JOIN supplement_sales sa ON s.id = sa.supplement_id
+            GROUP BY s.id, s.name, s.stock_quantity, s.cost
+            ORDER BY s.name ASC
+        ''')
+        stats['product_stats'] = product_stats or []
+    except Exception as e:
+        print(f"Error getting product stats: {e}")
+        stats['product_stats'] = []
     
     # Total inventory value
-    inventory_value = query_db('''
-        SELECT COALESCE(SUM(stock_quantity * cost), 0) as total 
-        FROM supplements
-    ''', one=True)
-    stats['inventory_value'] = float(inventory_value['total']) if inventory_value else 0
+    try:
+        inventory_value = query_db('''
+            SELECT COALESCE(SUM(stock_quantity * cost), 0) as total 
+            FROM supplements
+        ''', one=True)
+        stats['inventory_value'] = float(inventory_value['total']) if inventory_value else 0
+    except Exception as e:
+        print(f"Error getting inventory value: {e}")
+        stats['inventory_value'] = 0
     
     # Per-user sales statistics
-    user_sales = query_db('''
-        SELECT 
-            sold_by,
-            COUNT(*) as sales_count,
-            SUM(quantity) as total_quantity,
-            SUM(total_price) as total_revenue,
-            SUM(CASE WHEN payment_method = 'cash' THEN total_price ELSE 0 END) as cash_revenue,
-            SUM(CASE WHEN payment_method = 'card' OR payment_method = 'visa' THEN total_price ELSE 0 END) as card_revenue
-        FROM supplement_sales
-        WHERE sold_by IS NOT NULL
-        GROUP BY sold_by
-        ORDER BY total_revenue DESC
-    ''')
-    stats['user_sales'] = user_sales or []
+    try:
+        user_sales = query_db('''
+            SELECT 
+                sold_by,
+                COUNT(*) as sales_count,
+                SUM(quantity) as total_quantity,
+                SUM(total_price) as total_revenue,
+                SUM(CASE WHEN payment_method = 'cash' THEN total_price ELSE 0 END) as cash_revenue,
+                SUM(CASE WHEN payment_method = 'card' OR payment_method = 'visa' THEN total_price ELSE 0 END) as card_revenue
+            FROM supplement_sales
+            WHERE sold_by IS NOT NULL
+            GROUP BY sold_by
+            ORDER BY total_revenue DESC
+        ''')
+        stats['user_sales'] = user_sales or []
+    except Exception as e:
+        print(f"Error getting user sales: {e}")
+        stats['user_sales'] = []
     
     # Per-user sales today
     try:

@@ -2393,6 +2393,12 @@ def process_offer_with_pattern_matching(offer_text):
 def supplements():
     """Supplement and Water Management System"""
     try:
+        # Ensure tables exist
+        try:
+            create_table()
+        except Exception as table_error:
+            print(f"Warning: Could not create/verify tables: {table_error}")
+        
         supplements_data = get_all_supplements()
         stats = get_supplement_statistics()
         recent_sales = get_supplement_sales(limit=50)
@@ -2407,7 +2413,23 @@ def supplements():
         import traceback
         traceback.print_exc()
         flash(f"Error loading supplements: {str(e)}", "error")
-        return render_template('supplements.html', supplements=[], stats={}, recent_sales=[], is_rino=False)
+        # Return minimal safe defaults
+        safe_stats = {
+            'total_products': 0,
+            'today_sales': 0,
+            'cash_sales_today': 0,
+            'visa_sales_today': 0,
+            'month_sales': 0,
+            'total_sales': 0,
+            'total_sales_count': 0,
+            'inventory_value': 0,
+            'low_stock': 0,
+            'top_products': [],
+            'product_stats': [],
+            'user_sales': [],
+            'user_sales_today': []
+        }
+        return render_template('supplements.html', supplements=[], stats=safe_stats, recent_sales=[], is_rino=False)
 
 
 @app.route('/add_supplement', methods=['POST'])
@@ -2536,6 +2558,12 @@ def supplement_stats_api():
 def staff_management():
     """Staff Management System"""
     try:
+        # Ensure tables exist
+        try:
+            create_table()
+        except Exception as table_error:
+            print(f"Warning: Could not create/verify tables: {table_error}")
+        
         staff_data = get_all_staff()
         staff_stats = get_staff_statistics()
         recent_purchases = get_staff_purchases(limit=50)
@@ -2552,7 +2580,17 @@ def staff_management():
         import traceback
         traceback.print_exc()
         flash(f"Error loading staff management: {str(e)}", "error")
-        return render_template('staff_management.html', staff=[], stats={}, recent_purchases=[], supplements=[], is_rino=False)
+        # Return minimal safe defaults
+        safe_stats = {
+            'total_staff': 0,
+            'total_staff_purchases': 0,
+            'total_staff_purchase_count': 0,
+            'total_staff_purchase_quantity': 0,
+            'month_staff_purchases': 0,
+            'staff_by_role': [],
+            'staff_purchase_stats': []
+        }
+        return render_template('staff_management.html', staff=[], stats=safe_stats, recent_purchases=[], supplements=[], is_rino=False)
 
 
 @app.route('/add_staff', methods=['POST'])
