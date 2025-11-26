@@ -183,8 +183,8 @@ def index():
         attendance_data = query_db('SELECT * FROM attendance ORDER BY num DESC LIMIT 50')
         members_data = query_db('SELECT * FROM members ORDER BY id DESC LIMIT 50')
         return render_template("index.html", 
-                            attendance_data=attendance_data or [], 
-                            members_data=members_data or [])
+                                attendance_data=attendance_data or [], 
+                                members_data=members_data or [])
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback
@@ -767,6 +767,14 @@ def edit_member(member_id):
 
             # Get username from session for logging
             username = session.get('username', 'Unknown')
+            
+            # Get old member data before update for undo
+            old_member = get_member(member_id)
+            if old_member:
+                old_member_dict = dict(old_member)
+                # Log the edit action for undo
+                log_action('edit_member', member_id=member_id, member_name=old_member_dict.get('name'),
+                          action_data={'old_values': old_member_dict}, performed_by=username)
 
             update_member(member_id,
                 name=name, email=email, phone=phone, age=age, gender=gender,
@@ -1061,14 +1069,29 @@ def attendance_table():
                         if already:
                             flash(f"{member['name']} already came today!", "success")
                         else:
+                            # Log attendance addition for undo (before adding)
+                            username = session.get('username', 'Unknown')
+                            
+                            # Add attendance
                             add_attendance(
                                 member_id,
                                 member['name'],
                                 member['end_date'],
                                 member['membership_status']
                             )
+                            
+                            # Get the attendance record that was just added
+                            attendance_record = query_db(
+                                'SELECT * FROM attendance WHERE member_id = %s AND attendance_date = %s ORDER BY num DESC LIMIT 1',
+                                (member_id, today), one=True
+                            )
+                            if attendance_record:
+                                log_action('add_attendance', member_id=member_id, member_name=member['name'],
+                                          action_data={'attendance_num': attendance_record.get('num'),
+                                                      'attendance_date': attendance_record.get('attendance_date'),
+                                                      'attendance_time': attendance_record.get('attendance_time')},
+                                          performed_by=username)
                             flash(f"Attendance for {member['name']} recorded successfully!", "success")
-
                     except Exception as e:
                         print("Error adding attendance:", e)
                         flash(f"Error recording attendance: {str(e)}", "error")
@@ -1247,8 +1270,26 @@ def invitations():
             # Get username for logging
             username = session.get('username', 'Unknown')
             
+            # Get old invitation count before using
+            old_invitations = member.get('invitations', 0)
+            
             # Use the invitation
             use_invitation(member_id, friend_name, friend_phone, friend_email, username)
+            
+            # Get the invitation record that was just created
+            invitation_record = query_db(
+                'SELECT * FROM invitations WHERE member_id = %s ORDER BY id DESC LIMIT 1',
+                (member_id,), one=True
+            )
+            
+            # Log invitation usage for undo
+            log_action('use_invitation', member_id=member_id, member_name=member['name'],
+                      action_data={'invitation_id': invitation_record.get('id') if invitation_record else None,
+                                  'friend_name': friend_name,
+                                  'friend_phone': friend_phone,
+                                  'friend_email': friend_email,
+                                  'old_invitations': old_invitations},
+                      performed_by=username)
             
             flash(f'Invitation used successfully! {member["name"]} now has {member.get("invitations", 0) - 1} invitation(s) remaining.', 'success')
             return redirect(url_for('invitations'))
@@ -1424,10 +1465,57 @@ def undo_action(action_id):
             flash(f"Member {member_name} (ID: {member_id}) removed successfully!", "success")
         
         elif action_type == 'edit_member':
-            # This is more complex - we'd need to restore old values from member_logs
-            # For now, just show a message
-            flash("Member edit undo is complex. Please manually edit the member to restore values.", "info")
-            return redirect(url_for('undo_page'))
+            # Restore old member values
+            old_values = action_data.get('old_values', {})
+            if old_values:
+                # Restore all old values
+                update_member(member_id,
+                    name=old_values.get('name'),
+                    email=old_values.get('email'),
+                    phone=old_values.get('phone'),
+                    age=old_values.get('age'),
+                    gender=old_values.get('gender'),
+                    birthdate=old_values.get('birthdate'),
+                    actual_starting_date=old_values.get('actual_starting_date'),
+                    starting_date=old_values.get('starting_date'),
+                    end_date=old_values.get('end_date'),
+                    membership_packages=old_values.get('membership_packages'),
+                    membership_fees=old_values.get('membership_fees'),
+                    membership_status=old_values.get('membership_status'),
+                    invitations=old_values.get('invitations', 0),
+                    comment=old_values.get('comment'),
+                    edited_by=session.get('username', 'System')
+                )
+                flash(f"Member {member_name} (ID: {member_id}) edit undone. All values restored.", "success")
+            else:
+                flash("Could not restore member edit - old values not found.", "error")
+                return redirect(url_for('undo_page'))
+        
+        elif action_type == 'add_attendance':
+            # Delete the attendance record
+            attendance_num = action_data.get('attendance_num')
+            if attendance_num:
+                query_db('DELETE FROM attendance WHERE num = %s', (attendance_num,), commit=True)
+                flash(f"Attendance record for {member_name} removed successfully!", "success")
+            else:
+                flash("Could not find attendance record to delete.", "error")
+                return redirect(url_for('undo_page'))
+        
+        elif action_type == 'use_invitation':
+            # Restore invitation: delete invitation record and restore invitation count
+            invitation_id = action_data.get('invitation_id')
+            old_invitations = action_data.get('old_invitations', 0)
+            
+            if invitation_id:
+                # Delete the invitation record
+                query_db('DELETE FROM invitations WHERE id = %s', (invitation_id,), commit=True)
+                # Restore invitation count
+                query_db('UPDATE members SET invitations = %s WHERE id = %s', 
+                        (old_invitations, member_id), commit=True)
+                flash(f"Invitation usage undone for {member_name}. Invitation count restored to {old_invitations}.", "success")
+            else:
+                flash("Could not find invitation record to restore.", "error")
+                return redirect(url_for('undo_page'))
         
         else:
             flash(f"Unknown action type: {action_type}", "error")
@@ -1613,8 +1701,8 @@ def data_management():
                                         id_val = row.get(id_col)
                                         if pd.notna(id_val):
                                             custom_id = int(float(id_val))
-                                    except:
-                                        pass
+                            except:
+                                pass
                                 
                                 # Phone
                                 phone = None
@@ -1656,7 +1744,7 @@ def data_management():
                                         if pd.notna(birthdate_val):
                                             if isinstance(birthdate_val, pd.Timestamp):
                                                 birthdate = birthdate_val.strftime('%m/%d/%Y')
-                                            else:
+                            else:
                                                 birthdate = str(birthdate_val).strip()
                                                 if birthdate == 'nan' or birthdate == '':
                                                     birthdate = None
@@ -1778,7 +1866,7 @@ def data_management():
                                 print(f"Error processing row {idx + 2}: {e}")
                                 # Continue processing next row even if this one fails
                                 continue
-                        
+
                         # Bulk insert the entire batch at once
                         if batch_members:
                             try:
@@ -1830,8 +1918,8 @@ def data_management():
                                         imported += 1
                                     except Exception as individual_error:
                                         errors.append(f"Row in batch {batch_num}: {str(individual_error)[:100]}")
-                                        continue
-                        
+                                continue
+                                
                         # Log batch completion
                         if batch_num % 3 == 0:  # Log every 3 batches
                             progress = int((imported/total_rows)*100) if total_rows > 0 else 0
@@ -1856,7 +1944,7 @@ def data_management():
                     success_msg = f'Successfully imported {imported} member(s) out of {total_rows} row(s)!'
                     if len(errors) > 0:
                         success_msg += f' ({len(errors)} row(s) had errors)'
-                    flash(success_msg, 'success')
+                        flash(success_msg, 'success')
                 
                 if errors:
                     # Show summary of errors
@@ -1869,14 +1957,14 @@ def data_management():
                 
             except Exception as e:
                 print(f"CRITICAL ERROR importing Excel: {e}")
-                import traceback
+                    import traceback
                 error_trace = traceback.format_exc()
                 print(error_trace)
                 # Show user-friendly error message
                 error_msg = f'Error importing Excel file: {str(e)}'
                 if len(error_msg) > 200:
                     error_msg = error_msg[:200] + "..."
-                flash(error_msg, 'error')
+                    flash(error_msg, 'error')
                 # Also log the full traceback for debugging
                 print("Full error traceback:")
                 print(error_trace)
@@ -1894,6 +1982,7 @@ def data_management():
         print(f"Error in data_management route: {e}")
         import traceback
         traceback.print_exc()
+        return render_template('data_management.html', member_count=0, attendance_count=0)
         return render_template('data_management.html', member_count=0, attendance_count=0)
 
 @app.route('/offers', methods=['GET', 'POST'])
@@ -1916,10 +2005,10 @@ def offers():
                 flash('Failed to process offer. Please try again.', 'error')
                 return render_template('offers.html', offer_data=None)
                 
-        except Exception as e:
+                except Exception as e:
             print(f"Error processing offer: {e}")
-            import traceback
-            traceback.print_exc()
+                    import traceback
+                    traceback.print_exc()
             flash(f'Error processing offer: {str(e)}', 'error')
             return render_template('offers.html', offer_data=None)
     
@@ -2193,8 +2282,8 @@ Return ONLY the JSON object, nothing else."""
         return process_offer_with_pattern_matching(offer_text)
     except Exception as e:
         print(f"Error in process_offer_with_ai: {e}")
-        import traceback
-        traceback.print_exc()
+                import traceback
+                traceback.print_exc()
         # Fall back to pattern matching if OpenAI fails
         return process_offer_with_pattern_matching(offer_text)
 

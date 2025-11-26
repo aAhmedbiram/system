@@ -195,6 +195,10 @@
                                     ❄️ Used Freeze
                                 {% elif action.action_type == 'edit_member' %}
                                     ✏️ Edited Member
+                                {% elif action.action_type == 'add_attendance' %}
+                                    ✅ Added Attendance
+                                {% elif action.action_type == 'use_invitation' %}
+                                    🎫 Used Invitation
                                 {% else %}
                                     {{ action.action_type }}
                                 {% endif %}
