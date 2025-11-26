@@ -2393,21 +2393,23 @@ def supplements():
     try:
         supplements_data = get_all_supplements()
         stats = get_supplement_statistics()
-        recent_sales = get_supplement_sales(limit=10)
+        recent_sales = get_supplement_sales(limit=50)
+        is_rino = session.get('username') == 'rino'
         return render_template('supplements.html', 
                              supplements=supplements_data or [],
                              stats=stats,
-                             recent_sales=recent_sales or [])
+                             recent_sales=recent_sales or [],
+                             is_rino=is_rino)
     except Exception as e:
         print(f"Error in supplements route: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error loading supplements: {str(e)}", "error")
-        return render_template('supplements.html', supplements=[], stats={}, recent_sales=[])
+        return render_template('supplements.html', supplements=[], stats={}, recent_sales=[], is_rino=False)
 
 
 @app.route('/add_supplement', methods=['POST'])
-@login_required
+@rino_required
 def add_supplement_route():
     """Add a new supplement/product"""
     try:
@@ -2435,7 +2437,7 @@ def add_supplement_route():
 
 
 @app.route('/edit_supplement/<int:supplement_id>', methods=['POST'])
-@login_required
+@rino_required
 def edit_supplement(supplement_id):
     """Edit a supplement/product"""
     try:
@@ -2466,7 +2468,7 @@ def edit_supplement(supplement_id):
 
 
 @app.route('/delete_supplement/<int:supplement_id>', methods=['POST'])
-@login_required
+@rino_required
 def delete_supplement_route(supplement_id):
     """Delete a supplement/product"""
     try:

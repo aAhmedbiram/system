@@ -854,6 +854,22 @@ def get_supplement_statistics():
     ''', (today,), one=True)
     stats['today_sales'] = float(today_sales['total']) if today_sales else 0
     
+    # Cash sales today
+    cash_sales_today = query_db('''
+        SELECT COALESCE(SUM(total_price), 0) as total 
+        FROM supplement_sales 
+        WHERE DATE(sale_date) = %s AND payment_method = 'cash'
+    ''', (today,), one=True)
+    stats['cash_sales_today'] = float(cash_sales_today['total']) if cash_sales_today else 0
+    
+    # Visa/Card sales today
+    visa_sales_today = query_db('''
+        SELECT COALESCE(SUM(total_price), 0) as total 
+        FROM supplement_sales 
+        WHERE DATE(sale_date) = %s AND (payment_method = 'card' OR payment_method = 'visa')
+    ''', (today,), one=True)
+    stats['visa_sales_today'] = float(visa_sales_today['total']) if visa_sales_today else 0
+    
     # Total sales this month
     month_start = datetime.now().replace(day=1).strftime('%Y-%m-%d')
     month_sales = query_db('''
@@ -863,15 +879,47 @@ def get_supplement_statistics():
     ''', (month_start,), one=True)
     stats['month_sales'] = float(month_sales['total']) if month_sales else 0
     
+    # Total all-time sales
+    total_sales = query_db('''
+        SELECT COALESCE(SUM(total_price), 0) as total 
+        FROM supplement_sales
+    ''', one=True)
+    stats['total_sales'] = float(total_sales['total']) if total_sales else 0
+    
+    # Total sales count
+    total_sales_count = query_db('''
+        SELECT COUNT(*) as count 
+        FROM supplement_sales
+    ''', one=True)
+    stats['total_sales_count'] = total_sales_count['count'] if total_sales_count else 0
+    
     # Top selling products
     top_products = query_db('''
-        SELECT supplement_name, SUM(quantity) as total_quantity, SUM(total_price) as total_revenue
+        SELECT supplement_name, SUM(quantity) as total_quantity, SUM(total_price) as total_revenue, COUNT(*) as sales_count
         FROM supplement_sales
         GROUP BY supplement_name
         ORDER BY total_quantity DESC
         LIMIT 5
     ''')
     stats['top_products'] = top_products or []
+    
+    # Per-product statistics
+    product_stats = query_db('''
+        SELECT 
+            s.id,
+            s.name,
+            s.stock_quantity,
+            s.cost,
+            COALESCE(SUM(sa.quantity), 0) as total_sold,
+            COALESCE(SUM(sa.total_price), 0) as total_revenue,
+            COALESCE(COUNT(sa.id), 0) as sales_count,
+            (s.stock_quantity * s.cost) as inventory_value
+        FROM supplements s
+        LEFT JOIN supplement_sales sa ON s.id = sa.supplement_id
+        GROUP BY s.id, s.name, s.stock_quantity, s.cost
+        ORDER BY s.name ASC
+    ''')
+    stats['product_stats'] = product_stats or []
     
     # Total inventory value
     inventory_value = query_db('''
