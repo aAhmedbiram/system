@@ -181,6 +181,41 @@ def create_table():
                 used_by TEXT
             )
         ''')
+        
+        # Create supplements/products table
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS supplements (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                category TEXT,
+                subcategory TEXT,
+                price REAL DEFAULT 0,
+                cost REAL DEFAULT 0,
+                stock_quantity INTEGER DEFAULT 0,
+                unit TEXT DEFAULT 'piece',
+                description TEXT,
+                supplier TEXT,
+                barcode TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create supplement sales table
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS supplement_sales (
+                id SERIAL PRIMARY KEY,
+                supplement_id INTEGER REFERENCES supplements(id) ON DELETE CASCADE,
+                supplement_name TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                total_price REAL NOT NULL,
+                sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sold_by TEXT,
+                customer_name TEXT,
+                payment_method TEXT DEFAULT 'cash'
+            )
+        ''')
 
         # Create indexes for better query performance
         try:
@@ -207,6 +242,12 @@ def create_table():
             cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_member_id ON action_logs(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_action_time ON action_logs(action_time)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_undone ON action_logs(undone)')
+            
+            # Indexes for supplements tables
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_supplements_name ON supplements(name)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_supplements_category ON supplements(category)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_supplement_sales_date ON supplement_sales(sale_date)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_supplement_sales_supplement_id ON supplement_sales(supplement_id)')
             
             conn.commit()
             print("PostgreSQL tables and indexes created successfully!")
@@ -716,3 +757,127 @@ def get_member_invitations(member_id):
         WHERE member_id = %s 
         ORDER BY id ASC
     ''', (member_id,))
+
+
+# === Supplement/Product Management Functions ===
+def add_supplement(name, category=None, subcategory=None, price=0, cost=0, stock_quantity=0, unit='piece', description=None, supplier=None, barcode=None):
+    """Add a new supplement/product"""
+    try:
+        result = query_db('''
+            INSERT INTO supplements 
+            (name, category, subcategory, price, cost, stock_quantity, unit, description, supplier, barcode)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        ''', (name, category, subcategory, price, cost, stock_quantity, unit, description, supplier, barcode), one=True, commit=True)
+        return result['id'] if result else None
+    except Exception as e:
+        print(f"Error adding supplement: {e}")
+        raise e
+
+
+def get_supplement(supplement_id):
+    """Get a supplement by ID"""
+    return query_db('SELECT * FROM supplements WHERE id = %s', (supplement_id,), one=True)
+
+
+def get_all_supplements():
+    """Get all supplements"""
+    return query_db('SELECT * FROM supplements ORDER BY name ASC')
+
+
+def update_supplement(supplement_id, **kwargs):
+    """Update supplement fields"""
+    if not kwargs:
+        return
+    from datetime import datetime
+    kwargs['updated_at'] = datetime.now()
+    fields = [f"{k} = %s" for k in kwargs.keys()]
+    values = list(kwargs.values()) + [supplement_id]
+    query = f"UPDATE supplements SET {', '.join(fields)} WHERE id = %s"
+    query_db(query, tuple(values), commit=True)
+
+
+def delete_supplement(supplement_id):
+    """Delete a supplement"""
+    query_db('DELETE FROM supplements WHERE id = %s', (supplement_id,), commit=True)
+
+
+def add_supplement_sale(supplement_id, supplement_name, quantity, unit_price, total_price, sold_by=None, customer_name=None, payment_method='cash'):
+    """Record a supplement sale"""
+    try:
+        # Record the sale
+        query_db('''
+            INSERT INTO supplement_sales 
+            (supplement_id, supplement_name, quantity, unit_price, total_price, sold_by, customer_name, payment_method)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (supplement_id, supplement_name, quantity, unit_price, total_price, sold_by, customer_name, payment_method), commit=True)
+        
+        # Update stock quantity
+        query_db('''
+            UPDATE supplements 
+            SET stock_quantity = stock_quantity - %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        ''', (quantity, supplement_id), commit=True)
+    except Exception as e:
+        print(f"Error adding supplement sale: {e}")
+        raise e
+
+
+def get_supplement_sales(limit=100):
+    """Get recent supplement sales"""
+    return query_db('''
+        SELECT * FROM supplement_sales 
+        ORDER BY sale_date DESC 
+        LIMIT %s
+    ''', (limit,))
+
+
+def get_supplement_statistics():
+    """Get statistics for supplements"""
+    stats = {}
+    
+    # Total products
+    total_products = query_db('SELECT COUNT(*) as count FROM supplements', one=True)
+    stats['total_products'] = total_products['count'] if total_products else 0
+    
+    # Low stock items (stock < 10)
+    low_stock = query_db('SELECT COUNT(*) as count FROM supplements WHERE stock_quantity < 10', one=True)
+    stats['low_stock'] = low_stock['count'] if low_stock else 0
+    
+    # Total sales today
+    from datetime import datetime
+    today = datetime.now().strftime('%Y-%m-%d')
+    today_sales = query_db('''
+        SELECT COALESCE(SUM(total_price), 0) as total 
+        FROM supplement_sales 
+        WHERE DATE(sale_date) = %s
+    ''', (today,), one=True)
+    stats['today_sales'] = float(today_sales['total']) if today_sales else 0
+    
+    # Total sales this month
+    month_start = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+    month_sales = query_db('''
+        SELECT COALESCE(SUM(total_price), 0) as total 
+        FROM supplement_sales 
+        WHERE DATE(sale_date) >= %s
+    ''', (month_start,), one=True)
+    stats['month_sales'] = float(month_sales['total']) if month_sales else 0
+    
+    # Top selling products
+    top_products = query_db('''
+        SELECT supplement_name, SUM(quantity) as total_quantity, SUM(total_price) as total_revenue
+        FROM supplement_sales
+        GROUP BY supplement_name
+        ORDER BY total_quantity DESC
+        LIMIT 5
+    ''')
+    stats['top_products'] = top_products or []
+    
+    # Total inventory value
+    inventory_value = query_db('''
+        SELECT COALESCE(SUM(stock_quantity * cost), 0) as total 
+        FROM supplements
+    ''', one=True)
+    stats['inventory_value'] = float(inventory_value['total']) if inventory_value else 0
+    
+    return stats

@@ -131,7 +131,9 @@ from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
     add_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
-    use_invitation, get_all_invitations, get_member_invitations
+    use_invitation, get_all_invitations, get_member_invitations,
+    add_supplement, get_supplement, get_all_supplements, update_supplement, delete_supplement,
+    add_supplement_sale, get_supplement_sales, get_supplement_statistics
 )
 from .queries import delete_all_data as delete_all_data_from_db
 
@@ -2383,6 +2385,147 @@ def process_offer_with_pattern_matching(offer_text):
         import traceback
         traceback.print_exc()
         return None
+
+@app.route('/supplements')
+@login_required
+def supplements():
+    """Supplement and Water Management System"""
+    try:
+        supplements_data = get_all_supplements()
+        stats = get_supplement_statistics()
+        recent_sales = get_supplement_sales(limit=10)
+        return render_template('supplements.html', 
+                             supplements=supplements_data or [],
+                             stats=stats,
+                             recent_sales=recent_sales or [])
+    except Exception as e:
+        print(f"Error in supplements route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading supplements: {str(e)}", "error")
+        return render_template('supplements.html', supplements=[], stats={}, recent_sales=[])
+
+
+@app.route('/add_supplement', methods=['POST'])
+@login_required
+def add_supplement_route():
+    """Add a new supplement/product"""
+    try:
+        name = request.form.get('name', '').strip()
+        category = request.form.get('category', '').strip() or None
+        subcategory = request.form.get('subcategory', '').strip() or None
+        price = float(request.form.get('price', 0) or 0)
+        cost = float(request.form.get('cost', 0) or 0)
+        stock_quantity = int(request.form.get('stock_quantity', 0) or 0)
+        unit = request.form.get('unit', 'piece').strip()
+        description = request.form.get('description', '').strip() or None
+        supplier = request.form.get('supplier', '').strip() or None
+        barcode = request.form.get('barcode', '').strip() or None
+        
+        if not name:
+            flash('Product name is required!', 'error')
+            return redirect(url_for('supplements'))
+        
+        add_supplement(name, category, subcategory, price, cost, stock_quantity, unit, description, supplier, barcode)
+        flash(f'Product "{name}" added successfully!', 'success')
+    except Exception as e:
+        print(f"Error adding supplement: {e}")
+        flash(f'Error adding product: {str(e)}', 'error')
+    return redirect(url_for('supplements'))
+
+
+@app.route('/edit_supplement/<int:supplement_id>', methods=['POST'])
+@login_required
+def edit_supplement(supplement_id):
+    """Edit a supplement/product"""
+    try:
+        name = request.form.get('name', '').strip()
+        category = request.form.get('category', '').strip() or None
+        subcategory = request.form.get('subcategory', '').strip() or None
+        price = float(request.form.get('price', 0) or 0)
+        cost = float(request.form.get('cost', 0) or 0)
+        stock_quantity = int(request.form.get('stock_quantity', 0) or 0)
+        unit = request.form.get('unit', 'piece').strip()
+        description = request.form.get('description', '').strip() or None
+        supplier = request.form.get('supplier', '').strip() or None
+        barcode = request.form.get('barcode', '').strip() or None
+        
+        if not name:
+            flash('Product name is required!', 'error')
+            return redirect(url_for('supplements'))
+        
+        update_supplement(supplement_id,
+                         name=name, category=category, subcategory=subcategory,
+                         price=price, cost=cost, stock_quantity=stock_quantity,
+                         unit=unit, description=description, supplier=supplier, barcode=barcode)
+        flash(f'Product "{name}" updated successfully!', 'success')
+    except Exception as e:
+        print(f"Error editing supplement: {e}")
+        flash(f'Error updating product: {str(e)}', 'error')
+    return redirect(url_for('supplements'))
+
+
+@app.route('/delete_supplement/<int:supplement_id>', methods=['POST'])
+@login_required
+def delete_supplement_route(supplement_id):
+    """Delete a supplement/product"""
+    try:
+        supplement = get_supplement(supplement_id)
+        if supplement:
+            delete_supplement(supplement_id)
+            flash(f'Product "{supplement["name"]}" deleted successfully!', 'success')
+        else:
+            flash('Product not found!', 'error')
+    except Exception as e:
+        print(f"Error deleting supplement: {e}")
+        flash(f'Error deleting product: {str(e)}', 'error')
+    return redirect(url_for('supplements'))
+
+
+@app.route('/sell_supplement/<int:supplement_id>', methods=['POST'])
+@login_required
+def sell_supplement(supplement_id):
+    """Record a supplement sale"""
+    try:
+        supplement = get_supplement(supplement_id)
+        if not supplement:
+            flash('Product not found!', 'error')
+            return redirect(url_for('supplements'))
+        
+        quantity = int(request.form.get('quantity', 1) or 1)
+        customer_name = request.form.get('customer_name', '').strip() or None
+        payment_method = request.form.get('payment_method', 'cash').strip()
+        sold_by = session.get('username', 'Unknown')
+        
+        if quantity <= 0:
+            flash('Quantity must be greater than 0!', 'error')
+            return redirect(url_for('supplements'))
+        
+        if supplement['stock_quantity'] < quantity:
+            flash(f'Insufficient stock! Available: {supplement["stock_quantity"]}', 'error')
+            return redirect(url_for('supplements'))
+        
+        unit_price = supplement['price']
+        total_price = unit_price * quantity
+        
+        add_supplement_sale(supplement_id, supplement['name'], quantity, unit_price, total_price, sold_by, customer_name, payment_method)
+        flash(f'Sale recorded: {quantity} x {supplement["name"]} = {total_price:.2f}', 'success')
+    except Exception as e:
+        print(f"Error selling supplement: {e}")
+        flash(f'Error recording sale: {str(e)}', 'error')
+    return redirect(url_for('supplements'))
+
+
+@app.route('/api/supplement_stats')
+@login_required
+def supplement_stats_api():
+    """API endpoint for supplement statistics (for AJAX updates)"""
+    try:
+        stats = get_supplement_statistics()
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 # === Debug Route (for testing) ===
 @app.route('/debug/test')
