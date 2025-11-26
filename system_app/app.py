@@ -1723,8 +1723,31 @@ def invoices_list():
                 invoice_message += f"📎 Download PDF: {pdf_url}\n\n"
                 invoice_message += "Thank you for your business!"
                 
-                # Clean phone number and create WhatsApp URL
-                phone_clean = str(invoice.get('member_phone', '')).replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
+                # Clean and format phone number for WhatsApp (Egypt country code: +20)
+                phone_raw = str(invoice.get('member_phone', '')).strip()
+                phone_clean = phone_raw.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+                
+                # Handle Egyptian phone numbers
+                if phone_clean:
+                    # If it starts with +20, it already has country code
+                    if phone_clean.startswith('+20'):
+                        phone_clean = phone_clean[1:]  # Remove + for WhatsApp URL
+                    # If it starts with 0020, remove it and add 20
+                    elif phone_clean.startswith('0020'):
+                        phone_clean = '20' + phone_clean[4:]
+                    # If it starts with 20 (without +), keep it
+                    elif phone_clean.startswith('20') and len(phone_clean) >= 12:
+                        pass  # Already has country code
+                    # If it starts with 0 (Egyptian format), replace 0 with 20
+                    elif phone_clean.startswith('0'):
+                        phone_clean = '20' + phone_clean[1:]
+                    # If it doesn't start with country code, assume it's Egyptian and add 20
+                    elif len(phone_clean) == 10 or len(phone_clean) == 11:
+                        phone_clean = '20' + phone_clean
+                    # If it's a short number, try to add country code
+                    elif len(phone_clean) < 10:
+                        phone_clean = '20' + phone_clean
+                
                 invoice['whatsapp_url'] = f"https://wa.me/{phone_clean}?text={quote(invoice_message)}"
             else:
                 invoice['whatsapp_url'] = None
