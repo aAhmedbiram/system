@@ -1695,6 +1695,9 @@ def invoices_list():
         from urllib.parse import quote
         invoices = get_all_invoices() or []
         # Format WhatsApp messages for each invoice
+        from flask import request as flask_request
+        base_url = flask_request.host_url.rstrip('/')
+        
         for invoice in invoices:
             if invoice.get('member_phone'):
                 invoice_type_text = 'New Member Registration' if invoice.get('invoice_type') == 'new_member' else 'Membership Renewal'
@@ -1704,12 +1707,20 @@ def invoices_list():
                 elif not invoice_date_str:
                     invoice_date_str = 'N/A'
                 
+                # Create public PDF download link (no login required)
+                # Generate a simple token from invoice number for basic security
+                import hashlib
+                invoice_number = invoice.get('invoice_number', '')
+                token = hashlib.md5(f"{invoice_number}{secret_key}".encode()).hexdigest()[:12]
+                pdf_url = f"{base_url}/invoice/{invoice.get('id')}/pdf/public/{token}"
+                
                 invoice_message = f"📄 *Invoice {invoice.get('invoice_number', 'N/A')}*\n\n"
                 invoice_message += f"Member: {invoice.get('member_name', 'N/A')}\n"
                 invoice_message += f"Type: {invoice_type_text}\n"
                 invoice_message += f"Package: {invoice.get('package_name') or 'N/A'}\n"
                 invoice_message += f"Amount: ${invoice.get('amount', 0):.2f}\n"
                 invoice_message += f"Date: {invoice_date_str}\n\n"
+                invoice_message += f"📎 Download PDF: {pdf_url}\n\n"
                 invoice_message += "Thank you for your business!"
                 
                 # Clean phone number and create WhatsApp URL
@@ -1749,147 +1760,175 @@ def view_invoice(invoice_id):
         flash(f"Error loading invoice: {str(e)}", "error")
         return redirect(url_for('invoices_list'))
 
+def generate_invoice_pdf_response(invoice):
+    """Helper function to generate invoice PDF response"""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from io import BytesIO
+    from flask import Response
+    
+    # Get member details if member_id exists
+    member = None
+    if invoice.get('member_id'):
+        member = get_member(invoice['member_id'])
+    
+    # Create PDF buffer
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#4caf50'),
+        spaceAfter=30,
+    )
+    elements.append(Paragraph("RIVAL GYM", title_style))
+    elements.append(Paragraph("INVOICE", styles['Heading2']))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Invoice details
+    invoice_date_str = invoice['invoice_date'].strftime('%B %d, %Y') if hasattr(invoice['invoice_date'], 'strftime') else str(invoice['invoice_date'])
+    invoice_data = [
+        ['Invoice Number:', invoice['invoice_number']],
+        ['Date:', invoice_date_str],
+        ['Type:', 'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal'],
+    ]
+    
+    invoice_table = Table(invoice_data, colWidths=[2*inch, 4*inch])
+    invoice_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+    ]))
+    elements.append(invoice_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Bill To
+    elements.append(Paragraph("<b>Bill To:</b>", styles['Normal']))
+    bill_to_data = [
+        ['Member Name:', invoice['member_name']],
+        ['Member ID:', str(invoice['member_id']) if invoice['member_id'] else 'N/A'],
+    ]
+    if member:
+        if member.get('email'):
+            bill_to_data.append(['Email:', member['email']])
+        if member.get('phone'):
+            bill_to_data.append(['Phone:', member['phone']])
+    
+    bill_to_table = Table(bill_to_data, colWidths=[2*inch, 4*inch])
+    bill_to_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(bill_to_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Invoice items
+    elements.append(Paragraph("<b>Invoice Details:</b>", styles['Normal']))
+    items_data = [
+        ['Description', 'Package', 'Amount'],
+        [
+            'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal',
+            invoice['package_name'] or 'N/A',
+            f"${float(invoice['amount']):.2f}" if invoice.get('amount') else '$0.00'
+        ]
+    ]
+    
+    items_table = Table(items_data, colWidths=[3*inch, 2*inch, 1*inch])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4caf50')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Total
+    invoice_amount = float(invoice['amount']) if invoice['amount'] else 0.0
+    total_data = [
+        ['Subtotal:', f"${invoice_amount:.2f}"],
+        ['Tax:', '$0.00'],
+        ['Total:', f"${invoice_amount:.2f}"],
+    ]
+    
+    total_table = Table(total_data, colWidths=[4*inch, 2*inch])
+    total_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 12),
+        ('FONTSIZE', (0, 2), (-1, 2), 16),
+        ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#4caf50')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('TOPPADDING', (0, 2), (-1, 2), 12),
+        ('LINEABOVE', (0, 2), (-1, 2), 2, colors.HexColor('#4caf50')),
+    ]))
+    elements.append(total_table)
+    
+    # Footer
+    elements.append(Spacer(1, 0.5*inch))
+    elements.append(Paragraph("Thank you for your business!", styles['Normal']))
+    elements.append(Paragraph("This is a computer-generated invoice. No signature required.", styles['Normal']))
+    if invoice.get('created_by'):
+        elements.append(Paragraph(f"Created by: {invoice['created_by']}", styles['Normal']))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    # Create response
+    response = Response(buffer.read(), mimetype='application/pdf')
+    response.headers['Content-Disposition'] = f'attachment; filename=invoice_{invoice["invoice_number"]}.pdf'
+    return response
+
+@app.route('/invoice/<int:invoice_id>/pdf/public/<token>')
+def download_invoice_pdf_public(invoice_id, token):
+    """Public PDF download route (no login required) - uses token for basic security"""
+    try:
+        invoice = get_invoice(invoice_id)
+        if not invoice:
+            return "Invoice not found", 404
+        
+        # Verify token
+        import hashlib
+        invoice_number = invoice.get('invoice_number', '')
+        expected_token = hashlib.md5(f"{invoice_number}{secret_key}".encode()).hexdigest()[:12]
+        if token != expected_token:
+            return "Invalid access token", 403
+        
+        # Generate and return PDF
+        return generate_invoice_pdf_response(invoice)
+    except Exception as e:
+        print(f"Error generating public PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error generating PDF: {str(e)}", 500
+
 @app.route('/invoice/<int:invoice_id>/pdf')
 @login_required
 def download_invoice_pdf(invoice_id):
-    """Download invoice as PDF using reportlab"""
+    """Download invoice as PDF using reportlab (requires login)"""
     try:
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib import colors
-        from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from io import BytesIO
         
         invoice = get_invoice(invoice_id)
         if not invoice:
             flash("Invoice not found!", "error")
             return redirect(url_for('invoices_list'))
         
-        # Get member details if member_id exists
-        member = None
-        if invoice.get('member_id'):
-            member = get_member(invoice['member_id'])
-        
-        # Create PDF buffer
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        elements = []
-        styles = getSampleStyleSheet()
-        
-        # Title
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            textColor=colors.HexColor('#4caf50'),
-            spaceAfter=30,
-        )
-        elements.append(Paragraph("RIVAL GYM", title_style))
-        elements.append(Paragraph("INVOICE", styles['Heading2']))
-        elements.append(Spacer(1, 0.3*inch))
-        
-        # Invoice details
-        invoice_date_str = invoice['invoice_date'].strftime('%B %d, %Y') if hasattr(invoice['invoice_date'], 'strftime') else str(invoice['invoice_date'])
-        invoice_data = [
-            ['Invoice Number:', invoice['invoice_number']],
-            ['Date:', invoice_date_str],
-            ['Type:', 'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal'],
-        ]
-        
-        invoice_table = Table(invoice_data, colWidths=[2*inch, 4*inch])
-        invoice_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ]))
-        elements.append(invoice_table)
-        elements.append(Spacer(1, 0.3*inch))
-        
-        # Bill To
-        elements.append(Paragraph("<b>Bill To:</b>", styles['Normal']))
-        bill_to_data = [
-            ['Member Name:', invoice['member_name']],
-            ['Member ID:', str(invoice['member_id']) if invoice['member_id'] else 'N/A'],
-        ]
-        if member:
-            if member.get('email'):
-                bill_to_data.append(['Email:', member['email']])
-            if member.get('phone'):
-                bill_to_data.append(['Phone:', member['phone']])
-        
-        bill_to_table = Table(bill_to_data, colWidths=[2*inch, 4*inch])
-        bill_to_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(bill_to_table)
-        elements.append(Spacer(1, 0.3*inch))
-        
-        # Invoice items
-        elements.append(Paragraph("<b>Invoice Details:</b>", styles['Normal']))
-        items_data = [
-            ['Description', 'Package', 'Amount'],
-            [
-                'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal',
-                invoice['package_name'] or 'N/A',
-                f"${invoice['amount']:.2f}"
-            ]
-        ]
-        
-        items_table = Table(items_data, colWidths=[3*inch, 2*inch, 1*inch])
-        items_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4caf50')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ]))
-        elements.append(items_table)
-        elements.append(Spacer(1, 0.3*inch))
-        
-        # Total
-        invoice_amount = float(invoice['amount']) if invoice['amount'] else 0.0
-        total_data = [
-            ['Subtotal:', f"${invoice_amount:.2f}"],
-            ['Tax:', '$0.00'],
-            ['Total:', f"${invoice_amount:.2f}"],
-        ]
-        
-        total_table = Table(total_data, colWidths=[4*inch, 2*inch])
-        total_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 12),
-            ('FONTSIZE', (0, 2), (-1, 2), 16),
-            ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#4caf50')),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 2), (-1, 2), 12),
-            ('LINEABOVE', (0, 2), (-1, 2), 2, colors.HexColor('#4caf50')),
-        ]))
-        elements.append(total_table)
-        
-        # Footer
-        elements.append(Spacer(1, 0.5*inch))
-        elements.append(Paragraph("Thank you for your business!", styles['Normal']))
-        elements.append(Paragraph("This is a computer-generated invoice. No signature required.", styles['Normal']))
-        if invoice.get('created_by'):
-            elements.append(Paragraph(f"Created by: {invoice['created_by']}", styles['Normal']))
-        
-        # Build PDF
-        doc.build(elements)
-        buffer.seek(0)
-        
-        # Create response
-        from flask import Response
-        response = Response(buffer.read(), mimetype='application/pdf')
-        response.headers['Content-Disposition'] = f'attachment; filename=invoice_{invoice["invoice_number"]}.pdf'
-        return response
+        return generate_invoice_pdf_response(invoice)
     except Exception as e:
         print(f"Error generating PDF: {e}")
         import traceback
