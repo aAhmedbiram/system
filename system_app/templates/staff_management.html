@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Management - Rival Gym</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            color: #4caf50;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            color: #999;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #4caf50;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .change {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .staff-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .staff-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #4caf50;
+            transition: transform 0.3s ease;
+        }
+
+        .staff-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .staff-card h3 {
+            color: #4caf50;
+            margin-bottom: 15px;
+            font-size: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .staff-card .role-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .staff-info {
+            margin-bottom: 15px;
+        }
+
+        .staff-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .staff-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .staff-info-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .staff-info-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .staff-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-edit {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 22px;
+            border-bottom: 2px solid #4caf50;
+            padding-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #4caf50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #4caf50;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+
+        .flash-message {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .flash-success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #4caf50;
+        }
+
+        .flash-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #f44336;
+        }
+
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .total-highlight {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+            font-weight: 700;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👥 Staff Management System</h1>
+            <div class="header-actions">
+                <a href="{{ url_for('supplements') }}" class="btn btn-secondary">← Back to Supplements</a>
+                {% if is_rino %}
+                <button class="btn btn-primary" onclick="openAddStaffModal()">+ Add Staff</button>
+                {% endif %}
+            </div>
+        </header>
+
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Staff</h3>
+                <div class="value">{{ stats.total_staff or 0 }}</div>
+                <div class="change">Active members</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Purchases</h3>
+                <div class="value">${{ "%.2f"|format(stats.total_staff_purchases or 0) }}</div>
+                <div class="change">All time</div>
+            </div>
+            <div class="stat-card">
+                <h3>Purchase Count</h3>
+                <div class="value">{{ stats.total_staff_purchase_count or 0 }}</div>
+                <div class="change">Transactions</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Quantity</h3>
+                <div class="value">{{ stats.total_staff_purchase_quantity or 0 }}</div>
+                <div class="change">Items purchased</div>
+            </div>
+            <div class="stat-card">
+                <h3>This Month</h3>
+                <div class="value">${{ "%.2f"|format(stats.month_staff_purchases or 0) }}</div>
+                <div class="change">Monthly purchases</div>
+            </div>
+        </div>
+
+        <!-- Staff Members -->
+        <div class="card">
+            <h2>👨‍💼 Staff Members</h2>
+            <div class="staff-grid">
+                {% for staff_member in staff %}
+                <div class="staff-card">
+                    <h3>
+                        {{ staff_member.name }}
+                        <span class="role-badge">{{ staff_member.role }}</span>
+                    </h3>
+                    <div class="staff-info">
+                        {% if staff_member.phone %}
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Phone:</span>
+                            <span class="staff-info-value">{{ staff_member.phone }}</span>
+                        </div>
+                        {% endif %}
+                        {% if staff_member.email %}
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Email:</span>
+                            <span class="staff-info-value">{{ staff_member.email }}</span>
+                        </div>
+                        {% endif %}
+                        {% if staff_member.hire_date %}
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Hire Date:</span>
+                            <span class="staff-info-value">{{ staff_member.hire_date }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Status:</span>
+                            <span class="staff-info-value">
+                                {% if staff_member.status == 'active' %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-warning">Inactive</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% set staff_stat = stats.staff_purchase_stats | selectattr('id', 'equalto', staff_member.id) | first %}
+                        {% if staff_stat %}
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Total Spent:</span>
+                            <span class="staff-info-value" style="color: #4caf50; font-weight: 700;">${{ "%.2f"|format(staff_stat.total_spent or 0) }}</span>
+                        </div>
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Purchases:</span>
+                            <span class="staff-info-value">{{ staff_stat.purchase_count or 0 }} transactions</span>
+                        </div>
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Quantity:</span>
+                            <span class="staff-info-value">{{ staff_stat.total_quantity or 0 }} items</span>
+                        </div>
+                        {% else %}
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Total Spent:</span>
+                            <span class="staff-info-value" style="color: #999;">$0.00</span>
+                        </div>
+                        <div class="staff-info-item">
+                            <span class="staff-info-label">Purchases:</span>
+                            <span class="staff-info-value">0 transactions</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="staff-actions">
+                        <button class="btn btn-sm btn-success" onclick="openPurchaseModal({{ staff_member.id }}, '{{ staff_member.name }}')">Add Purchase</button>
+                        {% if is_rino %}
+                        <button class="btn btn-sm btn-edit" onclick="openEditStaffModal({{ staff_member.id }})">Edit</button>
+                        <form method="POST" action="{{ url_for('delete_staff_route', staff_id=staff_member.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ staff_member.name }}?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Staff Purchase Statistics -->
+        {% if stats.staff_purchase_stats %}
+        <div class="card">
+            <h2>📊 Purchase Statistics by Staff</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Purchase Count</th>
+                        <th>Total Quantity</th>
+                        <th>Total Spent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for staff_stat in stats.staff_purchase_stats %}
+                    <tr>
+                        <td><strong>{{ staff_stat.name }}</strong></td>
+                        <td>{{ staff_stat.role }}</td>
+                        <td>{{ staff_stat.purchase_count or 0 }}</td>
+                        <td>{{ staff_stat.total_quantity or 0 }}</td>
+                        <td style="color: #4caf50; font-weight: 700;">${{ "%.2f"|format(staff_stat.total_spent or 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr style="background: #f8f9fa; font-weight: 700;">
+                        <td colspan="2"><strong>TOTAL</strong></td>
+                        <td>{{ stats.total_staff_purchase_count or 0 }}</td>
+                        <td>{{ stats.total_staff_purchase_quantity or 0 }}</td>
+                        <td style="color: #4caf50; font-size: 18px;">${{ "%.2f"|format(stats.total_staff_purchases or 0) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Recent Purchases -->
+        <div class="card">
+            <h2>💰 Recent Purchases</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Staff Member</th>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                        <th>Date</th>
+                        <th>Recorded By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for purchase in recent_purchases %}
+                    <tr>
+                        <td><strong>{{ purchase.staff_name }}</strong></td>
+                        <td>{{ purchase.supplement_name }}</td>
+                        <td>{{ purchase.quantity }}</td>
+                        <td>${{ "%.2f"|format(purchase.unit_price or 0) }}</td>
+                        <td style="color: #4caf50; font-weight: 700;">${{ "%.2f"|format(purchase.total_price or 0) }}</td>
+                        <td>{{ purchase.purchase_date.strftime('%Y-%m-%d %H:%M') if purchase.purchase_date else 'N/A' }}</td>
+                        <td>{{ purchase.recorded_by or 'Unknown' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Staff Modal -->
+    {% if is_rino %}
+    <div id="addStaffModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addStaffModal')">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #4caf50;">Add New Staff Member</h2>
+            <form method="POST" action="{{ url_for('add_staff_route') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select name="role" required>
+                            <option value="Coach">Coach</option>
+                            <option value="Salesman">Salesman</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Trainer">Trainer</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Hire Date</label>
+                    <input type="date" name="hire_date">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Add Staff Member</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Staff Modal -->
+    <div id="editStaffModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editStaffModal')">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #4caf50;">Edit Staff Member</h2>
+            <form id="editStaffForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" name="name" id="edit_staff_name" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select name="role" id="edit_staff_role" required>
+                            <option value="Coach">Coach</option>
+                            <option value="Salesman">Salesman</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Trainer">Trainer</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select name="status" id="edit_staff_status">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" name="phone" id="edit_staff_phone">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" id="edit_staff_email">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Hire Date</label>
+                    <input type="date" name="hire_date" id="edit_staff_hire_date">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes" id="edit_staff_notes" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Update Staff Member</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Add Purchase Modal -->
+    <div id="purchaseModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('purchaseModal')">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #4caf50;">Record Purchase</h2>
+            <form id="purchaseForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="form-group">
+                    <label>Staff Member</label>
+                    <input type="text" id="purchase_staff_name" readonly style="background: #f0f0f0;">
+                </div>
+                <div class="form-group">
+                    <label>Product *</label>
+                    <select name="supplement_id" id="purchase_supplement_id" onchange="updatePurchasePrice()">
+                        <option value="">Select a product...</option>
+                        {% for supplement in supplements %}
+                        <option value="{{ supplement.id }}" data-price="{{ supplement.price or 0 }}" data-stock="{{ supplement.stock_quantity or 0 }}">{{ supplement.name }} - ${{ "%.2f"|format(supplement.price or 0) }}</option>
+                        {% endfor %}
+                    </select>
+                    <small style="color: #666;">Or enter custom product below</small>
+                </div>
+                <div class="form-group">
+                    <label>Custom Product Name (if not in list)</label>
+                    <input type="text" name="supplement_name" id="purchase_supplement_name" placeholder="Enter product name">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Quantity *</label>
+                        <input type="number" name="quantity" id="purchase_quantity" min="1" value="1" required onchange="calculatePurchaseTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label>Unit Price ($) *</label>
+                        <input type="number" name="unit_price" id="purchase_unit_price" step="0.01" min="0" required onchange="calculatePurchaseTotal()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Total Price</label>
+                    <input type="text" id="purchase_total_price" readonly style="background: #f0f0f0; font-size: 20px; font-weight: bold; color: #4caf50;">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 20px;">Record Purchase</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const staff = {{ staff | tojson }};
+        const supplements = {{ supplements | tojson }};
+        let currentStaffId = null;
+
+        function openAddStaffModal() {
+            document.getElementById('addStaffModal').style.display = 'block';
+        }
+
+        function openEditStaffModal(staffId) {
+            const staffMember = staff.find(s => s.id === staffId);
+            if (!staffMember) return;
+            
+            document.getElementById('edit_staff_name').value = staffMember.name || '';
+            document.getElementById('edit_staff_role').value = staffMember.role || 'Coach';
+            document.getElementById('edit_staff_status').value = staffMember.status || 'active';
+            document.getElementById('edit_staff_phone').value = staffMember.phone || '';
+            document.getElementById('edit_staff_email').value = staffMember.email || '';
+            document.getElementById('edit_staff_hire_date').value = staffMember.hire_date || '';
+            document.getElementById('edit_staff_notes').value = staffMember.notes || '';
+            
+            document.getElementById('editStaffForm').action = `/edit_staff/${staffId}`;
+            document.getElementById('editStaffModal').style.display = 'block';
+        }
+
+        function openPurchaseModal(staffId, staffName) {
+            currentStaffId = staffId;
+            document.getElementById('purchase_staff_name').value = staffName;
+            document.getElementById('purchase_supplement_id').value = '';
+            document.getElementById('purchase_supplement_name').value = '';
+            document.getElementById('purchase_quantity').value = 1;
+            document.getElementById('purchase_unit_price').value = 0;
+            document.getElementById('purchase_total_price').value = '$0.00';
+            
+            document.getElementById('purchaseForm').action = `/add_staff_purchase/${staffId}`;
+            document.getElementById('purchaseModal').style.display = 'block';
+        }
+
+        function updatePurchasePrice() {
+            const select = document.getElementById('purchase_supplement_id');
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const price = parseFloat(selectedOption.getAttribute('data-price')) || 0;
+                const stock = parseInt(selectedOption.getAttribute('data-stock')) || 0;
+                document.getElementById('purchase_unit_price').value = price.toFixed(2);
+                document.getElementById('purchase_quantity').max = stock;
+                document.getElementById('purchase_supplement_name').value = '';
+                calculatePurchaseTotal();
+            }
+        }
+
+        function calculatePurchaseTotal() {
+            const quantity = parseInt(document.getElementById('purchase_quantity').value) || 0;
+            const price = parseFloat(document.getElementById('purchase_unit_price').value) || 0;
+            const total = quantity * price;
+            document.getElementById('purchase_total_price').value = `$${total.toFixed(2)}`;
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modals = ['addStaffModal', 'editStaffModal', 'purchaseModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+

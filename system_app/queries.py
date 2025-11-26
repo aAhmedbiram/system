@@ -216,6 +216,39 @@ def create_table():
                 payment_method TEXT DEFAULT 'cash'
             )
         ''')
+        
+        # Create staff table
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS staff (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                role TEXT NOT NULL,
+                phone TEXT,
+                email TEXT,
+                hire_date DATE,
+                status TEXT DEFAULT 'active',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create staff purchases table
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS staff_purchases (
+                id SERIAL PRIMARY KEY,
+                staff_id INTEGER REFERENCES staff(id) ON DELETE CASCADE,
+                staff_name TEXT NOT NULL,
+                supplement_id INTEGER REFERENCES supplements(id) ON DELETE SET NULL,
+                supplement_name TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                total_price REAL NOT NULL,
+                purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                notes TEXT,
+                recorded_by TEXT
+            )
+        ''')
 
         # Create indexes for better query performance
         try:
@@ -248,6 +281,12 @@ def create_table():
             cr.execute('CREATE INDEX IF NOT EXISTS idx_supplements_category ON supplements(category)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_supplement_sales_date ON supplement_sales(sale_date)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_supplement_sales_supplement_id ON supplement_sales(supplement_id)')
+            
+            # Indexes for staff tables
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_role ON staff(role)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_status ON staff(status)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_purchases_staff_id ON staff_purchases(staff_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_purchases_date ON staff_purchases(purchase_date)')
             
             conn.commit()
             print("PostgreSQL tables and indexes created successfully!")

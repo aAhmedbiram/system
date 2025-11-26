@@ -133,7 +133,9 @@ from .queries import (
     add_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
     use_invitation, get_all_invitations, get_member_invitations,
     add_supplement, get_supplement, get_all_supplements, update_supplement, delete_supplement,
-    add_supplement_sale, get_supplement_sales, get_supplement_statistics
+    add_supplement_sale, get_supplement_sales, get_supplement_statistics,
+    add_staff, get_staff, get_all_staff, update_staff, delete_staff,
+    add_staff_purchase, get_staff_purchases, get_staff_statistics
 )
 from .queries import delete_all_data as delete_all_data_from_db
 
@@ -2527,6 +2529,142 @@ def supplement_stats_api():
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/staff_management')
+@login_required
+def staff_management():
+    """Staff Management System"""
+    try:
+        staff_data = get_all_staff()
+        staff_stats = get_staff_statistics()
+        recent_purchases = get_staff_purchases(limit=50)
+        supplements_data = get_all_supplements()
+        is_rino = session.get('username') == 'rino'
+        return render_template('staff_management.html', 
+                             staff=staff_data or [],
+                             stats=staff_stats,
+                             recent_purchases=recent_purchases or [],
+                             supplements=supplements_data or [],
+                             is_rino=is_rino)
+    except Exception as e:
+        print(f"Error in staff_management route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading staff management: {str(e)}", "error")
+        return render_template('staff_management.html', staff=[], stats={}, recent_purchases=[], supplements=[], is_rino=False)
+
+
+@app.route('/add_staff', methods=['POST'])
+@rino_required
+def add_staff_route():
+    """Add a new staff member"""
+    try:
+        name = request.form.get('name', '').strip()
+        role = request.form.get('role', '').strip()
+        phone = request.form.get('phone', '').strip() or None
+        email = request.form.get('email', '').strip() or None
+        hire_date = request.form.get('hire_date', '').strip() or None
+        status = request.form.get('status', 'active').strip()
+        notes = request.form.get('notes', '').strip() or None
+        
+        if not name or not role:
+            flash('Name and role are required!', 'error')
+            return redirect(url_for('staff_management'))
+        
+        add_staff(name, role, phone, email, hire_date, status, notes)
+        flash(f'Staff member "{name}" added successfully!', 'success')
+    except Exception as e:
+        print(f"Error adding staff: {e}")
+        flash(f'Error adding staff: {str(e)}', 'error')
+    return redirect(url_for('staff_management'))
+
+
+@app.route('/edit_staff/<int:staff_id>', methods=['POST'])
+@rino_required
+def edit_staff_route(staff_id):
+    """Edit a staff member"""
+    try:
+        name = request.form.get('name', '').strip()
+        role = request.form.get('role', '').strip()
+        phone = request.form.get('phone', '').strip() or None
+        email = request.form.get('email', '').strip() or None
+        hire_date = request.form.get('hire_date', '').strip() or None
+        status = request.form.get('status', 'active').strip()
+        notes = request.form.get('notes', '').strip() or None
+        
+        if not name or not role:
+            flash('Name and role are required!', 'error')
+            return redirect(url_for('staff_management'))
+        
+        update_staff(staff_id, name=name, role=role, phone=phone, email=email, hire_date=hire_date, status=status, notes=notes)
+        flash(f'Staff member "{name}" updated successfully!', 'success')
+    except Exception as e:
+        print(f"Error editing staff: {e}")
+        flash(f'Error updating staff: {str(e)}', 'error')
+    return redirect(url_for('staff_management'))
+
+
+@app.route('/delete_staff/<int:staff_id>', methods=['POST'])
+@rino_required
+def delete_staff_route(staff_id):
+    """Delete a staff member"""
+    try:
+        staff_member = get_staff(staff_id)
+        if staff_member:
+            delete_staff(staff_id)
+            flash(f'Staff member "{staff_member["name"]}" deleted successfully!', 'success')
+        else:
+            flash('Staff member not found!', 'error')
+    except Exception as e:
+        print(f"Error deleting staff: {e}")
+        flash(f'Error deleting staff: {str(e)}', 'error')
+    return redirect(url_for('staff_management'))
+
+
+@app.route('/add_staff_purchase/<int:staff_id>', methods=['POST'])
+@login_required
+def add_staff_purchase_route(staff_id):
+    """Record a staff purchase"""
+    try:
+        staff_member = get_staff(staff_id)
+        if not staff_member:
+            flash('Staff member not found!', 'error')
+            return redirect(url_for('staff_management'))
+        
+        supplement_id = request.form.get('supplement_id', '').strip()
+        if supplement_id:
+            supplement_id = int(supplement_id)
+            supplement = get_supplement(supplement_id)
+            if not supplement:
+                flash('Product not found!', 'error')
+                return redirect(url_for('staff_management'))
+            supplement_name = supplement['name']
+            unit_price = supplement['price']
+            
+            if supplement['stock_quantity'] < int(request.form.get('quantity', 1)):
+                flash(f'Insufficient stock! Available: {supplement["stock_quantity"]}', 'error')
+                return redirect(url_for('staff_management'))
+        else:
+            supplement_name = request.form.get('supplement_name', '').strip()
+            unit_price = float(request.form.get('unit_price', 0) or 0)
+            supplement_id = None
+        
+        quantity = int(request.form.get('quantity', 1) or 1)
+        total_price = unit_price * quantity
+        notes = request.form.get('notes', '').strip() or None
+        recorded_by = session.get('username', 'Unknown')
+        
+        if quantity <= 0:
+            flash('Quantity must be greater than 0!', 'error')
+            return redirect(url_for('staff_management'))
+        
+        add_staff_purchase(staff_id, staff_member['name'], supplement_id, supplement_name, quantity, unit_price, total_price, notes, recorded_by)
+        flash(f'Purchase recorded: {quantity} x {supplement_name} = ${total_price:.2f} for {staff_member["name"]}', 'success')
+    except Exception as e:
+        print(f"Error recording staff purchase: {e}")
+        flash(f'Error recording purchase: {str(e)}', 'error')
+    return redirect(url_for('staff_management'))
 
 
 # === Debug Route (for testing) ===
