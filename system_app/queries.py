@@ -886,37 +886,49 @@ def get_supplement_statistics():
     # Total sales today
     from datetime import datetime
     today = datetime.now().strftime('%Y-%m-%d')
-    today_sales = query_db('''
-        SELECT COALESCE(SUM(total_price), 0) as total 
-        FROM supplement_sales 
-        WHERE DATE(sale_date) = %s
-    ''', (today,), one=True)
-    stats['today_sales'] = float(today_sales['total']) if today_sales else 0
+    try:
+        today_sales = query_db('''
+            SELECT COALESCE(SUM(total_price), 0) as total 
+            FROM supplement_sales 
+            WHERE sale_date::date = %s
+        ''', (today,), one=True)
+        stats['today_sales'] = float(today_sales['total']) if today_sales else 0
+    except:
+        stats['today_sales'] = 0
     
     # Cash sales today
-    cash_sales_today = query_db('''
-        SELECT COALESCE(SUM(total_price), 0) as total 
-        FROM supplement_sales 
-        WHERE DATE(sale_date) = %s AND payment_method = 'cash'
-    ''', (today,), one=True)
-    stats['cash_sales_today'] = float(cash_sales_today['total']) if cash_sales_today else 0
+    try:
+        cash_sales_today = query_db('''
+            SELECT COALESCE(SUM(total_price), 0) as total 
+            FROM supplement_sales 
+            WHERE sale_date::date = %s AND payment_method = 'cash'
+        ''', (today,), one=True)
+        stats['cash_sales_today'] = float(cash_sales_today['total']) if cash_sales_today else 0
+    except:
+        stats['cash_sales_today'] = 0
     
     # Visa/Card sales today
-    visa_sales_today = query_db('''
-        SELECT COALESCE(SUM(total_price), 0) as total 
-        FROM supplement_sales 
-        WHERE DATE(sale_date) = %s AND (payment_method = 'card' OR payment_method = 'visa')
-    ''', (today,), one=True)
-    stats['visa_sales_today'] = float(visa_sales_today['total']) if visa_sales_today else 0
+    try:
+        visa_sales_today = query_db('''
+            SELECT COALESCE(SUM(total_price), 0) as total 
+            FROM supplement_sales 
+            WHERE sale_date::date = %s AND (payment_method = 'card' OR payment_method = 'visa')
+        ''', (today,), one=True)
+        stats['visa_sales_today'] = float(visa_sales_today['total']) if visa_sales_today else 0
+    except:
+        stats['visa_sales_today'] = 0
     
     # Total sales this month
     month_start = datetime.now().replace(day=1).strftime('%Y-%m-%d')
-    month_sales = query_db('''
-        SELECT COALESCE(SUM(total_price), 0) as total 
-        FROM supplement_sales 
-        WHERE DATE(sale_date) >= %s
-    ''', (month_start,), one=True)
-    stats['month_sales'] = float(month_sales['total']) if month_sales else 0
+    try:
+        month_sales = query_db('''
+            SELECT COALESCE(SUM(total_price), 0) as total 
+            FROM supplement_sales 
+            WHERE sale_date::date >= %s
+        ''', (month_start,), one=True)
+        stats['month_sales'] = float(month_sales['total']) if month_sales else 0
+    except:
+        stats['month_sales'] = 0
     
     # Total all-time sales
     total_sales = query_db('''
@@ -984,17 +996,20 @@ def get_supplement_statistics():
     stats['user_sales'] = user_sales or []
     
     # Per-user sales today
-    user_sales_today = query_db('''
-        SELECT 
-            sold_by,
-            COUNT(*) as sales_count,
-            SUM(quantity) as total_quantity,
-            SUM(total_price) as total_revenue
-        FROM supplement_sales
-        WHERE sold_by IS NOT NULL AND DATE(sale_date) = %s
-        GROUP BY sold_by
-        ORDER BY total_revenue DESC
-    ''', (today,))
-    stats['user_sales_today'] = user_sales_today or []
+    try:
+        user_sales_today = query_db('''
+            SELECT 
+                sold_by,
+                COUNT(*) as sales_count,
+                SUM(quantity) as total_quantity,
+                SUM(total_price) as total_revenue
+            FROM supplement_sales
+            WHERE sold_by IS NOT NULL AND sale_date::date = %s
+            GROUP BY sold_by
+            ORDER BY total_revenue DESC
+        ''', (today,))
+        stats['user_sales_today'] = user_sales_today or []
+    except:
+        stats['user_sales_today'] = []
     
     return stats
