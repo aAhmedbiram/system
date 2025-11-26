@@ -411,7 +411,16 @@
             
             if (member) {
                 memberNameDisplay.textContent = member.name;
-                invitationsDisplay.textContent = member.invitations || 0;
+                
+                // Check if member is expired
+                if (member.is_expired) {
+                    invitationsDisplay.textContent = 'N/A';
+                    invitationsDisplay.style.color = '#999';
+                } else {
+                    invitationsDisplay.textContent = member.invitations || 0;
+                    invitationsDisplay.style.color = '#ffd43b';
+                }
+                
                 memberInfo.style.display = 'block';
                 memberNotFound.style.display = 'none';
             } else {

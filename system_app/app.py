@@ -1402,6 +1402,42 @@ def invitations():
                 flash(f'Member with ID {member_id} not found!', 'error')
                 return redirect(url_for('invitations'))
             
+            # Check if member's membership is expired
+            from datetime import datetime
+            today = datetime.now().date()
+            end_date_str = member.get('end_date')
+            is_expired = False
+            
+            if end_date_str:
+                try:
+                    date_formats = [
+                        '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y',
+                        '%m-%d-%Y', '%d-%m-%Y', '%Y/%m/%d'
+                    ]
+                    
+                    end_date_parsed = None
+                    for fmt in date_formats:
+                        try:
+                            end_date_parsed = datetime.strptime(str(end_date_str).strip()[:10], fmt).date()
+                            break
+                        except (ValueError, IndexError):
+                            continue
+                    
+                    if end_date_parsed and end_date_parsed < today:
+                        is_expired = True
+                except Exception as e:
+                    print(f"Error parsing end_date for member {member_id}: {e}")
+            
+            # Check if expired or has no invitations
+            if is_expired:
+                flash(f'N/A - {member["name"]} (ID: {member_id}) doesn\'t have invitations. Membership expired.', 'error')
+                return redirect(url_for('invitations'))
+            
+            current_invitations = member.get('invitations', 0) or 0
+            if current_invitations <= 0:
+                flash(f'{member["name"]} (ID: {member_id}) doesn\'t have invitations. Available invitations: 0', 'error')
+                return redirect(url_for('invitations'))
+            
             # Get username for logging
             username = session.get('username', 'Unknown')
             
@@ -1456,9 +1492,46 @@ def invitations():
             (per_page, offset)
         )
         
+        # Get all members with is_expired flag for JavaScript
+        from datetime import datetime
+        today = datetime.now().date()
+        all_members = query_db('SELECT id, name, invitations, end_date FROM members ORDER BY id ASC') or []
+        
+        # Process members to add is_expired flag
+        processed_members = []
+        for member in all_members:
+            member_dict = dict(member) if hasattr(member, 'keys') else member
+            is_expired = False
+            
+            # Check if end_date is expired
+            end_date_str = member_dict.get('end_date')
+            if end_date_str:
+                try:
+                    # Try to parse various date formats
+                    date_formats = [
+                        '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y',
+                        '%m-%d-%Y', '%d-%m-%Y', '%Y/%m/%d'
+                    ]
+                    
+                    end_date_parsed = None
+                    for fmt in date_formats:
+                        try:
+                            end_date_parsed = datetime.strptime(str(end_date_str).strip()[:10], fmt).date()
+                            break
+                        except (ValueError, IndexError):
+                            continue
+                    
+                    if end_date_parsed and end_date_parsed < today:
+                        is_expired = True
+                except Exception as e:
+                    print(f"Error parsing end_date for member {member_dict.get('id')}: {e}")
+            
+            member_dict['is_expired'] = is_expired
+            processed_members.append(member_dict)
+        
         return render_template('invitations.html', 
                              invitations_data=invitations_data or [],
-                             members_data=query_db('SELECT id, name, invitations FROM members ORDER BY id ASC') or [],
+                             members_data=processed_members,
                              page=page,
                              total_pages=total_pages,
                              total_count=total_count['count'] if total_count else 0)
