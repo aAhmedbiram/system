@@ -779,16 +779,47 @@ def edit_member(member_id):
                 # Log the edit action for undo
                 log_action('edit_member', member_id=member_id, member_name=old_member_dict.get('name'),
                           action_data={'old_values': old_member_dict}, performed_by=username)
-
-            update_member(member_id,
-                name=name, email=email, phone=phone, age=age, gender=gender,
-                birthdate=birthdate, actual_starting_date=actual_starting_date,
-                starting_date=starting_date, end_date=end_date,
-                membership_packages=f"{numeric_value} {unit}",
-                membership_fees=fees, membership_status=status,
-                invitations=invitations, comment=comment,
-                edited_by=username
-            )
+                
+                # Check if starting_date has changed - if so, reset freeze_used
+                old_starting_date = old_member_dict.get('starting_date', '')
+                # Normalize dates for comparison (handle different formats)
+                old_starting_date_normalized = format_date_for_input(old_starting_date) if old_starting_date else ''
+                starting_date_normalized = starting_date if starting_date else ''
+                
+                # Prepare update parameters
+                update_params = {
+                    'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
+                    'birthdate': birthdate, 'actual_starting_date': actual_starting_date,
+                    'starting_date': starting_date, 'end_date': end_date,
+                    'membership_packages': f"{numeric_value} {unit}",
+                    'membership_fees': fees, 'membership_status': status,
+                    'invitations': invitations, 'comment': comment,
+                    'edited_by': username
+                }
+                
+                # If starting_date changed, reset freeze_used
+                if starting_date_normalized and old_starting_date_normalized and starting_date_normalized != old_starting_date_normalized:
+                    update_params['freeze_used'] = False
+                    flash("Member updated successfully! Freeze has been reset due to start date change.", "success")
+                elif starting_date_normalized and not old_starting_date_normalized:
+                    # New starting date added
+                    update_params['freeze_used'] = False
+                
+                update_member(member_id, **update_params)
+                if 'freeze_used' not in update_params:
+                    flash("Member updated successfully!", "success")
+            else:
+                # Member not found, but try to update anyway
+                update_member(member_id,
+                    name=name, email=email, phone=phone, age=age, gender=gender,
+                    birthdate=birthdate, actual_starting_date=actual_starting_date,
+                    starting_date=starting_date, end_date=end_date,
+                    membership_packages=f"{numeric_value} {unit}",
+                    membership_fees=fees, membership_status=status,
+                    invitations=invitations, comment=comment,
+                    edited_by=username
+                )
+                flash("Member updated successfully!", "success")
             flash("Member updated successfully!", "success")
         except Exception as e:
             flash(f"Error updating member: {str(e)}", "error")

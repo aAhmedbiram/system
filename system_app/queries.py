@@ -756,6 +756,49 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
         if not member:
             raise ValueError(f"Member with ID {member_id} not found")
         
+        # Check if member's end date has expired
+        end_date_str = member.get('end_date')
+        if end_date_str:
+            from datetime import datetime
+            
+            try:
+                # Parse the end date - handle various formats
+                if isinstance(end_date_str, str):
+                    end_date_str = end_date_str.strip()
+                    end_date = None
+                    
+                    # Try common date formats
+                    date_formats = [
+                        '%Y-%m-%d',      # 2024-12-31
+                        '%m/%d/%Y',       # 12/31/2024
+                        '%d/%m/%Y',       # 31/12/2024
+                        '%m-%d-%Y',       # 12-31-2024
+                        '%d-%m-%Y',       # 31-12-2024
+                        '%Y/%m/%d',       # 2024/12/31
+                    ]
+                    
+                    for fmt in date_formats:
+                        try:
+                            end_date = datetime.strptime(end_date_str, fmt).date()
+                            break
+                        except ValueError:
+                            continue
+                    
+                    # If parsing succeeded, check if expired
+                    if end_date:
+                        today = datetime.now().date()
+                        if end_date < today:
+                            raise ValueError(f"Member {member['name']} (ID: {member_id}) cannot use invitations because their membership has expired. End date: {end_date_str}")
+                    else:
+                        # If we couldn't parse the date, log warning but allow (graceful degradation)
+                        print(f"Warning: Could not parse end_date '{end_date_str}' for member {member_id}. Allowing invitation usage.")
+            except ValueError as ve:
+                # Re-raise ValueError (our custom error about expired membership)
+                raise ve
+            except Exception as e:
+                # For other exceptions, log but don't block
+                print(f"Warning: Error checking end date for member {member_id}: {e}")
+        
         # Check if member has available invitations
         current_invitations = member.get('invitations', 0) or 0
         if current_invitations <= 0:
