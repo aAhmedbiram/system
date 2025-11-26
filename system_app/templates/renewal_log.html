@@ -199,7 +199,13 @@
                                     N/A
                                 {% endif %}
                             </td>
-                            <td>${{ "%.2f"|format(log.fees or 0) }}</td>
+                            <td>
+                                {% if log.fees is not none %}
+                                    ${{ "%.2f"|format(log.fees) }}
+                                {% else %}
+                                    $0.00
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if log.renewal_time %}
                                     {% if log.renewal_time is string %}
@@ -248,7 +254,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if daily.sum %}
+                                {% if daily.sum is not none and daily.sum != 0 %}
                                     ${{ "%.2f"|format(daily.sum) }}
                                 {% else %}
                                     #N/A

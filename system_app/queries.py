@@ -899,14 +899,24 @@ def get_renewal_logs():
 def get_daily_totals():
     """Get daily income totals from renewals"""
     try:
-        return query_db('''
+        results = query_db('''
             SELECT 
                 renewal_date::date as date,
-                SUM(fees) as sum
+                COALESCE(SUM(fees), 0) as sum
             FROM renewal_logs
             GROUP BY renewal_date::date
             ORDER BY renewal_date::date DESC
         ''', ())
+        
+        # Ensure all sums are floats
+        if results:
+            for result in results:
+                if result.get('sum') is None:
+                    result['sum'] = 0.0
+                else:
+                    result['sum'] = float(result['sum'])
+        
+        return results or []
     except Exception as e:
         print(f"Error getting daily totals: {e}")
         return []
@@ -922,16 +932,21 @@ def get_monthly_total(year=None, month=None):
             month = now.month
         
         result = query_db('''
-            SELECT SUM(fees) as total
+            SELECT COALESCE(SUM(fees), 0) as total
             FROM renewal_logs
             WHERE EXTRACT(YEAR FROM renewal_date) = %s
             AND EXTRACT(MONTH FROM renewal_date) = %s
         ''', (year, month), one=True)
         
-        return result.get('total', 0) if result else 0
+        if result:
+            total = result.get('total')
+            if total is None:
+                return 0.0
+            return float(total)
+        return 0.0
     except Exception as e:
         print(f"Error getting monthly total: {e}")
-        return 0
+        return 0.0
 
 
 # === Supplement/Product Management Functions ===

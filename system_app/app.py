@@ -1572,7 +1572,15 @@ def renewal_log():
         monthly_total = get_monthly_total(now.year, now.month)
         
         # Calculate total membership (all time)
-        total_membership = sum([log.get('fees', 0) or 0 for log in renewal_logs])
+        total_membership = 0.0
+        if renewal_logs:
+            for log in renewal_logs:
+                fees = log.get('fees')
+                if fees is not None:
+                    try:
+                        total_membership += float(fees)
+                    except (ValueError, TypeError):
+                        pass
         
         return render_template('renewal_log.html',
                              renewal_logs=renewal_logs,
