@@ -312,15 +312,25 @@
         <th>Delete</th>
     </tr>
 
-    <!-- Global search row -->
+    <!-- filter row -->
     <tr class="filter-row">
-        <th colspan="17" style="text-align: center; padding: 15px;">
-            <input type="text" id="globalSearch" placeholder="Search all columns (searches entire database)" 
-                   style="width: 80%; padding: 12px; font-size: 16px; background: #222; border: 1px solid #444; border-radius: 6px; color: white;"
-                   value="{{ search_query or '' }}"
-                   onkeyup="handleGlobalSearch(event)">
-            <button type="button" onclick="clearSearch()" style="padding: 12px 20px; margin-left: 10px; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer;">Clear</button>
-        </th>
+        <th><input type="text" id="search_id" placeholder="Search" value="{{ search_id or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_name" placeholder="Search" value="{{ search_name or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_email" placeholder="Search" value="{{ search_email or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_phone" placeholder="Search" value="{{ search_phone or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_age" placeholder="Search" value="{{ search_age or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_gender" placeholder="Search" value="{{ search_gender or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_actual_start" placeholder="Search" value="{{ search_actual_start or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_start_date" placeholder="Search" value="{{ search_start_date or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_end_date" placeholder="Search" value="{{ search_end_date or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_package" placeholder="Search" value="{{ search_package or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_fees" placeholder="Search" value="{{ search_fees or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_status" placeholder="Search" value="{{ search_status or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_invitations" placeholder="Search" value="{{ search_invitations or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_comment" placeholder="Search" value="{{ search_comment or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th></th>
+        <th></th>
+        <th></th>
     </tr>
     </thead>
 
@@ -404,12 +414,28 @@
     <!-- Pagination -->
     {% if total_pages > 1 %}
     <div class="pagination">
-        {% if search_query %}
-            <a href="?page=1&search={{ search_query|urlencode }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
-            <a href="?page={{ page - 1 }}&search={{ search_query|urlencode }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
-            <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total members{% if search_query %} matching "{{ search_query }}"{% endif %})</span>
-            <a href="?page={{ page + 1 }}&search={{ search_query|urlencode }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
-            <a href="?page={{ total_pages }}&search={{ search_query|urlencode }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+        {% set has_search = search_id or search_name or search_email or search_phone or search_age or search_gender or search_actual_start or search_start_date or search_end_date or search_package or search_fees or search_status or search_invitations or search_comment %}
+        {% if has_search %}
+            {% set search_params = '' %}
+            {% if search_id %}{% set search_params = search_params + '&search_id=' + search_id|urlencode %}{% endif %}
+            {% if search_name %}{% set search_params = search_params + '&search_name=' + search_name|urlencode %}{% endif %}
+            {% if search_email %}{% set search_params = search_params + '&search_email=' + search_email|urlencode %}{% endif %}
+            {% if search_phone %}{% set search_params = search_params + '&search_phone=' + search_phone|urlencode %}{% endif %}
+            {% if search_age %}{% set search_params = search_params + '&search_age=' + search_age|urlencode %}{% endif %}
+            {% if search_gender %}{% set search_params = search_params + '&search_gender=' + search_gender|urlencode %}{% endif %}
+            {% if search_actual_start %}{% set search_params = search_params + '&search_actual_start=' + search_actual_start|urlencode %}{% endif %}
+            {% if search_start_date %}{% set search_params = search_params + '&search_start_date=' + search_start_date|urlencode %}{% endif %}
+            {% if search_end_date %}{% set search_params = search_params + '&search_end_date=' + search_end_date|urlencode %}{% endif %}
+            {% if search_package %}{% set search_params = search_params + '&search_package=' + search_package|urlencode %}{% endif %}
+            {% if search_fees %}{% set search_params = search_params + '&search_fees=' + search_fees|urlencode %}{% endif %}
+            {% if search_status %}{% set search_params = search_params + '&search_status=' + search_status|urlencode %}{% endif %}
+            {% if search_invitations %}{% set search_params = search_params + '&search_invitations=' + search_invitations|urlencode %}{% endif %}
+            {% if search_comment %}{% set search_params = search_params + '&search_comment=' + search_comment|urlencode %}{% endif %}
+            <a href="?page=1{{ search_params }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
+            <a href="?page={{ page - 1 }}{{ search_params }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
+            <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total members)</span>
+            <a href="?page={{ page + 1 }}{{ search_params }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
+            <a href="?page={{ total_pages }}{{ search_params }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
         {% else %}
             <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
             <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
@@ -425,33 +451,50 @@
 <script>
 
     /* FILTER */
-    // Global search function - searches entire database
+    // Column search function - searches entire database
     let searchTimeout;
-    function handleGlobalSearch(event) {
+    function handleColumnSearch() {
         clearTimeout(searchTimeout);
-        const searchValue = event.target.value.trim();
         
         // Debounce: wait 500ms after user stops typing
         searchTimeout = setTimeout(() => {
-            if (searchValue.length > 0 || searchValue.length === 0) {
-                // Redirect to same page with search parameter
-                const url = new URL(window.location.href);
-                if (searchValue.length > 0) {
-                    url.searchParams.set('search', searchValue);
-                } else {
-                    url.searchParams.delete('search');
-                }
-                url.searchParams.set('page', '1'); // Reset to first page on search
-                window.location.href = url.toString();
-            }
+            const url = new URL(window.location.href);
+            
+            // Get all search values
+            const searchId = document.getElementById('search_id').value.trim();
+            const searchName = document.getElementById('search_name').value.trim();
+            const searchEmail = document.getElementById('search_email').value.trim();
+            const searchPhone = document.getElementById('search_phone').value.trim();
+            const searchAge = document.getElementById('search_age').value.trim();
+            const searchGender = document.getElementById('search_gender').value.trim();
+            const searchActualStart = document.getElementById('search_actual_start').value.trim();
+            const searchStartDate = document.getElementById('search_start_date').value.trim();
+            const searchEndDate = document.getElementById('search_end_date').value.trim();
+            const searchPackage = document.getElementById('search_package').value.trim();
+            const searchFees = document.getElementById('search_fees').value.trim();
+            const searchStatus = document.getElementById('search_status').value.trim();
+            const searchInvitations = document.getElementById('search_invitations').value.trim();
+            const searchComment = document.getElementById('search_comment').value.trim();
+            
+            // Set or remove search parameters
+            if (searchId) url.searchParams.set('search_id', searchId); else url.searchParams.delete('search_id');
+            if (searchName) url.searchParams.set('search_name', searchName); else url.searchParams.delete('search_name');
+            if (searchEmail) url.searchParams.set('search_email', searchEmail); else url.searchParams.delete('search_email');
+            if (searchPhone) url.searchParams.set('search_phone', searchPhone); else url.searchParams.delete('search_phone');
+            if (searchAge) url.searchParams.set('search_age', searchAge); else url.searchParams.delete('search_age');
+            if (searchGender) url.searchParams.set('search_gender', searchGender); else url.searchParams.delete('search_gender');
+            if (searchActualStart) url.searchParams.set('search_actual_start', searchActualStart); else url.searchParams.delete('search_actual_start');
+            if (searchStartDate) url.searchParams.set('search_start_date', searchStartDate); else url.searchParams.delete('search_start_date');
+            if (searchEndDate) url.searchParams.set('search_end_date', searchEndDate); else url.searchParams.delete('search_end_date');
+            if (searchPackage) url.searchParams.set('search_package', searchPackage); else url.searchParams.delete('search_package');
+            if (searchFees) url.searchParams.set('search_fees', searchFees); else url.searchParams.delete('search_fees');
+            if (searchStatus) url.searchParams.set('search_status', searchStatus); else url.searchParams.delete('search_status');
+            if (searchInvitations) url.searchParams.set('search_invitations', searchInvitations); else url.searchParams.delete('search_invitations');
+            if (searchComment) url.searchParams.set('search_comment', searchComment); else url.searchParams.delete('search_comment');
+            
+            url.searchParams.set('page', '1'); // Reset to first page on search
+            window.location.href = url.toString();
         }, 500);
-    }
-    
-    function clearSearch() {
-        const url = new URL(window.location.href);
-        url.searchParams.delete('search');
-        url.searchParams.set('page', '1');
-        window.location.href = url.toString();
     }
 
     /* SORT */
