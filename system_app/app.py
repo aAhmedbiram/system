@@ -1388,8 +1388,27 @@ def logs():
 def undo_page():
     """Display all undoable actions"""
     try:
+        import json
         actions = get_undoable_actions(limit=200)
-        return render_template('undo.html', actions=actions or [])
+        # Parse action_data for each action to make it accessible in template
+        parsed_actions = []
+        for action in (actions or []):
+            action_dict = dict(action) if hasattr(action, 'keys') else action
+            action_data_raw = action_dict.get('action_data')
+            if action_data_raw:
+                if isinstance(action_data_raw, dict):
+                    action_dict['action_data'] = action_data_raw
+                elif isinstance(action_data_raw, str):
+                    try:
+                        action_dict['action_data'] = json.loads(action_data_raw)
+                    except:
+                        action_dict['action_data'] = {}
+                else:
+                    action_dict['action_data'] = {}
+            else:
+                action_dict['action_data'] = {}
+            parsed_actions.append(action_dict)
+        return render_template('undo.html', actions=parsed_actions)
     except Exception as e:
         print(f"Error in undo_page route: {e}")
         import traceback

@@ -212,6 +212,62 @@
                             <div class="action-details">
                                 <strong>Performed by:</strong> {{ action.performed_by or 'Unknown' }}
                             </div>
+                            <div class="action-details" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #444;">
+                                <strong style="color: #ff9800;">What will be undone:</strong>
+                                <div style="margin-top: 5px; color: #ccc; font-size: 13px; line-height: 1.6;">
+                                    {% set action_data = action.action_data or {} %}
+                                    {% if action.action_type == 'delete_member' %}
+                                        Will restore the deleted member with all their information:
+                                        <ul style="margin: 5px 0; padding-left: 20px;">
+                                            <li>Name: {{ action_data.get('name', 'N/A') }}</li>
+                                            <li>Email: {{ action_data.get('email', 'N/A') }}</li>
+                                            <li>Phone: {{ action_data.get('phone', 'N/A') }}</li>
+                                            <li>Package: {{ action_data.get('membership_packages', 'N/A') }}</li>
+                                            <li>Status: {{ action_data.get('membership_status', 'N/A') }}</li>
+                                        </ul>
+                                    {% elif action.action_type == 'add_member' %}
+                                        Will remove the newly added member:
+                                        <ul style="margin: 5px 0; padding-left: 20px;">
+                                            <li>Name: {{ action_data.get('name', 'N/A') }}</li>
+                                            <li>Email: {{ action_data.get('email', 'N/A') }}</li>
+                                            <li>Package: {{ action_data.get('membership_packages', 'N/A') }}</li>
+                                        </ul>
+                                    {% elif action.action_type == 'use_freeze' %}
+                                        Will restore freeze:
+                                        <ul style="margin: 5px 0; padding-left: 20px;">
+                                            <li>End date: {{ action_data.get('new_end_date', 'N/A') }} → {{ action_data.get('old_end_date', 'N/A') }}</li>
+                                            <li>Freeze days used: {{ action_data.get('freeze_days', 'N/A') }} days</li>
+                                            <li>Freeze status: Will be reset to unused</li>
+                                        </ul>
+                                    {% elif action.action_type == 'edit_member' %}
+                                        Will restore all member fields to their previous values before the edit:
+                                        <ul style="margin: 5px 0; padding-left: 20px;">
+                                            {% set old_values = action_data.get('old_values', {}) %}
+                                            <li>Name: {{ old_values.get('name', 'N/A') }}</li>
+                                            <li>Email: {{ old_values.get('email', 'N/A') }}</li>
+                                            <li>Phone: {{ old_values.get('phone', 'N/A') }}</li>
+                                            <li>Package: {{ old_values.get('membership_packages', 'N/A') }}</li>
+                                            <li>Fees: {{ old_values.get('membership_fees', 'N/A') }}</li>
+                                            <li>Status: {{ old_values.get('membership_status', 'N/A') }}</li>
+                                        </ul>
+                                    {% elif action.action_type == 'add_attendance' %}
+                                        Will remove attendance record:
+                                        <ul style="margin: 5px 0; padding-left: 20px;">
+                                            <li>Date: {{ action_data.get('attendance_date', 'N/A') }}</li>
+                                            <li>Time: {{ action_data.get('attendance_time', 'N/A') }}</li>
+                                        </ul>
+                                    {% elif action.action_type == 'use_invitation' %}
+                                        Will restore invitation:
+                                        <ul style="margin: 5px 0; padding-left: 20px;">
+                                            <li>Friend name: {{ action_data.get('friend_name', 'N/A') }}</li>
+                                            <li>Friend phone: {{ action_data.get('friend_phone', 'N/A') }}</li>
+                                            <li>Invitation count: {{ (action_data.get('old_invitations', 0) - 1) }} → {{ action_data.get('old_invitations', 0) }}</li>
+                                        </ul>
+                                    {% else %}
+                                        Will reverse this action
+                                    {% endif %}
+                                </div>
+                            </div>
                             <div class="action-time">
                                 {{ action.action_time.strftime('%Y-%m-%d %H:%M:%S') if action.action_time else 'Unknown time' }}
                             </div>
