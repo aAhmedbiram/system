@@ -819,17 +819,94 @@ def edit_member(member_id):
                 # Log the edit action for undo
                 log_action('edit_member', member_id=member_id, member_name=old_member_dict.get('name'),
                           action_data={'old_values': old_member_dict}, performed_by=username)
-
-            update_member(member_id,
-                name=name, email=email, phone=phone, age=age, gender=gender,
-                birthdate=birthdate, actual_starting_date=actual_starting_date,
-                starting_date=starting_date, end_date=end_date,
-                membership_packages=f"{numeric_value} {unit}",
-                membership_fees=fees, membership_status=status,
-                invitations=invitations, comment=comment,
-                edited_by=username
-            )
-            flash("Member updated successfully!", "success")
+                
+                # Check if member is reactivating (start_date or end_date changed to extend membership)
+                # If freeze was used, reset it so they can use it again
+                from datetime import datetime
+                should_reset_freeze = False
+                
+                # Check if starting_date changed (reactivation)
+                old_starting_date = old_member_dict.get('starting_date', '')
+                if starting_date and old_starting_date:
+                    try:
+                        # Normalize dates for comparison
+                        old_starting_normalized = format_date_for_input(old_starting_date)
+                        new_starting_normalized = starting_date if starting_date else ''
+                        
+                        if new_starting_normalized and old_starting_normalized and new_starting_normalized != old_starting_normalized:
+                            # Starting date changed - this is a reactivation
+                            should_reset_freeze = True
+                    except Exception as e:
+                        print(f"Error comparing starting dates: {e}")
+                
+                # Check if end_date changed to a future date (reactivation)
+                old_end_date = old_member_dict.get('end_date', '')
+                if end_date and old_end_date:
+                    try:
+                        # Try to parse dates
+                        date_formats = [
+                            '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y',
+                            '%m-%d-%Y', '%d-%m-%Y', '%Y/%m/%d'
+                        ]
+                        
+                        old_end_parsed = None
+                        new_end_parsed = None
+                        
+                        for fmt in date_formats:
+                            try:
+                                if old_end_date:
+                                    old_end_parsed = datetime.strptime(str(old_end_date).strip()[:10], fmt).date()
+                                if end_date:
+                                    new_end_parsed = datetime.strptime(str(end_date).strip()[:10], fmt).date()
+                                break
+                            except (ValueError, IndexError):
+                                continue
+                        
+                        # If new end_date is in the future and different from old, it's a reactivation
+                        if new_end_parsed and old_end_parsed:
+                            today = datetime.now().date()
+                            if new_end_parsed > old_end_parsed and new_end_parsed > today:
+                                should_reset_freeze = True
+                        elif new_end_parsed:
+                            # New end date exists and old didn't, check if it's in future
+                            today = datetime.now().date()
+                            if new_end_parsed > today:
+                                should_reset_freeze = True
+                    except Exception as e:
+                        print(f"Error comparing end dates: {e}")
+                
+                # Prepare update parameters
+                update_params = {
+                    'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
+                    'birthdate': birthdate, 'actual_starting_date': actual_starting_date,
+                    'starting_date': starting_date, 'end_date': end_date,
+                    'membership_packages': f"{numeric_value} {unit}",
+                    'membership_fees': fees, 'membership_status': status,
+                    'invitations': invitations, 'comment': comment,
+                    'edited_by': username
+                }
+                
+                # Reset freeze_used if member is reactivating and had used freeze
+                if should_reset_freeze and old_member_dict.get('freeze_used'):
+                    update_params['freeze_used'] = False
+                    flash("Member updated successfully! Freeze has been reset due to membership reactivation.", "success")
+                
+                update_member(member_id, **update_params)
+                
+                if 'freeze_used' not in update_params:
+                    flash("Member updated successfully!", "success")
+            else:
+                # Member not found, but try to update anyway
+                update_member(member_id,
+                    name=name, email=email, phone=phone, age=age, gender=gender,
+                    birthdate=birthdate, actual_starting_date=actual_starting_date,
+                    starting_date=starting_date, end_date=end_date,
+                    membership_packages=f"{numeric_value} {unit}",
+                    membership_fees=fees, membership_status=status,
+                    invitations=invitations, comment=comment,
+                    edited_by=username
+                )
+                flash("Member updated successfully!", "success")
         except Exception as e:
             flash(f"Error updating member: {str(e)}", "error")
         return redirect(url_for("index"))
