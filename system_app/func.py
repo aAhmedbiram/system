@@ -32,12 +32,12 @@ def calculate_end_date(start_date, duration_str):
 def membership_fees(package_name):
     """Returns price as float always"""
     fees_map = {
-        "1 Month": 350.0,
-        "2 Months": 600.0,
-        "3 Months": 800.0,
-        "4 Months": 1000.0,
-        "6 Months": 1400.0,
-        "12 Months": 2400.0
+        "1 Month": 500.0,
+        "2 Months": 800.0,
+        "3 Months": 1200.0,
+        "4 Months": 1200.0,
+        "6 Months": 2000.0,
+        "12 Months": 3000.0
     }
     return fees_map.get(package_name.strip(), 0.0)  # 0.0 if not found
 
