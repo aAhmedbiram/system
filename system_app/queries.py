@@ -249,6 +249,19 @@ def create_table():
                 recorded_by TEXT
             )
         ''')
+        
+        # Create renewal_logs table to track membership renewals
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS renewal_logs (
+                id SERIAL PRIMARY KEY,
+                member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+                package_name TEXT NOT NULL,
+                renewal_date DATE NOT NULL,
+                renewal_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                fees REAL NOT NULL,
+                edited_by TEXT
+            )
+        ''')
 
         # Create indexes for better query performance
         try:
@@ -839,6 +852,86 @@ def get_member_invitations(member_id):
         WHERE member_id = %s 
         ORDER BY id ASC
     ''', (member_id,))
+
+
+def log_renewal(member_id, package_name, renewal_date, fees, edited_by=None):
+    """Log a membership renewal when start_date is edited"""
+    try:
+        from datetime import datetime
+        # Parse renewal_date to ensure it's a date
+        if isinstance(renewal_date, str):
+            # Try to parse various date formats
+            date_formats = [
+                '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y',
+                '%m-%d-%Y', '%d-%m-%Y', '%Y/%m/%d'
+            ]
+            renewal_date_parsed = None
+            for fmt in date_formats:
+                try:
+                    renewal_date_parsed = datetime.strptime(renewal_date.strip()[:10], fmt).date()
+                    break
+                except (ValueError, IndexError):
+                    continue
+            if renewal_date_parsed:
+                renewal_date = renewal_date_parsed
+            else:
+                print(f"Warning: Could not parse renewal_date: {renewal_date}")
+                return False
+        
+        query_db('''
+            INSERT INTO renewal_logs (member_id, package_name, renewal_date, fees, edited_by)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (member_id, package_name, renewal_date, fees, edited_by), commit=True)
+        return True
+    except Exception as e:
+        print(f"Error logging renewal: {e}")
+        return False
+
+
+def get_renewal_logs():
+    """Get all renewal logs ordered by renewal_date"""
+    return query_db(
+        'SELECT * FROM renewal_logs ORDER BY renewal_date DESC, renewal_time DESC',
+        ()
+    )
+
+
+def get_daily_totals():
+    """Get daily income totals from renewals"""
+    try:
+        return query_db('''
+            SELECT 
+                renewal_date::date as date,
+                SUM(fees) as sum
+            FROM renewal_logs
+            GROUP BY renewal_date::date
+            ORDER BY renewal_date::date DESC
+        ''', ())
+    except Exception as e:
+        print(f"Error getting daily totals: {e}")
+        return []
+
+
+def get_monthly_total(year=None, month=None):
+    """Get total income for a specific month"""
+    try:
+        from datetime import datetime
+        if not year or not month:
+            now = datetime.now()
+            year = now.year
+            month = now.month
+        
+        result = query_db('''
+            SELECT SUM(fees) as total
+            FROM renewal_logs
+            WHERE EXTRACT(YEAR FROM renewal_date) = %s
+            AND EXTRACT(MONTH FROM renewal_date) = %s
+        ''', (year, month), one=True)
+        
+        return result.get('total', 0) if result else 0
+    except Exception as e:
+        print(f"Error getting monthly total: {e}")
+        return 0
 
 
 # === Supplement/Product Management Functions ===

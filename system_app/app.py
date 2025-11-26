@@ -135,7 +135,8 @@ from .queries import (
     add_supplement, get_supplement, get_all_supplements, update_supplement, delete_supplement,
     add_supplement_sale, get_supplement_sales, get_supplement_statistics,
     add_staff, get_staff, get_all_staff, update_staff, delete_staff,
-    add_staff_purchase, get_staff_purchases, get_staff_statistics
+    add_staff_purchase, get_staff_purchases, get_staff_statistics,
+    log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total
 )
 from .queries import delete_all_data as delete_all_data_from_db
 
@@ -836,6 +837,17 @@ def edit_member(member_id):
                         if new_starting_normalized and old_starting_normalized and new_starting_normalized != old_starting_normalized:
                             # Starting date changed - this is a reactivation
                             should_reset_freeze = True
+                            
+                            # Log the renewal
+                            package_name = f"{numeric_value} {unit}".strip()
+                            if package_name:
+                                log_renewal(
+                                    member_id=member_id,
+                                    package_name=package_name,
+                                    renewal_date=starting_date,
+                                    fees=fees,
+                                    edited_by=username
+                                )
                     except Exception as e:
                         print(f"Error comparing starting dates: {e}")
                 
@@ -1541,6 +1553,42 @@ def invitations():
         traceback.print_exc()
         flash(f"Error loading invitations: {str(e)}", "error")
         return render_template('invitations.html', invitations_data=[], members_data=[], page=1, total_pages=1, total_count=0)
+
+@app.route('/renewal_log')
+@login_required
+def renewal_log():
+    """Display renewal log with daily and monthly totals"""
+    try:
+        from datetime import datetime
+        
+        # Get all renewal logs
+        renewal_logs = get_renewal_logs() or []
+        
+        # Get daily totals
+        daily_totals = get_daily_totals() or []
+        
+        # Get current month total
+        now = datetime.now()
+        monthly_total = get_monthly_total(now.year, now.month)
+        
+        # Calculate total membership (all time)
+        total_membership = sum([log.get('fees', 0) or 0 for log in renewal_logs])
+        
+        return render_template('renewal_log.html',
+                             renewal_logs=renewal_logs,
+                             daily_totals=daily_totals,
+                             monthly_total=monthly_total,
+                             total_membership=total_membership)
+    except Exception as e:
+        print(f"Error in renewal_log route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading renewal log: {str(e)}", "error")
+        return render_template('renewal_log.html',
+                             renewal_logs=[],
+                             daily_totals=[],
+                             monthly_total=0,
+                             total_membership=0)
 
 @app.route('/logs')
 @login_required

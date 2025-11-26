@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renewal Log - Rival Gym System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #fff;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        .index-btn {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .index-btn:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+
+        .summary-box {
+            background: rgba(34, 34, 34, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            margin-bottom: 30px;
+            display: inline-block;
+            margin-right: 20px;
+            min-width: 200px;
+        }
+
+        .summary-box h3 {
+            color: #4caf50;
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+
+        .summary-box .value {
+            color: #ffd43b;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .table-container {
+            max-height: 60vh;
+            border: 1px solid #444;
+            overflow-y: auto;
+            overflow-x: auto;
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #222;
+            min-width: 600px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #444;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+            color: #4caf50;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+
+        tr:hover {
+            background-color: #333;
+        }
+
+        .highlight {
+            background-color: #ffd43b !important;
+            color: #000;
+        }
+
+        h2 {
+            color: #4caf50;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .flash-message {
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 700px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(46, 125, 50, 0.95);
+            color: white;
+            border: 1px solid #4caf50;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        .flash-message.error {
+            background: rgba(198, 40, 40, 0.95);
+            border-color: #e53935;
+        }
+    </style>
+</head>
+<body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ category }}">
+            {{ message | safe }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <header>
+        <h1>Rival Gym System - Renewal Log</h1>
+    </header>
+
+    <section>
+        <a href="{{ url_for('index') }}" class="index-btn">← Back to Home</a>
+
+        <div class="summary-box">
+            <h3>Total Membership</h3>
+            <div class="value">${{ "%.2f"|format(total_membership) }}</div>
+        </div>
+
+        <div class="summary-box">
+            <h3>Total Month</h3>
+            <div class="value">${{ "%.2f"|format(monthly_total) }}</div>
+        </div>
+
+        <h2>Renewal Log</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Member ID</th>
+                        <th>Package Name</th>
+                        <th>Start Date</th>
+                        <th>Fees</th>
+                        <th>Renewal Time</th>
+                        <th>Edited By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if renewal_logs %}
+                        {% for log in renewal_logs %}
+                        <tr>
+                            <td>{{ log.id }}</td>
+                            <td>{{ log.member_id }}</td>
+                            <td>{{ log.package_name }}</td>
+                            <td>
+                                {% if log.renewal_date %}
+                                    {% if log.renewal_date is string %}
+                                        {{ log.renewal_date }}
+                                    {% else %}
+                                        {{ log.renewal_date.strftime('%m/%d/%Y') }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>${{ "%.2f"|format(log.fees or 0) }}</td>
+                            <td>
+                                {% if log.renewal_time %}
+                                    {% if log.renewal_time is string %}
+                                        {{ log.renewal_time }}
+                                    {% else %}
+                                        {{ log.renewal_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>{{ log.edited_by or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: #888;">No renewal logs found</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Total Every Day</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Total every day</th>
+                        <th>Sum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if daily_totals %}
+                        {% for daily in daily_totals %}
+                        <tr>
+                            <td>
+                                {% if daily.date %}
+                                    {% if daily.date is string %}
+                                        {{ daily.date }}
+                                    {% else %}
+                                        {{ daily.date.strftime('%m/%d/%Y') }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if daily.sum %}
+                                    ${{ "%.2f"|format(daily.sum) }}
+                                {% else %}
+                                    #N/A
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="2" style="text-align: center; color: #888;">No daily totals found</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</body>
+</html>
+
