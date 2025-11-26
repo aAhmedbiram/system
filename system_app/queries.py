@@ -143,6 +143,31 @@ def create_table():
                 edit_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Create action_logs table for undo functionality
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS action_logs (
+                id SERIAL PRIMARY KEY,
+                action_type TEXT NOT NULL,
+                member_id INTEGER,
+                member_name TEXT,
+                action_data JSONB,
+                performed_by TEXT,
+                action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                undone BOOLEAN DEFAULT FALSE,
+                undo_time TIMESTAMP
+            )
+        ''')
+        
+        # Add undone column if it doesn't exist (for existing databases)
+        try:
+            cr.execute('ALTER TABLE action_logs ADD COLUMN IF NOT EXISTS undone BOOLEAN DEFAULT FALSE')
+        except:
+            pass
+        try:
+            cr.execute('ALTER TABLE action_logs ADD COLUMN IF NOT EXISTS undo_time TIMESTAMP')
+        except:
+            pass
 
         cr.execute('''
             CREATE TABLE IF NOT EXISTS invitations (
@@ -177,6 +202,11 @@ def create_table():
             # Indexes for invitations table
             cr.execute('CREATE INDEX IF NOT EXISTS idx_invitations_member_id ON invitations(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_invitations_used_date ON invitations(used_date)')
+            
+            # Indexes for action_logs table
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_member_id ON action_logs(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_action_time ON action_logs(action_time)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_undone ON action_logs(undone)')
             
             conn.commit()
             print("PostgreSQL tables and indexes created successfully!")
@@ -578,6 +608,63 @@ def get_all_logs():
         SELECT * FROM member_logs 
         ORDER BY id ASC
     ''')
+
+
+# === Action Logging for Undo ===
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
+def log_action(action_type, member_id=None, member_name=None, action_data=None, performed_by=None):
+    """Log an action for undo functionality"""
+    try:
+        action_data_json = json.dumps(action_data) if action_data else None
+        query_db('''
+            INSERT INTO action_logs 
+            (action_type, member_id, member_name, action_data, performed_by)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (action_type, member_id, member_name, action_data_json, performed_by), commit=True)
+    except Exception as e:
+        print(f"Error logging action: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def get_undoable_actions(limit=100):
+    """Get recent actions that can be undone"""
+    try:
+        return query_db('''
+            SELECT * FROM action_logs 
+            WHERE undone = FALSE
+            ORDER BY action_time DESC
+            LIMIT %s
+        ''', (limit,))
+    except Exception as e:
+        print(f"Error getting undoable actions: {e}")
+        return []
+
+
+def mark_action_undone(action_id):
+    """Mark an action as undone"""
+    try:
+        query_db('''
+            UPDATE action_logs 
+            SET undone = TRUE, undo_time = CURRENT_TIMESTAMP
+            WHERE id = %s
+        ''', (action_id,), commit=True)
+    except Exception as e:
+        print(f"Error marking action as undone: {e}")
+        raise
+
+
+def get_action_by_id(action_id):
+    """Get a specific action by ID"""
+    try:
+        return query_db('SELECT * FROM action_logs WHERE id = %s', (action_id,), one=True)
+    except Exception as e:
+        print(f"Error getting action: {e}")
+        return None
 
 
 # === Invitation functions ===

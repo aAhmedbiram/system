@@ -130,7 +130,7 @@ from .func import calculate_age, calculate_end_date, membership_fees, compare_da
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
-    add_attendance, get_all_logs, get_member_logs,
+    add_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
     use_invitation, get_all_invitations, get_member_invitations
 )
 from .queries import delete_all_data as delete_all_data_from_db
@@ -582,7 +582,7 @@ def add_member_route():
         new_member_id = (last_member['id'] + 1) if last_member else 1
 
         # --- 3. Add new member ---
-        add_member(
+        added_id = add_member(
             member_name, member_email, member_phone, member_age, member_gender,
             member_birthdate, member_actual_starting_date, member_starting_date,
             member_end_date, f"{numeric_value} {unit}", member_membership_fees,
@@ -590,6 +590,27 @@ def add_member_route():
             custom_id=new_member_id,
             invitations=member_invitations
         )
+        
+        # Log the addition action for undo
+        username = session.get('username', 'Unknown')
+        import json
+        member_data = {
+            'name': member_name,
+            'email': member_email,
+            'phone': member_phone,
+            'age': member_age,
+            'gender': member_gender,
+            'birthdate': member_birthdate,
+            'actual_starting_date': member_actual_starting_date,
+            'starting_date': member_starting_date,
+            'end_date': member_end_date,
+            'membership_packages': f"{numeric_value} {unit}",
+            'membership_fees': member_membership_fees,
+            'membership_status': member_membership_status,
+            'invitations': member_invitations
+        }
+        log_action('add_member', member_id=added_id, member_name=member_name,
+                  action_data=member_data, performed_by=username)
 
         # --- Format date ---
         formatted_date = ""
@@ -772,6 +793,14 @@ def delete_member_route(member_id):
             return redirect(url_for("all_members"))
         
         member_name = member.get('name', 'Unknown')
+        username = session.get('username', 'Unknown')
+        
+        # Log the deletion action for undo
+        import json
+        member_data = dict(member)  # Convert to dict for JSON serialization
+        log_action('delete_member', member_id=member_id, member_name=member_name, 
+                  action_data=member_data, performed_by=username)
+        
         delete_member(member_id)
         flash(f"Member {member_name} (ID: {member_id}) deleted successfully!", "success")
     except Exception as e:
@@ -879,6 +908,13 @@ def use_freeze(member_id):
         # Add freeze period to end_date
         new_end_date = end_date + timedelta(days=freeze_days)
         new_end_date_str = new_end_date.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Log the freeze action for undo
+        username = session.get('username', 'Unknown')
+        log_action('use_freeze', member_id=member_id, member_name=member['name'],
+                  action_data={'old_end_date': end_date_str, 'new_end_date': new_end_date_str, 
+                              'freeze_days': freeze_days, 'package': package},
+                  performed_by=username)
         
         # Update member: extend end_date and mark freeze as used
         query_db(
@@ -1305,6 +1341,99 @@ def logs():
         flash(f"Error loading logs: {str(e)}", "error")
         return render_template('logs.html', logs_data=[], member_id=None, member_name=None, page=1, total_pages=1, total_count=0)
 
+
+@app.route('/undo')
+@rino_required
+def undo_page():
+    """Display all undoable actions"""
+    try:
+        actions = get_undoable_actions(limit=200)
+        return render_template('undo.html', actions=actions or [])
+    except Exception as e:
+        print(f"Error in undo_page route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading undo page: {str(e)}", "error")
+        return render_template('undo.html', actions=[])
+
+
+@app.route('/undo_action/<int:action_id>', methods=['POST'])
+@rino_required
+def undo_action(action_id):
+    """Undo a specific action"""
+    try:
+        import json
+        action = get_action_by_id(action_id)
+        if not action:
+            flash("Action not found!", "error")
+            return redirect(url_for('undo_page'))
+        
+        if action.get('undone'):
+            flash("This action has already been undone!", "error")
+            return redirect(url_for('undo_page'))
+        
+        action_type = action.get('action_type')
+        action_data = json.loads(action.get('action_data') or '{}')
+        member_id = action.get('member_id')
+        member_name = action.get('member_name', 'Unknown')
+        
+        if action_type == 'delete_member':
+            # Restore deleted member
+            member_data = action_data
+            add_member(
+                member_data.get('name'),
+                member_data.get('email'),
+                member_data.get('phone'),
+                member_data.get('age'),
+                member_data.get('gender'),
+                member_data.get('birthdate'),
+                member_data.get('actual_starting_date'),
+                member_data.get('starting_date'),
+                member_data.get('end_date'),
+                member_data.get('membership_packages'),
+                member_data.get('membership_fees'),
+                member_data.get('membership_status'),
+                custom_id=member_id,
+                invitations=member_data.get('invitations', 0),
+                comment=member_data.get('comment')
+            )
+            flash(f"Member {member_name} (ID: {member_id}) restored successfully!", "success")
+        
+        elif action_type == 'use_freeze':
+            # Undo freeze: restore original end_date and set freeze_used to FALSE
+            old_end_date = action_data.get('old_end_date')
+            query_db(
+                'UPDATE members SET end_date = %s, freeze_used = FALSE WHERE id = %s',
+                (old_end_date, member_id),
+                commit=True
+            )
+            flash(f"Freeze undone for {member_name}. End date restored to {old_end_date}.", "success")
+        
+        elif action_type == 'add_member':
+            # Delete the added member
+            delete_member(member_id)
+            flash(f"Member {member_name} (ID: {member_id}) removed successfully!", "success")
+        
+        elif action_type == 'edit_member':
+            # This is more complex - we'd need to restore old values from member_logs
+            # For now, just show a message
+            flash("Member edit undo is complex. Please manually edit the member to restore values.", "info")
+            return redirect(url_for('undo_page'))
+        
+        else:
+            flash(f"Unknown action type: {action_type}", "error")
+            return redirect(url_for('undo_page'))
+        
+        # Mark action as undone
+        mark_action_undone(action_id)
+        return redirect(url_for('undo_page'))
+        
+    except Exception as e:
+        print(f"Error in undo_action route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error undoing action: {str(e)}", "error")
+        return redirect(url_for('undo_page'))
 
 
 @app.route('/data_management', methods=['GET', 'POST'])

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undo Actions - Rival Gym System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #fff;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        .index-btn {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .index-btn:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+
+        .actions-container {
+            background: rgba(34, 34, 34, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            margin: 20px auto;
+            max-width: 1400px;
+        }
+
+        .action-item {
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .action-item:hover {
+            background: #2a2a2a;
+            border-color: #4caf50;
+        }
+
+        .action-info {
+            flex: 1;
+        }
+
+        .action-type {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4caf50;
+            margin-bottom: 8px;
+        }
+
+        .action-details {
+            color: #ccc;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .action-time {
+            color: #888;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .undo-btn {
+            background-color: #ff9800;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-left: 20px;
+        }
+
+        .undo-btn:hover {
+            background-color: #ffb74d;
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.4);
+        }
+
+        .undo-btn:disabled {
+            background-color: #666;
+            color: #999;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .no-actions {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+            font-size: 18px;
+        }
+
+        .flash-messages {
+            margin: 20px;
+        }
+
+        .flash-message {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .flash-success {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .flash-error {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .flash-info {
+            background-color: #2196F3;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Rival Gym System - Undo Actions</h1>
+    </header>
+
+    <section>
+        <a class="index-btn" href="{{ url_for('index') }}">Home</a>
+
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="actions-container">
+            {% if actions %}
+                {% for action in actions %}
+                    <div class="action-item">
+                        <div class="action-info">
+                            <div class="action-type">
+                                {% if action.action_type == 'delete_member' %}
+                                    🗑️ Deleted Member
+                                {% elif action.action_type == 'add_member' %}
+                                    ➕ Added Member
+                                {% elif action.action_type == 'use_freeze' %}
+                                    ❄️ Used Freeze
+                                {% elif action.action_type == 'edit_member' %}
+                                    ✏️ Edited Member
+                                {% else %}
+                                    {{ action.action_type }}
+                                {% endif %}
+                            </div>
+                            <div class="action-details">
+                                <strong>Member:</strong> {{ action.member_name or 'N/A' }}
+                                {% if action.member_id %}
+                                    (ID: {{ action.member_id }})
+                                {% endif %}
+                            </div>
+                            <div class="action-details">
+                                <strong>Performed by:</strong> {{ action.performed_by or 'Unknown' }}
+                            </div>
+                            <div class="action-time">
+                                {{ action.action_time.strftime('%Y-%m-%d %H:%M:%S') if action.action_time else 'Unknown time' }}
+                            </div>
+                        </div>
+                        <form method="POST" action="{{ url_for('undo_action', action_id=action.id) }}" 
+                              onsubmit="return confirm('Are you sure you want to undo this action? This cannot be undone!');" 
+                              style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> 
+                            <button type="submit" class="undo-btn">Undo</button>
+                        </form>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-actions">
+                    No undoable actions found. All actions have been undone or no actions have been performed yet.
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</body>
+</html>
+
