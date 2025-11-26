@@ -1373,7 +1373,16 @@ def undo_action(action_id):
             return redirect(url_for('undo_page'))
         
         action_type = action.get('action_type')
-        action_data = json.loads(action.get('action_data') or '{}')
+        # Handle action_data - it might be a dict (from JSONB) or a string
+        action_data_raw = action.get('action_data')
+        if action_data_raw is None:
+            action_data = {}
+        elif isinstance(action_data_raw, dict):
+            action_data = action_data_raw
+        elif isinstance(action_data_raw, str):
+            action_data = json.loads(action_data_raw)
+        else:
+            action_data = {}
         member_id = action.get('member_id')
         member_name = action.get('member_name', 'Unknown')
         
