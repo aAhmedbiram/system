@@ -1081,11 +1081,7 @@ def edit_member(member_id):
                 else:
                     flash("Member updated successfully!", "success")
                 
-                # Redirect to invoice if renewal invoice was created
-                if renewal_invoice_id:
-                    return redirect(url_for('view_invoice', invoice_id=renewal_invoice_id))
-                else:
-                    return redirect(url_for("index"))
+                return redirect(url_for("index"))
             else:
                 # Member not found, but try to update anyway
                 update_member(member_id,
