@@ -73,6 +73,12 @@ def create_table():
         except:
             pass
         
+        # Add freeze_used column if it doesn't exist (for existing databases)
+        try:
+            cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS freeze_used BOOLEAN DEFAULT FALSE')
+        except:
+            pass
+        
         # Add email verification columns to users table if they don't exist
         try:
             cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE')

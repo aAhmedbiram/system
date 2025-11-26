@@ -116,8 +116,9 @@
         th:nth-child(12), td:nth-child(12) { width: 80px; } /* Status */
         th:nth-child(13), td:nth-child(13) { width: 100px; } /* Invitations */
         th:nth-child(14), td:nth-child(14) { width: 200px; min-width: 200px; } /* Comment */
-        th:nth-child(15), td:nth-child(15) { width: 100px; } /* Edit */
-        th:nth-child(16), td:nth-child(16) { width: 100px; } /* Delete */
+        th:nth-child(15), td:nth-child(15) { width: 120px; } /* Freeze */
+        th:nth-child(16), td:nth-child(16) { width: 100px; } /* Edit */
+        th:nth-child(17), td:nth-child(17) { width: 100px; } /* Delete */
 
         th {
             background-color: #333;
@@ -192,6 +193,40 @@
             transform: scale(1.05);
             text-decoration: none;
             box-shadow: 0 4px 8px rgba(229, 57, 53, 0.4);
+        }
+
+        .freeze-link {
+            background-color: #ff9800;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .freeze-link:hover:not(:disabled) {
+            background-color: #ffb74d;
+            transform: scale(1.05);
+            text-decoration: none;
+            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.4);
+        }
+
+        .freeze-link:disabled {
+            background-color: #666;
+            color: #999;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .freeze-used {
+            color: #999;
+            font-size: 12px;
+            font-style: italic;
         }
 
         .pagination {
@@ -272,6 +307,7 @@
         <th onclick="sortTable(11)">Status ▲▼</th>
         <th onclick="sortTable(12)">Invitations ▲▼</th>
         <th onclick="sortTable(13)">Comment ▲▼</th>
+        <th>Freeze</th>
         <th>Edit</th>
         <th>Delete</th>
     </tr>
@@ -281,6 +317,7 @@
         {% for i in range(14) %}
             <th><input type="text" onkeyup="filterTable({{i}})" placeholder="Search"></th>
         {% endfor %}
+        <th></th>
         <th></th>
         <th></th>
     </tr>
@@ -303,6 +340,40 @@
         <td>{{ member.membership_status }}</td>
         <td style="color: #ffd43b; font-weight: bold;">{{ member.invitations or 0 }}</td>
         <td class="comment-cell">{{ member.comment or '-' }}</td>
+        <td>
+            {% set package = (member.membership_packages or '').strip() %}
+            {% set package_lower = package.lower() %}
+            {% set has_freeze = False %}
+            {% set freeze_days = 0 %}
+            
+            {# Check package formats: "1 Month", "2 Months", "3 Months", "4 Months", "6 Months", "12 Months" #}
+            {% if '3 month' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 7 %}
+            {% elif '4 month' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 7 %}
+            {% elif '6 month' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 14 %}
+            {% elif '12 month' in package_lower or '1 year' in package_lower or 'year' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 30 %}
+            {% endif %}
+            
+            {% if member.freeze_used %}
+                <span class="freeze-used">Used</span>
+            {% elif has_freeze %}
+                <form method="POST" action="{{ url_for('use_freeze', member_id=member.id) }}" 
+                      onsubmit="return confirm('Are you sure you want to use freeze for {{ member.name }}? This will extend the membership by {{ freeze_days }} days and cannot be undone!');" 
+                      style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> 
+                    <button type="submit" class="freeze-link" style="border: none; cursor: pointer;">Use Freeze</button>
+                </form>
+            {% else %}
+                <span class="freeze-used">N/A</span>
+            {% endif %}
+        </td>
         <td><a class="edit-link"
                 href="{{ url_for('edit_member', member_id=member.id) }}">Edit</a></td>
         <td>

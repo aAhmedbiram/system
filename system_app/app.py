@@ -781,6 +781,122 @@ def delete_member_route(member_id):
         flash(f"Error deleting member: {str(e)}", "error")
     return redirect(url_for("all_members"))
 
+def calculate_freeze_period(package):
+    """Calculate freeze period in days based on membership package"""
+    if not package:
+        return 0
+    
+    package_lower = str(package).lower().strip()
+    
+    # Extract number of months from package string
+    import re
+    month_match = re.search(r'(\d+)\s*(?:month|months|m)', package_lower)
+    if month_match:
+        months = int(month_match.group(1))
+    else:
+        # Check for year
+        year_match = re.search(r'(\d+)\s*(?:year|years|y)', package_lower)
+        if year_match:
+            months = int(year_match.group(1)) * 12
+        else:
+            return 0
+    
+    # Freeze rules:
+    # 1 month = 0 days
+    # 2 months = 0 days
+    # 3 months = 1 week (7 days)
+    # 4 months = 1 week (7 days)
+    # 6 months = 2 weeks (14 days)
+    # 12 months = 1 month (30 days)
+    
+    if months == 1 or months == 2:
+        return 0
+    elif months == 3 or months == 4:
+        return 7  # 1 week
+    elif months == 6:
+        return 14  # 2 weeks
+    elif months == 12:
+        return 30  # 1 month
+    else:
+        return 0
+
+@app.route("/use_freeze/<int:member_id>", methods=["POST"])
+@login_required
+def use_freeze(member_id):
+    try:
+        member = get_member(member_id)
+        if not member:
+            flash("Member not found!", "error")
+            return redirect(url_for("all_members"))
+        
+        # Check if freeze already used
+        if member.get('freeze_used'):
+            flash(f"Freeze has already been used for {member['name']}.", "error")
+            return redirect(url_for("all_members"))
+        
+        # Calculate freeze period
+        package = member.get('membership_packages', '')
+        freeze_days = calculate_freeze_period(package)
+        
+        if freeze_days == 0:
+            flash(f"No freeze available for {member['name']} (package: {package}).", "error")
+            return redirect(url_for("all_members"))
+        
+        # Parse current end_date
+        end_date_str = member.get('end_date', '')
+        
+        if not end_date_str or end_date_str == 'None':
+            flash(f"No end date found for {member['name']}.", "error")
+            return redirect(url_for("all_members"))
+        
+        # Try to parse the date in various formats
+        end_date = None
+        date_formats = [
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M:%S.%f',
+            '%Y-%m-%d',
+            '%m/%d/%Y %H:%M:%S',
+            '%m/%d/%Y',
+            '%d/%m/%Y %H:%M:%S',
+            '%d/%m/%Y',
+            '%B %d, %Y',
+            '%b %d, %Y',
+            '%d %B %Y',
+            '%d %b %Y'
+        ]
+        
+        for fmt in date_formats:
+            try:
+                end_date = datetime.strptime(str(end_date_str).strip(), fmt)
+                break
+            except:
+                continue
+        
+        if not end_date:
+            flash(f"Could not parse end date '{end_date_str}' for {member['name']}. Please check the date format.", "error")
+            return redirect(url_for("all_members"))
+        
+        # Add freeze period to end_date
+        new_end_date = end_date + timedelta(days=freeze_days)
+        new_end_date_str = new_end_date.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Update member: extend end_date and mark freeze as used
+        query_db(
+            'UPDATE members SET end_date = %s, freeze_used = TRUE WHERE id = %s',
+            (new_end_date_str, member_id),
+            commit=True
+        )
+        
+        flash(f"Freeze applied successfully! {member['name']}'s membership extended by {freeze_days} days. New end date: {new_end_date.strftime('%Y-%m-%d')}.", "success")
+        return redirect(url_for("all_members"))
+        
+    except Exception as e:
+        print(f"Error in use_freeze route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error applying freeze: {str(e)}", "error")
+        return redirect(url_for("all_members"))
+
 @app.route("/show_member_data", methods=["POST"])
 @login_required
 def show_member_data():
