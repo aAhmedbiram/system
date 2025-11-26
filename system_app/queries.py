@@ -1049,3 +1049,184 @@ def get_supplement_statistics():
         stats['user_sales_today'] = []
     
     return stats
+
+
+# === Staff Management Functions ===
+def add_staff(name, role, phone=None, email=None, hire_date=None, status='active', notes=None):
+    """Add a new staff member"""
+    try:
+        result = query_db('''
+            INSERT INTO staff (name, role, phone, email, hire_date, status, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        ''', (name, role, phone, email, hire_date, status, notes), one=True, commit=True)
+        return result['id'] if result else None
+    except Exception as e:
+        print(f"Error adding staff: {e}")
+        raise e
+
+
+def get_staff(staff_id):
+    """Get a staff member by ID"""
+    try:
+        return query_db('SELECT * FROM staff WHERE id = %s', (staff_id,), one=True)
+    except Exception as e:
+        print(f"Error getting staff: {e}")
+        return None
+
+
+def get_all_staff():
+    """Get all staff members"""
+    try:
+        return query_db('SELECT * FROM staff ORDER BY name ASC')
+    except Exception as e:
+        print(f"Error getting all staff: {e}")
+        return []
+
+
+def update_staff(staff_id, **kwargs):
+    """Update staff fields"""
+    if not kwargs:
+        return
+    try:
+        from datetime import datetime
+        kwargs['updated_at'] = datetime.now()
+        fields = [f"{k} = %s" for k in kwargs.keys()]
+        values = list(kwargs.values()) + [staff_id]
+        query = f"UPDATE staff SET {', '.join(fields)} WHERE id = %s"
+        query_db(query, tuple(values), commit=True)
+    except Exception as e:
+        print(f"Error updating staff: {e}")
+        raise e
+
+
+def delete_staff(staff_id):
+    """Delete a staff member"""
+    try:
+        query_db('DELETE FROM staff WHERE id = %s', (staff_id,), commit=True)
+    except Exception as e:
+        print(f"Error deleting staff: {e}")
+        raise e
+
+
+def add_staff_purchase(staff_id, staff_name, supplement_id, supplement_name, quantity, unit_price, total_price, notes=None, recorded_by=None):
+    """Record a staff purchase"""
+    try:
+        query_db('''
+            INSERT INTO staff_purchases 
+            (staff_id, staff_name, supplement_id, supplement_name, quantity, unit_price, total_price, notes, recorded_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (staff_id, staff_name, supplement_id, supplement_name, quantity, unit_price, total_price, notes, recorded_by), commit=True)
+        
+        # Update stock quantity
+        if supplement_id:
+            query_db('''
+                UPDATE supplements 
+                SET stock_quantity = stock_quantity - %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            ''', (quantity, supplement_id), commit=True)
+    except Exception as e:
+        print(f"Error adding staff purchase: {e}")
+        raise e
+
+
+def get_staff_purchases(staff_id=None, limit=100):
+    """Get staff purchases"""
+    try:
+        if staff_id:
+            return query_db('''
+                SELECT * FROM staff_purchases 
+                WHERE staff_id = %s
+                ORDER BY purchase_date DESC 
+                LIMIT %s
+            ''', (staff_id, limit))
+        else:
+            return query_db('''
+                SELECT * FROM staff_purchases 
+                ORDER BY purchase_date DESC 
+                LIMIT %s
+            ''', (limit,))
+    except Exception as e:
+        print(f"Error getting staff purchases: {e}")
+        return []
+
+
+def get_staff_statistics():
+    """Get statistics for staff"""
+    stats = {}
+    
+    try:
+        # Total staff
+        total_staff = query_db('SELECT COUNT(*) as count FROM staff WHERE status = %s', ('active',), one=True)
+        stats['total_staff'] = total_staff['count'] if total_staff else 0
+    except Exception as e:
+        print(f"Error getting total staff: {e}")
+        stats['total_staff'] = 0
+    
+    try:
+        # Staff by role
+        staff_by_role = query_db('''
+            SELECT role, COUNT(*) as count 
+            FROM staff 
+            WHERE status = 'active'
+            GROUP BY role
+        ''')
+        stats['staff_by_role'] = staff_by_role or []
+    except Exception as e:
+        print(f"Error getting staff by role: {e}")
+        stats['staff_by_role'] = []
+    
+    try:
+        # Per-staff purchase statistics
+        staff_purchase_stats = query_db('''
+            SELECT 
+                s.id,
+                s.name,
+                s.role,
+                COALESCE(COUNT(sp.id), 0) as purchase_count,
+                COALESCE(SUM(sp.quantity), 0) as total_quantity,
+                COALESCE(SUM(sp.total_price), 0) as total_spent
+            FROM staff s
+            LEFT JOIN staff_purchases sp ON s.id = sp.staff_id
+            WHERE s.status = 'active'
+            GROUP BY s.id, s.name, s.role
+            ORDER BY total_spent DESC
+        ''')
+        stats['staff_purchase_stats'] = staff_purchase_stats or []
+    except Exception as e:
+        print(f"Error getting staff purchase stats: {e}")
+        stats['staff_purchase_stats'] = []
+    
+    try:
+        # Total staff purchases
+        total_staff_purchases = query_db('''
+            SELECT 
+                COALESCE(SUM(total_price), 0) as total,
+                COALESCE(COUNT(*), 0) as count,
+                COALESCE(SUM(quantity), 0) as total_quantity
+            FROM staff_purchases
+        ''', one=True)
+        stats['total_staff_purchases'] = float(total_staff_purchases['total']) if total_staff_purchases else 0
+        stats['total_staff_purchase_count'] = total_staff_purchases['count'] if total_staff_purchases else 0
+        stats['total_staff_purchase_quantity'] = total_staff_purchases['total_quantity'] if total_staff_purchases else 0
+    except Exception as e:
+        print(f"Error getting total staff purchases: {e}")
+        stats['total_staff_purchases'] = 0
+        stats['total_staff_purchase_count'] = 0
+        stats['total_staff_purchase_quantity'] = 0
+    
+    try:
+        # Staff purchases this month
+        from datetime import datetime
+        month_start = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+        month_staff_purchases = query_db('''
+            SELECT COALESCE(SUM(total_price), 0) as total 
+            FROM staff_purchases 
+            WHERE purchase_date::date >= %s
+        ''', (month_start,), one=True)
+        stats['month_staff_purchases'] = float(month_staff_purchases['total']) if month_staff_purchases else 0
+    except Exception as e:
+        print(f"Error getting month staff purchases: {e}")
+        stats['month_staff_purchases'] = 0
+    
+    return stats
