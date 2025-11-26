@@ -887,13 +887,27 @@ def edit_member(member_id):
                 }
                 
                 # Reset freeze_used if member is reactivating and had used freeze
+                # Also recalculate invitations if reactivating (they're already calculated, but ensure they're updated)
+                reset_messages = []
                 if should_reset_freeze and old_member_dict.get('freeze_used'):
                     update_params['freeze_used'] = False
-                    flash("Member updated successfully! Freeze has been reset due to membership reactivation.", "success")
+                    reset_messages.append("Freeze has been reset")
+                
+                # Check if invitations need to be recalculated (if package changed or reactivating)
+                old_package = old_member_dict.get('membership_packages', '').strip()
+                new_package = f"{numeric_value} {unit}".strip()
+                old_invitations = old_member_dict.get('invitations', 0) or 0
+                
+                if should_reset_freeze and old_invitations != invitations:
+                    # Invitations are already recalculated in update_params, but add message if changed
+                    reset_messages.append("Invitations recalculated")
                 
                 update_member(member_id, **update_params)
                 
-                if 'freeze_used' not in update_params:
+                # Show appropriate success message
+                if reset_messages:
+                    flash(f"Member updated successfully! {', '.join(reset_messages)} due to membership reactivation.", "success")
+                else:
                     flash("Member updated successfully!", "success")
             else:
                 # Member not found, but try to update anyway

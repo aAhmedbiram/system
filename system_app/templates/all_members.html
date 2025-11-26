@@ -338,7 +338,14 @@
         <td>{{ member.membership_packages }}</td>
         <td>{{ member.membership_fees }}</td>
         <td>{{ member.membership_status }}</td>
-        <td style="color: #ffd43b; font-weight: bold;">{{ member.invitations or 0 }}</td>
+        <td>
+            {# Show N/A if end_date is expired, otherwise show invitation count #}
+            {% if member.is_expired %}
+                <span class="freeze-used">N/A</span>
+            {% else %}
+                <span style="color: #ffd43b; font-weight: bold;">{{ member.invitations or 0 }}</span>
+            {% endif %}
+        </td>
         <td class="comment-cell">{{ member.comment or '-' }}</td>
         <td>
             {% set package = (member.membership_packages or '').strip() %}
