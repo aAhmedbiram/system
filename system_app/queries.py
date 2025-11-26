@@ -1024,9 +1024,12 @@ def get_invoice_by_number(invoice_number):
 
 
 def get_all_invoices():
-    """Get all invoices ordered by ID ascending"""
+    """Get all invoices ordered by ID ascending, including member phone number"""
     return query_db(
-        'SELECT * FROM invoices ORDER BY id ASC',
+        '''SELECT i.*, m.phone as member_phone 
+           FROM invoices i 
+           LEFT JOIN members m ON i.member_id = m.id 
+           ORDER BY i.id ASC''',
         ()
     )
 

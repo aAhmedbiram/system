@@ -1692,7 +1692,32 @@ def invitations():
 def invoices_list():
     """Display all invoices"""
     try:
+        from urllib.parse import quote
         invoices = get_all_invoices() or []
+        # Format WhatsApp messages for each invoice
+        for invoice in invoices:
+            if invoice.get('member_phone'):
+                invoice_type_text = 'New Member Registration' if invoice.get('invoice_type') == 'new_member' else 'Membership Renewal'
+                invoice_date_str = invoice.get('invoice_date')
+                if invoice_date_str and not isinstance(invoice_date_str, str):
+                    invoice_date_str = invoice_date_str.strftime('%Y-%m-%d')
+                elif not invoice_date_str:
+                    invoice_date_str = 'N/A'
+                
+                invoice_message = f"📄 *Invoice {invoice.get('invoice_number', 'N/A')}*\n\n"
+                invoice_message += f"Member: {invoice.get('member_name', 'N/A')}\n"
+                invoice_message += f"Type: {invoice_type_text}\n"
+                invoice_message += f"Package: {invoice.get('package_name') or 'N/A'}\n"
+                invoice_message += f"Amount: ${invoice.get('amount', 0):.2f}\n"
+                invoice_message += f"Date: {invoice_date_str}\n\n"
+                invoice_message += "Thank you for your business!"
+                
+                # Clean phone number and create WhatsApp URL
+                phone_clean = str(invoice.get('member_phone', '')).replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
+                invoice['whatsapp_url'] = f"https://wa.me/{phone_clean}?text={quote(invoice_message)}"
+            else:
+                invoice['whatsapp_url'] = None
+        
         return render_template('invoices_list.html', invoices=invoices)
     except Exception as e:
         print(f"Error in invoices_list route: {e}")
