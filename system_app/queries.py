@@ -788,7 +788,7 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
                     if end_date:
                         today = datetime.now().date()
                         if end_date < today:
-                            raise ValueError(f"N/A - {member['name']} (ID: {member_id}) doesn't have invitations. Membership expired on {end_date_str}.")
+                            raise ValueError(f"Member {member['name']} (ID: {member_id}) cannot use invitations because their membership has expired. End date: {end_date_str}")
                     else:
                         # If we couldn't parse the date, log warning but allow (graceful degradation)
                         print(f"Warning: Could not parse end_date '{end_date_str}' for member {member_id}. Allowing invitation usage.")
@@ -802,7 +802,7 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
         # Check if member has available invitations
         current_invitations = member.get('invitations', 0) or 0
         if current_invitations <= 0:
-            raise ValueError(f"{member['name']} (ID: {member_id}) doesn't have invitations. Available invitations: 0")
+            raise ValueError(f"Member {member['name']} (ID: {member_id}) has no available invitations")
         
         # Record the invitation usage
         query_db('''
