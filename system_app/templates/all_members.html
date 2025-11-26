@@ -361,7 +361,10 @@
                 {% set freeze_days = 30 %}
             {% endif %}
             
-            {% if member.freeze_used %}
+            {# Show N/A if end_date is expired, otherwise show normal freeze logic #}
+            {% if member.is_expired %}
+                <span class="freeze-used">N/A</span>
+            {% elif member.freeze_used %}
                 <span class="freeze-used">Used</span>
             {% elif has_freeze %}
                 <form method="POST" action="{{ url_for('use_freeze', member_id=member.id) }}" 

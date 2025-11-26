@@ -670,8 +670,48 @@ def all_members():
             (per_page, offset)
         )
         
+        # Process members to add is_expired flag for freeze button logic
+        from datetime import datetime
+        today = datetime.now().date()
+        
+        processed_members = []
+        if members_data:
+            for member in members_data:
+                member_dict = dict(member) if hasattr(member, 'keys') else member
+                is_expired = False
+                
+                # Check if end_date is expired
+                end_date_str = member_dict.get('end_date')
+                if end_date_str:
+                    try:
+                        # Try to parse various date formats
+                        date_formats = [
+                            '%Y-%m-%d',      # 2024-12-31
+                            '%m/%d/%Y',       # 12/31/2024
+                            '%d/%m/%Y',       # 31/12/2024
+                            '%m-%d-%Y',       # 12-31-2024
+                            '%d-%m-%Y',       # 31-12-2024
+                            '%Y/%m/%d',       # 2024/12/31
+                        ]
+                        
+                        end_date_parsed = None
+                        for fmt in date_formats:
+                            try:
+                                end_date_parsed = datetime.strptime(str(end_date_str).strip()[:10], fmt).date()
+                                break
+                            except (ValueError, IndexError):
+                                continue
+                        
+                        if end_date_parsed and end_date_parsed < today:
+                            is_expired = True
+                    except Exception as e:
+                        print(f"Error parsing end_date for member {member_dict.get('id')}: {e}")
+                
+                member_dict['is_expired'] = is_expired
+                processed_members.append(member_dict)
+        
         return render_template("all_members.html", 
-                            members_data=members_data or [],
+                            members_data=processed_members,
                             page=page,
                             total_pages=total_pages,
                             total_count=total_count['count'] if total_count else 0)
