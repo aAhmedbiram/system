@@ -928,4 +928,34 @@ def get_supplement_statistics():
     ''', one=True)
     stats['inventory_value'] = float(inventory_value['total']) if inventory_value else 0
     
+    # Per-user sales statistics
+    user_sales = query_db('''
+        SELECT 
+            sold_by,
+            COUNT(*) as sales_count,
+            SUM(quantity) as total_quantity,
+            SUM(total_price) as total_revenue,
+            SUM(CASE WHEN payment_method = 'cash' THEN total_price ELSE 0 END) as cash_revenue,
+            SUM(CASE WHEN payment_method = 'card' OR payment_method = 'visa' THEN total_price ELSE 0 END) as card_revenue
+        FROM supplement_sales
+        WHERE sold_by IS NOT NULL
+        GROUP BY sold_by
+        ORDER BY total_revenue DESC
+    ''')
+    stats['user_sales'] = user_sales or []
+    
+    # Per-user sales today
+    user_sales_today = query_db('''
+        SELECT 
+            sold_by,
+            COUNT(*) as sales_count,
+            SUM(quantity) as total_quantity,
+            SUM(total_price) as total_revenue
+        FROM supplement_sales
+        WHERE sold_by IS NOT NULL AND DATE(sale_date) = %s
+        GROUP BY sold_by
+        ORDER BY total_revenue DESC
+    ''', (today,))
+    stats['user_sales_today'] = user_sales_today or []
+    
     return stats

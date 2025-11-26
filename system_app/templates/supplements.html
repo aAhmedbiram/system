@@ -525,6 +525,66 @@
         </div>
         {% endif %}
 
+        <!-- Per-User Sales Statistics -->
+        {% if stats.user_sales %}
+        <div class="card" style="margin-top: 30px;">
+            <h2>👥 Sales by User (All Time)</h2>
+            <div class="product-stats-grid">
+                {% for user_stat in stats.user_sales %}
+                <div class="product-stat-card" style="border-left-color: #4caf50;">
+                    <h4>{{ user_stat.sold_by or 'Unknown' }}</h4>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Total Sales:</span>
+                        <span class="product-stat-value" style="color: #4caf50; font-weight: 700; font-size: 18px;">${{ "%.2f"|format(user_stat.total_revenue or 0) }}</span>
+                    </div>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Sales Count:</span>
+                        <span class="product-stat-value">{{ user_stat.sales_count or 0 }} transactions</span>
+                    </div>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Total Quantity:</span>
+                        <span class="product-stat-value">{{ user_stat.total_quantity or 0 }} units</span>
+                    </div>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Cash Revenue:</span>
+                        <span class="product-stat-value">${{ "%.2f"|format(user_stat.cash_revenue or 0) }}</span>
+                    </div>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Card Revenue:</span>
+                        <span class="product-stat-value">${{ "%.2f"|format(user_stat.card_revenue or 0) }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Per-User Sales Today -->
+        {% if stats.user_sales_today %}
+        <div class="card" style="margin-top: 30px;">
+            <h2>📅 Sales by User (Today)</h2>
+            <div class="product-stats-grid">
+                {% for user_stat in stats.user_sales_today %}
+                <div class="product-stat-card" style="border-left-color: #ff9800;">
+                    <h4>{{ user_stat.sold_by or 'Unknown' }}</h4>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Today's Sales:</span>
+                        <span class="product-stat-value" style="color: #ff9800; font-weight: 700; font-size: 18px;">${{ "%.2f"|format(user_stat.total_revenue or 0) }}</span>
+                    </div>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Sales Count:</span>
+                        <span class="product-stat-value">{{ user_stat.sales_count or 0 }} transactions</span>
+                    </div>
+                    <div class="product-stat-item">
+                        <span class="product-stat-label">Total Quantity:</span>
+                        <span class="product-stat-value">{{ user_stat.total_quantity or 0 }} units</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="main-content">
             <div class="card">
                 <h2>📦 Product Inventory</h2>
