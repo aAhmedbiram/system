@@ -237,6 +237,34 @@ def clear_login_attempts(ip_address):
     if ip_address in _login_attempts:
         del _login_attempts[ip_address]
 
+def reset_all_login_attempts():
+    """Reset all login attempt lockouts"""
+    global _login_attempts
+    _login_attempts.clear()
+    return True
+
+@app.route('/admin/reset_login_lockout', methods=['GET'])
+@login_required
+def reset_login_lockout():
+    """Admin route to reset all login attempt lockouts"""
+    reset_all_login_attempts()
+    flash('All login attempt lockouts have been reset.', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/reset_lockout', methods=['GET'])
+@csrf.exempt
+def reset_lockout_public():
+    """Public route to reset login lockout (requires secret token)"""
+    # Check for secret token in query parameter or environment variable
+    secret_token = os.environ.get('RESET_LOCKOUT_TOKEN', 'reset_lockout_12345')
+    provided_token = request.args.get('token', '')
+    
+    if provided_token == secret_token:
+        reset_all_login_attempts()
+        return jsonify({'success': True, 'message': 'All login attempt lockouts have been reset.'}), 200
+    else:
+        return jsonify({'success': False, 'message': 'Invalid token.'}), 403
+
 @app.route('/login', methods=['GET', 'POST'])
 @csrf.exempt  # Exempt login from CSRF (public endpoint, no authenticated session yet)
 def login():
