@@ -406,56 +406,65 @@
     </style>
 </head>
 
-<body>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
 <div class="content-wrapper">
 <header>
-    <h1>Rival Gym System - All Members</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
+        <h1>{{ t.rival_gym_system }} - {{ t.all_members }}</h1>
+        <a href="{{ url_for('toggle_language') }}" class="language-toggle-btn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; font-size: 14px; padding: 8px 16px; border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 6px; transition: all 0.3s; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+            {% if current_lang == 'en' %}
+                🇸🇦 {{ t.arabic }}
+            {% else %}
+                🇬🇧 {{ t.english }}
+            {% endif %}
+        </a>
+    </div>
 </header>
 
 <section>
-    <a class="index-btn" href="{{ url_for('index') }}">Home</a>
-    <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
+    <a class="index-btn" href="{{ url_for('index') }}">{{ t.home }}</a>
+    <button class="download-btn" onclick="downloadCSV()">{{ t.download_csv }}</button>
 
 <div class="table-container">
 <table id="membersTable">
 
     <thead>
     <tr>
-        <th onclick="sortTable(0)">Member ID ▲▼</th>
-        <th onclick="sortTable(1)">Name ▲▼</th>
-        <th onclick="sortTable(2)">Email ▲▼</th>
-        <th onclick="sortTable(3)">Phone ▲▼</th>
-        <th onclick="sortTable(4)">Age ▲▼</th>
-        <th onclick="sortTable(5)">Gender ▲▼</th>
-        <th onclick="sortTable(6)">Actual start ▲▼</th>
-        <th onclick="sortTable(7)">Start date ▲▼</th>
-        <th onclick="sortTable(8)">End date ▲▼</th>
-        <th onclick="sortTable(9)">Package ▲▼</th>
-        <th onclick="sortTable(10)">Fees ▲▼</th>
-        <th onclick="sortTable(11)">Status ▲▼</th>
-        <th onclick="sortTable(12)">Invitations ▲▼</th>
-        <th onclick="sortTable(13)">Comment ▲▼</th>
-        <th>Freeze</th>
-        <th>Edit</th>
-        <th>Delete</th>
+        <th onclick="sortTable(0)">{{ t.member_id }} ▲▼</th>
+        <th onclick="sortTable(1)">{{ t.name }} ▲▼</th>
+        <th onclick="sortTable(2)">{{ t.email }} ▲▼</th>
+        <th onclick="sortTable(3)">{{ t.phone }} ▲▼</th>
+        <th onclick="sortTable(4)">{{ t.age }} ▲▼</th>
+        <th onclick="sortTable(5)">{{ t.gender }} ▲▼</th>
+        <th onclick="sortTable(6)">{{ t.actual_starting_date }} ▲▼</th>
+        <th onclick="sortTable(7)">{{ t.starting_date }} ▲▼</th>
+        <th onclick="sortTable(8)">{{ t.end_date }} ▲▼</th>
+        <th onclick="sortTable(9)">{{ t.membership_package }} ▲▼</th>
+        <th onclick="sortTable(10)">{{ t.fees }} ▲▼</th>
+        <th onclick="sortTable(11)">{{ t.status }} ▲▼</th>
+        <th onclick="sortTable(12)">{{ t.invitations }} ▲▼</th>
+        <th onclick="sortTable(13)">{{ t.comment }} ▲▼</th>
+        <th>{{ t.freeze }}</th>
+        <th>{{ t.edit }}</th>
+        <th>{{ t.delete }}</th>
     </tr>
 
     <!-- filter row -->
     <tr class="filter-row">
-        <th><input type="text" id="search_id" placeholder="Search" value="{{ search_id or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_name" placeholder="Search" value="{{ search_name or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_email" placeholder="Search" value="{{ search_email or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_phone" placeholder="Search" value="{{ search_phone or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_age" placeholder="Search" value="{{ search_age or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_gender" placeholder="Search" value="{{ search_gender or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_actual_start" placeholder="Search" value="{{ search_actual_start or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_start_date" placeholder="Search" value="{{ search_start_date or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_end_date" placeholder="Search" value="{{ search_end_date or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_package" placeholder="Search" value="{{ search_package or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_fees" placeholder="Search" value="{{ search_fees or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_status" placeholder="Search" value="{{ search_status or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_invitations" placeholder="Search" value="{{ search_invitations or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_comment" placeholder="Search" value="{{ search_comment or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_id" placeholder="{{ t.search }}" value="{{ search_id or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_name" placeholder="{{ t.search }}" value="{{ search_name or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_email" placeholder="{{ t.search }}" value="{{ search_email or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_phone" placeholder="{{ t.search }}" value="{{ search_phone or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_age" placeholder="{{ t.search }}" value="{{ search_age or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_gender" placeholder="{{ t.search }}" value="{{ search_gender or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_actual_start" placeholder="{{ t.search }}" value="{{ search_actual_start or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_start_date" placeholder="{{ t.search }}" value="{{ search_start_date or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_end_date" placeholder="{{ t.search }}" value="{{ search_end_date or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_package" placeholder="{{ t.search }}" value="{{ search_package or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_fees" placeholder="{{ t.search }}" value="{{ search_fees or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_status" placeholder="{{ t.search }}" value="{{ search_status or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_invitations" placeholder="{{ t.search }}" value="{{ search_invitations or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_comment" placeholder="{{ t.search }}" value="{{ search_comment or '' }}" onkeyup="handleColumnSearch()"></th>
         <th></th>
         <th></th>
         <th></th>
@@ -567,17 +576,17 @@
             {% if search_status %}{% set search_params = search_params + '&search_status=' + search_status|urlencode %}{% endif %}
             {% if search_invitations %}{% set search_params = search_params + '&search_invitations=' + search_invitations|urlencode %}{% endif %}
             {% if search_comment %}{% set search_params = search_params + '&search_comment=' + search_comment|urlencode %}{% endif %}
-            <a href="?page=1{{ search_params }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
-            <a href="?page={{ page - 1 }}{{ search_params }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
-            <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total members)</span>
-            <a href="?page={{ page + 1 }}{{ search_params }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
-            <a href="?page={{ total_pages }}{{ search_params }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+            <a href="?page=1{{ search_params }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.first }}</a>
+            <a href="?page={{ page - 1 }}{{ search_params }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.previous }}</a>
+            <span class="pagination-info">{{ t.page }} {{ page }} {{ t.of }} {{ total_pages }} ({{ total_count }} {{ t.total }} {{ t.members }})</span>
+            <a href="?page={{ page + 1 }}{{ search_params }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.next }}</a>
+            <a href="?page={{ total_pages }}{{ search_params }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.last }}</a>
         {% else %}
-            <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
-            <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
-            <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total members)</span>
-            <a href="?page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
-            <a href="?page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+            <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.first }}</a>
+            <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.previous }}</a>
+            <span class="pagination-info">{{ t.page }} {{ page }} {{ t.of }} {{ total_pages }} ({{ total_count }} {{ t.total }} {{ t.members }})</span>
+            <a href="?page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.next }}</a>
+            <a href="?page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.last }}</a>
         {% endif %}
     </div>
     {% endif %}

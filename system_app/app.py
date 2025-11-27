@@ -352,7 +352,62 @@ TRANSLATIONS = {
         'rival_gym_system': 'Rival Gym System',
         'language': 'Language',
         'arabic': 'Arabic',
-        'english': 'English'
+        'english': 'English',
+        'login': 'Login',
+        'signup': 'Sign Up',
+        'username': 'Username',
+        'password': 'Password',
+        'old_password': 'Old Password',
+        'new_password': 'New Password',
+        'confirm_password': 'Confirm New Password',
+        'back_to_home': 'Back to Home',
+        'home': 'Home',
+        'edit': 'Edit',
+        'delete': 'Delete',
+        'save': 'Save',
+        'cancel': 'Cancel',
+        'submit': 'Submit',
+        'all_members': 'All Members',
+        'edit_logs': 'Edit Logs',
+        'edit_member': 'Edit Member',
+        'delete_member': 'Delete Member',
+        'freeze': 'Freeze',
+        'use_freeze': 'Use Freeze',
+        'freeze_used': 'Used',
+        'status': 'Status',
+        'valid': 'Valid',
+        'expired': 'Expired',
+        'age': 'Age',
+        'end_date': 'End Date',
+        'fees': 'Fees',
+        'comment': 'Comment',
+        'no_results': 'No results found',
+        'loading': 'Loading...',
+        'error': 'Error',
+        'success': 'Success',
+        'confirm': 'Confirm',
+        'are_you_sure': 'Are you sure?',
+        'this_action_cannot_be_undone': 'This action cannot be undone!',
+        'send': 'Send',
+        'send_message': 'Send Message',
+        'message': 'Message',
+        'enter_message': 'Enter your message here...',
+        'back': 'Back',
+        'next': 'Next',
+        'previous': 'Previous',
+        'first': 'First',
+        'last': 'Last',
+        'page': 'Page',
+        'of': 'of',
+        'total': 'total',
+        'members': 'members',
+        'download': 'Download',
+        'download_csv': 'Download CSV',
+        'create': 'Create',
+        'update': 'Update',
+        'close': 'Close',
+        'yes': 'Yes',
+        'no': 'No'
     },
     'ar': {
         'welcome': 'مرحباً',
@@ -398,7 +453,62 @@ TRANSLATIONS = {
         'rival_gym_system': 'نظام ريڤال جيم',
         'language': 'اللغة',
         'arabic': 'العربية',
-        'english': 'الإنجليزية'
+        'english': 'الإنجليزية',
+        'login': 'تسجيل الدخول',
+        'signup': 'إنشاء حساب',
+        'username': 'اسم المستخدم',
+        'password': 'كلمة المرور',
+        'old_password': 'كلمة المرور القديمة',
+        'new_password': 'كلمة المرور الجديدة',
+        'confirm_password': 'تأكيد كلمة المرور الجديدة',
+        'back_to_home': 'العودة للصفحة الرئيسية',
+        'home': 'الرئيسية',
+        'edit': 'تعديل',
+        'delete': 'حذف',
+        'save': 'حفظ',
+        'cancel': 'إلغاء',
+        'submit': 'إرسال',
+        'all_members': 'جميع الأعضاء',
+        'edit_logs': 'سجلات التعديل',
+        'edit_member': 'تعديل العضو',
+        'delete_member': 'حذف العضو',
+        'freeze': 'تجميد',
+        'use_freeze': 'استخدام التجميد',
+        'freeze_used': 'مستخدم',
+        'status': 'الحالة',
+        'valid': 'نشط',
+        'expired': 'منتهي',
+        'age': 'العمر',
+        'end_date': 'تاريخ الانتهاء',
+        'fees': 'الرسوم',
+        'comment': 'تعليق',
+        'no_results': 'لا توجد نتائج',
+        'loading': 'جاري التحميل...',
+        'error': 'خطأ',
+        'success': 'نجح',
+        'confirm': 'تأكيد',
+        'are_you_sure': 'هل أنت متأكد؟',
+        'this_action_cannot_be_undone': 'لا يمكن التراجع عن هذا الإجراء!',
+        'send': 'إرسال',
+        'send_message': 'إرسال رسالة',
+        'message': 'الرسالة',
+        'enter_message': 'أدخل رسالتك هنا...',
+        'back': 'رجوع',
+        'next': 'التالي',
+        'previous': 'السابق',
+        'first': 'الأول',
+        'last': 'الأخير',
+        'page': 'صفحة',
+        'of': 'من',
+        'total': 'إجمالي',
+        'members': 'أعضاء',
+        'download': 'تحميل',
+        'download_csv': 'تحميل CSV',
+        'create': 'إنشاء',
+        'update': 'تحديث',
+        'close': 'إغلاق',
+        'yes': 'نعم',
+        'no': 'لا'
     }
 }
 
@@ -423,14 +533,21 @@ def inject_translations():
     }
 
 @app.route('/toggle_language')
-@login_required
 def toggle_language():
-    """Toggle between English and Arabic"""
+    """Toggle between English and Arabic - works for all pages including login"""
     current_lang = session.get('language', 'en')
     new_lang = 'ar' if current_lang == 'en' else 'en'
     session['language'] = new_lang
     session.permanent = True
-    return redirect(request.referrer or url_for('index'))
+    # Redirect back to the page they came from, or login if not logged in
+    referrer = request.referrer
+    if referrer:
+        return redirect(referrer)
+    # If no referrer, try to go to index if logged in, otherwise login
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    else:
+        return redirect(url_for('login'))
 
 @app.route('/')
 @app.route('/home')

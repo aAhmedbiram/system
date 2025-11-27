@@ -248,16 +248,53 @@
             color: #66d66a;
             text-decoration: underline;
         }
+
+        .language-toggle-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 16px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 1000;
+        }
+
+        .language-toggle-btn:hover {
+            background: linear-gradient(135deg, #764ba2, #667eea);
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
+        }
+
+        body[dir="rtl"] .language-toggle-btn {
+            right: auto;
+            left: 20px;
+        }
     </style>
 </head>
-<body>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+    <a href="{{ url_for('toggle_language') }}" class="language-toggle-btn">
+        {% if current_lang == 'en' %}
+            🇸🇦 {{ t.arabic }}
+        {% else %}
+            🇬🇧 {{ t.english }}
+        {% endif %}
+    </a>
     <header>
-        <h1>Rival Gym System - Login</h1>
+        <h1>{{ t.rival_gym_system }} - {{ t.login }}</h1>
     </header>
 
     <div class="login-container">
         <form action="/login" method="post">
-            <h2>Login</h2>
+            <h2>{{ t.login }}</h2>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -267,19 +304,19 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username" required placeholder="Enter your username">
+            <label for="username">{{ t.username }}:</label>
+            <input type="text" id="username" name="username" required placeholder="{{ t.username }}">
 
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required placeholder="Enter your password">
+            <label for="password">{{ t.password }}:</label>
+            <input type="password" id="password" name="password" required placeholder="{{ t.password }}">
 
-            <button type="submit">Login</button>
+            <button type="submit">{{ t.login }}</button>
             
             <div class="link-text">
                 <a href="{{ url_for('resend_verification') }}">Didn't receive verification email?</a>
             </div>
             
-            <a class="signup" href="{{ url_for('signup') }}" role="button">Sign Up</a>
+            <a class="signup" href="{{ url_for('signup') }}" role="button">{{ t.signup }}</a>
         </form>
     </div>
 </body>
