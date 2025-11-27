@@ -5,173 +5,457 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice {{ invoice.invoice_number }} - Rival Gym System</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         @media print {
             .no-print {
                 display: none !important;
             }
             body {
                 margin: 0;
+                padding: 0;
+                background: white;
+            }
+            .invoice-container {
+                box-shadow: none;
                 padding: 20px;
+                max-width: 100%;
+            }
+            .header {
+                border-bottom: 3px solid #4caf50;
+            }
+            .gradient-bg {
+                background: linear-gradient(135deg, #4caf50 0%, #66d66a 100%) !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .info-card {
+                border: 1px solid #ddd;
             }
         }
         
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
             margin: 0;
             padding: 20px;
-            background: #f5f5f5;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
             color: #333;
+            min-height: 100vh;
         }
-        
-        .invoice-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 40px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 40px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #4caf50;
-        }
-        
-        .company-info h1 {
-            color: #4caf50;
-            margin: 0;
-            font-size: 28px;
-        }
-        
-        .company-info p {
-            margin: 5px 0;
-            color: #666;
-        }
-        
-        .invoice-info {
-            text-align: right;
-        }
-        
-        .invoice-info h2 {
-            color: #4caf50;
-            margin: 0 0 10px 0;
-        }
-        
-        .invoice-info p {
-            margin: 5px 0;
-            color: #666;
-        }
-        
-        .invoice-details {
-            margin: 30px 0;
-        }
-        
-        .invoice-details table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        
-        .invoice-details th,
-        .invoice-details td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        .invoice-details th {
-            background-color: #4caf50;
-            color: white;
-            font-weight: bold;
-        }
-        
-        .invoice-details tr:hover {
-            background-color: #f9f9f9;
-        }
-        
-        .total-section {
-            margin-top: 30px;
-            text-align: right;
-        }
-        
-        .total-row {
-            display: flex;
-            justify-content: flex-end;
-            margin: 10px 0;
-            font-size: 18px;
-        }
-        
-        .total-label {
-            width: 200px;
-            text-align: right;
-            font-weight: bold;
-        }
-        
-        .total-amount {
-            width: 150px;
-            text-align: right;
-            color: #4caf50;
-            font-weight: bold;
-        }
-        
-        .grand-total {
-            font-size: 24px;
-            border-top: 2px solid #4caf50;
-            padding-top: 10px;
-            margin-top: 20px;
-        }
-        
-        .footer {
-            margin-top: 50px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
+
+        .no-print {
             text-align: center;
-            color: #666;
-            font-size: 14px;
+            margin-bottom: 30px;
         }
-        
+
         .action-buttons {
-            text-align: center;
-            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
         }
-        
+
         .btn {
             display: inline-block;
-            padding: 12px 24px;
-            margin: 0 10px;
-            background-color: #4caf50;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
             color: white;
             text-decoration: none;
-            border-radius: 6px;
-            font-weight: bold;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
             cursor: pointer;
             border: none;
-            font-size: 16px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
-        
+
         .btn:hover {
-            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
         }
-        
+
         .btn-secondary {
-            background-color: #2196F3;
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
         }
-        
+
         .btn-secondary:hover {
-            background-color: #1976D2;
+            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.5);
         }
-        
+
         .back-link {
             display: inline-block;
             margin-bottom: 20px;
             color: #4caf50;
             text-decoration: none;
+            font-weight: 600;
+            padding: 10px 20px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(76, 175, 80, 0.2);
         }
         
-        .back-link:hover {
-            text-decoration: underline;
+        .invoice-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 0;
+            position: relative;
+        }
+
+        /* Futuristic header with gradient */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 3px solid transparent;
+            border-image: linear-gradient(90deg, #4caf50, #66d66a, #4caf50) 1;
+            position: relative;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #4caf50, #66d66a, #4caf50);
+            background-size: 200% 100%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% center; }
+            50% { background-position: 100% center; }
+        }
+
+        .company-info {
+            flex: 1;
+        }
+
+        .company-info h1 {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0 0 10px 0;
+            font-size: 42px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .company-info .tagline {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .company-info p {
+            margin: 8px 0;
+            color: #555;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .company-info p::before {
+            content: '▸';
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .invoice-info {
+            text-align: right;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            padding: 25px 35px;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
+            min-width: 280px;
+        }
+
+        .invoice-info h2 {
+            margin: 0 0 20px 0;
+            font-size: 32px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .invoice-info .invoice-number {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            backdrop-filter: blur(10px);
+        }
+
+        .invoice-info p {
+            margin: 10px 0;
+            font-size: 14px;
+            opacity: 0.95;
+        }
+
+        .invoice-info strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+
+        /* Info cards */
+        .info-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .info-card h3 {
+            color: #4caf50;
+            margin-bottom: 20px;
+            font-size: 20px;
+            font-weight: 700;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4caf50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-card h3::before {
+            content: '◉';
+            font-size: 12px;
+        }
+
+        .info-card table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .info-card th {
+            text-align: left;
+            padding: 10px 0;
+            color: #666;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: 40%;
+        }
+
+        .info-card td {
+            padding: 10px 0;
+            color: #333;
+            font-weight: 500;
+            font-size: 15px;
+        }
+
+        /* Invoice details table */
+        .invoice-details {
+            margin: 40px 0;
+        }
+
+        .invoice-details h3 {
+            color: #4caf50;
+            margin-bottom: 20px;
+            font-size: 22px;
+            font-weight: 700;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4caf50;
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .details-table thead {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+        }
+
+        .details-table th {
+            padding: 18px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .details-table tbody tr {
+            border-bottom: 1px solid #e9ecef;
+            transition: all 0.3s;
+        }
+
+        .details-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .details-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .details-table td {
+            padding: 18px;
+            color: #333;
+            font-size: 15px;
+        }
+
+        .details-table td:last-child {
+            font-weight: 700;
+            color: #4caf50;
+            font-size: 16px;
+        }
+
+        /* Total section */
+        .total-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 12px 0;
+            font-size: 16px;
+        }
+
+        .total-label {
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 14px;
+        }
+
+        .total-amount {
+            font-weight: 700;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .grand-total {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 3px solid #4caf50;
+            font-size: 24px;
+        }
+
+        .grand-total .total-label {
+            font-size: 20px;
+            color: #4caf50;
+        }
+
+        .grand-total .total-amount {
+            font-size: 28px;
+            color: #4caf50;
+        }
+
+        /* Notes section */
+        .notes-section {
+            margin-top: 40px;
+            padding: 25px;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+            border-left: 4px solid #ffc107;
+            border-radius: 8px;
+        }
+
+        .notes-section strong {
+            color: #856404;
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .notes-section p {
+            color: #856404;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .footer p {
+            margin: 8px 0;
+            line-height: 1.8;
+        }
+
+        .footer .thank-you {
+            color: #4caf50;
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .invoice-container {
+                padding: 30px 20px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 30px;
+            }
+
+            .invoice-info {
+                width: 100%;
+                text-align: left;
+            }
+
+            .info-section {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -187,15 +471,16 @@
     <div class="invoice-container">
         <div class="header">
             <div class="company-info">
-                <h1>Rival Gym</h1>
-                <p>Membership Management System</p>
-                <p>Email: Rival.gym1@gmail.com</p>
-                <p>Phone: +20 1003527758</p>
+                <h1>RIVAL GYM</h1>
+                <p class="tagline">Membership Management System</p>
+                <p>📧 Rival.gym1@gmail.com</p>
+                <p>📞 +20 1003527758</p>
             </div>
-            <div class="invoice-info">
+            <div class="invoice-info gradient-bg">
                 <h2>INVOICE</h2>
-                <p><strong>Invoice #:</strong> {{ invoice.invoice_number }}</p>
-                <p><strong>Date:</strong> 
+                <div class="invoice-number">#{{ invoice.invoice_number }}</div>
+                <p>
+                    <strong>Date</strong>
                     {% if invoice.invoice_date %}
                         {% if invoice.invoice_date is string %}
                             {{ invoice.invoice_date }}
@@ -206,7 +491,8 @@
                         N/A
                     {% endif %}
                 </p>
-                <p><strong>Type:</strong> 
+                <p>
+                    <strong>Type</strong>
                     {% if invoice.invoice_type == 'new_member' %}
                         New Member Registration
                     {% elif invoice.invoice_type == 'renewal' %}
@@ -218,36 +504,40 @@
             </div>
         </div>
         
+        <div class="info-section">
+            <div class="info-card">
+                <h3>Bill To</h3>
+                <table>
+                    <tr>
+                        <th>Member Name</th>
+                        <td>{{ invoice.member_name }}</td>
+                    </tr>
+                    {% if member %}
+                    <tr>
+                        <th>Member ID</th>
+                        <td>#{{ invoice.member_id }}</td>
+                    </tr>
+                    <tr>
+                        <th>Email</th>
+                        <td>{{ member.email or 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Phone</th>
+                        <td>{{ member.phone or 'N/A' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <th>Member ID</th>
+                        <td>#{{ invoice.member_id or 'N/A' }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        
         <div class="invoice-details">
-            <h3>Bill To:</h3>
-            <table>
-                <tr>
-                    <th>Member Name</th>
-                    <td>{{ invoice.member_name }}</td>
-                </tr>
-                {% if member %}
-                <tr>
-                    <th>Member ID</th>
-                    <td>{{ invoice.member_id }}</td>
-                </tr>
-                <tr>
-                    <th>Email</th>
-                    <td>{{ member.email or 'N/A' }}</td>
-                </tr>
-                <tr>
-                    <th>Phone</th>
-                    <td>{{ member.phone or 'N/A' }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <th>Member ID</th>
-                    <td>{{ invoice.member_id or 'N/A' }}</td>
-                </tr>
-                {% endif %}
-            </table>
-            
-            <h3>Invoice Details:</h3>
-            <table>
+            <h3>Invoice Details</h3>
+            <table class="details-table">
                 <thead>
                     <tr>
                         <th>Description</th>
@@ -275,33 +565,39 @@
         
         <div class="total-section">
             <div class="total-row">
-                <div class="total-label">Subtotal:</div>
+                <div class="total-label">Subtotal</div>
                 <div class="total-amount">${{ "%.2f"|format(invoice.amount or 0) }}</div>
             </div>
             <div class="total-row">
-                <div class="total-label">Tax:</div>
+                <div class="total-label">Tax</div>
                 <div class="total-amount">$0.00</div>
             </div>
             <div class="total-row grand-total">
-                <div class="total-label">Total:</div>
+                <div class="total-label">Total Amount</div>
                 <div class="total-amount">${{ "%.2f"|format(invoice.amount or 0) }}</div>
             </div>
         </div>
         
         {% if invoice.notes %}
-        <div style="margin-top: 30px; padding: 15px; background: #f9f9f9; border-radius: 6px;">
-            <strong>Notes:</strong> {{ invoice.notes }}
+        <div class="notes-section">
+            <strong>Additional Notes</strong>
+            <p>{{ invoice.notes }}</p>
         </div>
         {% endif %}
         
         <div class="footer">
-            <p>Thank you for your business!</p>
+            <p class="thank-you">Thank you for your business!</p>
             <p>This is a computer-generated invoice. No signature required.</p>
             {% if invoice.created_by %}
-            <p>Created by: {{ invoice.created_by }}</p>
+            <p><strong>Created by:</strong> {{ invoice.created_by }}</p>
             {% endif %}
+            <p style="margin-top: 20px; font-size: 11px; color: #999;">© <span id="current-year"></span> Rival Gym. All rights reserved.</p>
         </div>
     </div>
+
+    <script>
+        // Set current year in footer
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+    </script>
 </body>
 </html>
-

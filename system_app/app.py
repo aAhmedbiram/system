@@ -274,6 +274,34 @@ def rino_required(f):
     return decorated_function
 
 
+# === Ahmed Adel Only Decorator ===
+def ahmed_adel_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('You must log in first!', 'error')
+            return redirect(url_for('login'))
+        if session.get('username') != 'ahmed_adel':
+            flash('You do not have permission to access this page!', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# === Ayman Ashour Only Decorator ===
+def ayman_ashour_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('You must log in first!', 'error')
+            return redirect(url_for('login'))
+        if session.get('username') != 'ayman_ashour':
+            flash('You do not have permission to access this page!', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # @app.teardown_appcontext
 # def teardown_db(exception):
 #     close_db()
