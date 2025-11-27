@@ -1,122 +1,250 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Logs - Rival Gym System</title>
-
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
             margin: 0;
             padding: 0;
-            background: #111;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
             color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body[dir="rtl"] {
+            direction: rtl;
+            font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        /* Grid pattern overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
         }
 
         header {
-            background-color: rgba(34, 34, 34, 0.95);
-            color: #4caf50;
-            padding: 0.8em 1em;
-            text-align: center;
-            font-size: 22px;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
         header h1 {
             margin: 0;
             padding: 0;
             font-size: 22px;
+            text-align: center;
+            flex: 1;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .language-toggle-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 16px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .language-toggle-btn:hover {
+            background: linear-gradient(135deg, #764ba2, #667eea);
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
         }
 
         section {
             margin: 20px;
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 20px auto;
         }
 
         h2 {
             color: #4caf50;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: 700;
         }
 
         .index-btn {
-            background-color: #4caf50;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
             color: white;
-            padding: 14px;
+            padding: 14px 24px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
             transition: all 0.3s;
             display: inline-block;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
 
         .index-btn:hover {
-            background-color: #66d66a;
-            transform: scale(1.03);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
         }
 
         .filter-btn {
-            background-color: #2196F3;
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
             color: white;
-            padding: 14px;
+            padding: 14px 24px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
             transition: all 0.3s;
             display: inline-block;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             margin-left: 10px;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
         }
 
         .filter-btn:hover {
-            background-color: #42a5f5;
-            transform: scale(1.03);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.5);
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            color: white;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 15px;
+            margin-left: 10px;
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 152, 0, 0.5);
         }
 
         .table-container {
             max-height: 80vh;
-            border: 1px solid #444;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
             overflow-y: auto;
             overflow-x: auto;
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            background: #222;
+            background: transparent;
             min-width: 800px;
         }
 
-        th,
-        td {
-            padding: 10px;
-            border: 1px solid #444;
+        th, td {
+            padding: 12px;
+            border: 1px solid rgba(76, 175, 80, 0.2);
             text-align: left;
         }
 
         th {
-            background-color: #333;
+            background: rgba(20, 20, 30, 0.9);
+            backdrop-filter: blur(10px);
             color: #4caf50;
-            font-weight: bold;
+            font-weight: 700;
             position: sticky;
             top: 0;
             z-index: 10;
+            border: 1px solid rgba(76, 175, 80, 0.3);
         }
 
         tr:nth-child(even) {
-            background-color: #2a2a2a;
+            background: rgba(20, 20, 30, 0.3);
         }
 
         tr:hover {
-            background-color: #333;
+            background: rgba(76, 175, 80, 0.1);
         }
 
         .old-value {
@@ -165,7 +293,7 @@
         }
 
         .pagination-btn {
-            background-color: #4caf50;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
             color: white;
             padding: 10px 20px;
             border: none;
@@ -173,17 +301,18 @@
             cursor: pointer;
             text-decoration: none;
             font-size: 14px;
-            font-weight: bold;
+            font-weight: 600;
             transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
         }
 
         .pagination-btn:hover:not(.disabled) {
-            background-color: #66d66a;
-            transform: scale(1.05);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
         }
 
         .pagination-btn.disabled {
-            background-color: #444;
+            background: rgba(102, 102, 102, 0.5);
             color: #888;
             cursor: not-allowed;
             opacity: 0.5;
@@ -198,156 +327,158 @@
 
         .filter-section {
             margin-bottom: 20px;
-            padding: 15px;
-            background: #222;
-            border-radius: 8px;
-            border: 1px solid #444;
+            padding: 20px;
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
 
         .filter-section input {
-            padding: 10px;
-            border: 1px solid #444;
-            border-radius: 5px;
-            background: #333;
+            padding: 12px 16px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            background: rgba(20, 20, 30, 0.6);
             color: #fff;
             font-size: 16px;
-            width: 200px;
+            width: 250px;
+            transition: all 0.3s;
+        }
+
+        .filter-section input:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+            background: rgba(20, 20, 30, 0.8);
         }
 
         .filter-section button {
-            padding: 10px 20px;
-            background-color: #2196F3;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
             color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-left: 10px;
-        }
-
-        .filter-section button:hover {
-            background-color: #42a5f5;
-        }
-
-        .download-btn {
-            background-color: #2196F3;
-            color: white;
-            padding: 14px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            text-decoration: none;
             font-size: 16px;
-            font-weight: bold;
-            transition: all 0.3s;
-            display: inline-block;
-            margin-bottom: 10px;
+            font-weight: 600;
             margin-left: 10px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
         }
 
-        .download-btn:hover {
-            background-color: #42a5f5;
-            transform: scale(1.03);
+        .filter-section button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.5);
         }
     </style>
 </head>
-
-<body>
-    <header>
-        <h1>Rival Gym System - Edit Logs</h1>
-    </header>
-
-    <section>
-        <a href="{{ url_for('index') }}" class="index-btn">← Back to Home</a>
-        {% if member_name %}
-        <a href="{{ url_for('logs') }}" class="filter-btn">Show All Logs</a>
-        {% endif %}
-        {% if logs_data %}
-        <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
-        {% endif %}
-
-        <h2>{% if member_name %}Edit Logs for {{ member_name }} (ID: {{ member_id }}){% else %}All Member Edit Logs{% endif %}</h2>
-
-        <div class="filter-section">
-            <form method="GET" action="{{ url_for('logs') }}" style="display: inline-block;">
-                <input type="number" name="member_id" placeholder="Filter by Member ID" value="{{ member_id or '' }}">
-                <button type="submit">Filter</button>
-            </form>
-        </div>
-
-        <div class="table-container">
-            {% if logs_data %}
-            <table id="logsTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Member ID</th>
-                        <th>Member Name</th>
-                        <th>Field Changed</th>
-                        <th>Old Value</th>
-                        <th>New Value</th>
-                        <th>Edited By</th>
-                        <th>Edit Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs_data %}
-                    <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.member_id }}</td>
-                        <td class="member-name">{{ log.member_name }}</td>
-                        <td class="field-name">{{ log.field_name }}</td>
-                        <td class="old-value">{{ log.old_value or '(empty)' }}</td>
-                        <td class="new-value">{{ log.new_value or '(empty)' }}</td>
-                        <td class="edited-by">{{ log.edited_by }}</td>
-                        <td class="edit-time">
-                            {% if log.edit_time %}
-                                {% if log.edit_time is string %}
-                                    {{ log.edit_time }}
-                                {% else %}
-                                    {{ log.edit_time.strftime('%Y-%m-%d %H:%M:%S') }}
-                                {% endif %}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="no-logs">
-                <p>No edit logs found{% if member_id %} for this member{% endif %}.</p>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+    <div class="content-wrapper">
+        <header>
+            <div class="header-content">
+                <h1>{{ t.rival_gym_system }} - {{ t.view_edit_logs }}</h1>
+                <a href="{{ url_for('toggle_language') }}" class="language-toggle-btn">
+                    {% if current_lang == 'en' %}
+                        🇸🇦 {{ t.arabic }}
+                    {% else %}
+                        🇬🇧 {{ t.english }}
+                    {% endif %}
+                </a>
             </div>
+        </header>
+
+        <section>
+            <a href="{{ url_for('index') }}" class="index-btn">← {{ t.back_to_home }}</a>
+            {% if member_name %}
+            <a href="{{ url_for('logs') }}" class="filter-btn">{{ t.view_edit_logs }}</a>
+            {% endif %}
+            {% if logs_data %}
+            <button class="download-btn" onclick="downloadCSV()">{{ t.download_csv }}</button>
             {% endif %}
 
-            <!-- Pagination -->
-            {% if total_pages > 1 %}
-            <div class="pagination">
-                {% if member_id %}
-                <a href="?member_id={{ member_id }}&page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
-                <a href="?member_id={{ member_id }}&page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
-                <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total logs)</span>
-                <a href="?member_id={{ member_id }}&page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
-                <a href="?member_id={{ member_id }}&page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+            <h2>{% if member_name %}{{ t.view_edit_logs }} {{ member_name }} ({{ t.member_id }}: {{ member_id }}){% else %}{{ t.view_edit_logs }}{% endif %}</h2>
+
+            <div class="filter-section">
+                <form method="GET" action="{{ url_for('logs') }}" style="display: inline-block;">
+                    <input type="number" name="member_id" placeholder="{{ t.member_id }}" value="{{ member_id or '' }}">
+                    <button type="submit">{{ t.search }}</button>
+                </form>
+            </div>
+
+            <div class="table-container">
+                {% if logs_data %}
+                <table id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>{{ t.member_id }}</th>
+                            <th>{{ t.member_name }}</th>
+                            <th>Field Changed</th>
+                            <th>Old Value</th>
+                            <th>New Value</th>
+                            <th>Edited By</th>
+                            <th>Edit Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs_data %}
+                        <tr>
+                            <td>{{ log.id }}</td>
+                            <td>{{ log.member_id }}</td>
+                            <td class="member-name">{{ log.member_name }}</td>
+                            <td class="field-name">{{ log.field_name }}</td>
+                            <td class="old-value">{{ log.old_value or '(empty)' }}</td>
+                            <td class="new-value">{{ log.new_value or '(empty)' }}</td>
+                            <td class="edited-by">{{ log.edited_by }}</td>
+                            <td class="edit-time">
+                                {% if log.edit_time %}
+                                    {% if log.edit_time is string %}
+                                        {{ log.edit_time }}
+                                    {% else %}
+                                        {{ log.edit_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
                 {% else %}
-                <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
-                <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
-                <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total logs)</span>
-                <a href="?page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
-                <a href="?page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
+                <div class="no-logs">
+                    <p>{{ t.no_results }}{% if member_id %} {{ t.member_id }}{% endif %}.</p>
+                </div>
+                {% endif %}
+
+                <!-- Pagination -->
+                {% if total_pages > 1 %}
+                <div class="pagination">
+                    {% if member_id %}
+                    <a href="?member_id={{ member_id }}&page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.first }}</a>
+                    <a href="?member_id={{ member_id }}&page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.previous }}</a>
+                    <span class="pagination-info">{{ t.page }} {{ page }} {{ t.of }} {{ total_pages }} ({{ total_count }} {{ t.total }} logs)</span>
+                    <a href="?member_id={{ member_id }}&page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.next }}</a>
+                    <a href="?member_id={{ member_id }}&page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.last }}</a>
+                    {% else %}
+                    <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.first }}</a>
+                    <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">{{ t.previous }}</a>
+                    <span class="pagination-info">{{ t.page }} {{ page }} {{ t.of }} {{ total_pages }} ({{ total_count }} {{ t.total }} logs)</span>
+                    <a href="?page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.next }}</a>
+                    <a href="?page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">{{ t.last }}</a>
+                    {% endif %}
+                </div>
                 {% endif %}
             </div>
-            {% endif %}
-        </div>
-    </section>
+        </section>
+    </div>
 
     <script>
-        /* DOWNLOAD CSV */
         function downloadCSV() {
             let table = document.getElementById("logsTable");
             if (!table) {
-                alert("No data to download");
+                alert("{{ t.no_results }}");
                 return;
             }
             
@@ -358,9 +489,7 @@
                 let cols = row.querySelectorAll("th, td");
                 let rowData = [];
                 cols.forEach((col) => {
-                    // Get text content and clean it up
                     let text = col.innerText || col.textContent || "";
-                    // Remove line breaks and extra spaces, replace commas with spaces
                     text = text.replace(/\n/g, " ").replace(/,/g, " ").replace(/\s+/g, " ").trim();
                     rowData.push('"' + text + '"');
                 });
@@ -371,7 +500,6 @@
             let link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             
-            // Generate filename based on whether filtering by member
             {% if member_name %}
             let filename = "edit_logs_member_{{ member_id }}_{{ member_name|replace(' ', '_') }}.csv";
             {% else %}
@@ -385,6 +513,4 @@
         }
     </script>
 </body>
-
 </html>
-

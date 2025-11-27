@@ -5,33 +5,128 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search Results - Rival Gym System</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
             margin: 0;
             padding: 0;
-            background: #111;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
             color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body[dir="rtl"] {
+            direction: rtl;
+            font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        /* Grid pattern overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
         }
 
         header {
-            background-color: rgba(34, 34, 34, 0.95);
-            color: #4caf50;
-            padding: 0.8em 1em;
-            text-align: center;
-            font-size: 22px;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
         header h1 {
             margin: 0;
             padding: 0;
             font-size: 22px;
+            text-align: center;
+            flex: 1;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .language-toggle-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 16px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .language-toggle-btn:hover {
+            background: linear-gradient(135deg, #764ba2, #667eea);
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
         }
 
         h2, h3 {
             color: #4caf50;
             margin-bottom: 20px;
+            font-weight: 700;
         }
 
         h3 {
@@ -42,14 +137,20 @@
         section {
             margin: 20px;
             padding: 30px;
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 20px auto;
         }
 
         .table-container {
-            background: rgba(34, 34, 34, 0.95);
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
-            border: 1px solid #444;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(76, 175, 80, 0.3);
             margin: 20px auto;
             max-width: 1400px;
         }
@@ -58,20 +159,21 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
-            background: rgba(34, 34, 34, 0.95);
+            background: transparent;
         }
 
         th, td {
-            border: 1px solid #444;
+            border: 1px solid rgba(76, 175, 80, 0.2);
             padding: 12px;
             text-align: center;
             color: #fff;
         }
 
         th {
-            background-color: rgba(34, 34, 34, 0.95);
+            background: rgba(20, 20, 30, 0.9);
+            backdrop-filter: blur(10px);
             color: #4caf50;
-            font-weight: bold;
+            font-weight: 700;
         }
 
         tr:hover {
@@ -79,46 +181,57 @@
         }
 
         .edit-link {
-            color: #4caf50;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
             text-decoration: none;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: 600;
             transition: all 0.3s;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
         }
 
         .edit-link:hover {
-            color: #66d66a;
-            text-decoration: underline;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
         }
 
         .back-btn {
-            background-color: #4caf50;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
             color: white;
-            padding: 14px;
+            padding: 14px 24px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
             display: inline-block;
             transition: all 0.3s;
             margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
 
         .back-btn:hover {
-            background-color: #66d66a;
-            transform: scale(1.03);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
         }
 
         .no-member-found {
             text-align: center;
-            padding: 30px;
-            background: rgba(34, 34, 34, 0.95);
-            border: 1px solid #444;
+            padding: 40px;
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
             border-radius: 12px;
             font-size: 18px;
             color: #fff;
-            margin: 20px;
+            margin: 20px auto;
+            max-width: 600px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         }
 
         /* Status light indicators */
@@ -171,70 +284,81 @@
         }
     </style>
 </head>
-<body>
-    <header>
-        <h1>Rival Gym System - Search Results</h1>
-    </header>
-    <section class="member-data">    
-        <!-- Display member data here -->
-        {% if member_data %}
-            <div class="table-container">
-                <h3>Member Data</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Member ID</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Age</th>
-                            <th>Gender</th>
-                            <th>Actual starting date</th>
-                            <th>Starting date</th>
-                            <th>End date</th>
-                            <th>Membership packages</th>
-                            <th>Membership fees</th>
-                            <th>Membership status</th>
-                            <th>Comment</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>{{ member_data.id }}</td>
-                            <td>{{ member_data.name }}</td>
-                            <td>{{ member_data.email }}</td>
-                            <td>{{ member_data.phone }}</td>
-                            <td>{{ member_data.age }}</td>
-                            <td>{{ member_data.gender }}</td>
-                            <td>{{ member_data.actual_starting_date }}</td>
-                            <td>{{ member_data.starting_date }}</td>
-                            <td>{{ member_data.end_date }}</td>
-                            <td>{{ member_data.membership_packages }}</td>
-                            <td>{{ member_data.membership_fees }}</td>
-                            <td>
-                                {% if member_data.membership_status == 'VAL' %}
-                                    <span class="status-light val" title="Valid - Active Membership"></span>
-                                {% elif member_data.membership_status == 'EX' %}
-                                    <span class="status-light ex" title="Expired - Membership Ended"></span>
-                                {% else %}
-                                    <span class="status-light unknown" title="Unknown Status"></span>
-                                {% endif %}
-                            </td>
-                            <td style="text-align: left; max-width: 200px; word-wrap: break-word;">{{ member_data.comment or '-' }}</td>
-                            <td>
-                                <a class="edit-link" href="{{ url_for('edit_member', member_id=member_data.id) }}">Edit</a>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+    <div class="content-wrapper">
+        <header>
+            <div class="header-content">
+                <h1>{{ t.rival_gym_system }} - {{ t.search }}</h1>
+                <a href="{{ url_for('toggle_language') }}" class="language-toggle-btn">
+                    {% if current_lang == 'en' %}
+                        🇸🇦 {{ t.arabic }}
+                    {% else %}
+                        🇬🇧 {{ t.english }}
+                    {% endif %}
+                </a>
             </div>
-        {% else  %}
-        <div class="no-member-found">No member found</div>
-        {% endif %}
-        <div style="text-align: center;">
-            <a class="back-btn" href="{{url_for('index') }}">Back</a>
-        </div>
-    </section>
+        </header>
+        <section class="member-data">    
+            <!-- Display member data here -->
+            {% if member_data %}
+                <div class="table-container">
+                    <h3>{{ t.member_name }}</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>{{ t.member_id }}</th>
+                                <th>{{ t.name }}</th>
+                                <th>{{ t.email }}</th>
+                                <th>{{ t.phone }}</th>
+                                <th>{{ t.age }}</th>
+                                <th>{{ t.gender }}</th>
+                                <th>{{ t.actual_starting_date }}</th>
+                                <th>{{ t.starting_date }}</th>
+                                <th>{{ t.end_date }}</th>
+                                <th>{{ t.membership_package }}</th>
+                                <th>{{ t.fees }}</th>
+                                <th>{{ t.status }}</th>
+                                <th>{{ t.comment }}</th>
+                                <th>{{ t.edit }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ member_data.id }}</td>
+                                <td>{{ member_data.name }}</td>
+                                <td>{{ member_data.email }}</td>
+                                <td>{{ member_data.phone }}</td>
+                                <td>{{ member_data.age }}</td>
+                                <td>{{ member_data.gender }}</td>
+                                <td>{{ member_data.actual_starting_date }}</td>
+                                <td>{{ member_data.starting_date }}</td>
+                                <td>{{ member_data.end_date }}</td>
+                                <td>{{ member_data.membership_packages }}</td>
+                                <td>{{ member_data.membership_fees }}</td>
+                                <td>
+                                    {% if member_data.membership_status == 'VAL' %}
+                                        <span class="status-light val" title="{{ t.valid }}"></span>
+                                    {% elif member_data.membership_status == 'EX' %}
+                                        <span class="status-light ex" title="{{ t.expired }}"></span>
+                                    {% else %}
+                                        <span class="status-light unknown" title="Unknown"></span>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: left; max-width: 200px; word-wrap: break-word;">{{ member_data.comment or '-' }}</td>
+                                <td>
+                                    <a class="edit-link" href="{{ url_for('edit_member', member_id=member_data.id) }}">{{ t.edit }}</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+            <div class="no-member-found">{{ t.no_results }}</div>
+            {% endif %}
+            <div style="text-align: center;">
+                <a class="back-btn" href="{{ url_for('index') }}">{{ t.back }}</a>
+            </div>
+        </section>
+    </div>
 </body>
 </html>
