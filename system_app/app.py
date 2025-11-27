@@ -306,6 +306,132 @@ def ayman_ashour_required(f):
 # def teardown_db(exception):
 #     close_db()
 
+# === Language Translation System ===
+TRANSLATIONS = {
+    'en': {
+        'welcome': 'Welcome',
+        'change_password': 'Change Password',
+        'search_by_id': 'Search by ID',
+        'search_by_name': 'Search by Name',
+        'search_by_phone': 'Search by Phone',
+        'add_new_member': 'Add New Member',
+        'member_id': 'Member ID',
+        'member_name': 'Member Name',
+        'phone_number': 'Phone Number',
+        'name': 'Name',
+        'email': 'Email',
+        'phone': 'Phone',
+        'birthdate': 'Birthdate',
+        'gender': 'Gender',
+        'male': 'Male',
+        'female': 'Female',
+        'actual_starting_date': 'Actual Starting Date',
+        'starting_date': 'Starting Date',
+        'membership_package': 'Membership Package',
+        'add_member': 'Add Member',
+        'view_all_members': 'View All Members',
+        'view_edit_logs': 'View Edit Logs',
+        'renewal_log': 'Renewal Log',
+        'all_invoices': 'All Invoices',
+        'undo_actions': 'Undo Actions',
+        'supplements_water': 'Supplements & Water',
+        'online_users': 'Online Users',
+        'attendance_table': 'Attendance Table',
+        'attendance_backup': 'Attendance Backup',
+        'invitations': 'Invitations',
+        'offers': 'Offers',
+        'data_management': 'Data Management',
+        'logout': 'Logout',
+        'enter_member_id': 'Enter Member ID',
+        'enter_member_name': 'Enter Member Name',
+        'enter_phone_number': 'Enter Phone Number',
+        'full_name': 'Full Name',
+        'email_address': 'Email Address',
+        'select_package': 'Select Package',
+        'search': 'Search',
+        'rival_gym_system': 'Rival Gym System',
+        'language': 'Language',
+        'arabic': 'Arabic',
+        'english': 'English'
+    },
+    'ar': {
+        'welcome': 'مرحباً',
+        'change_password': 'تغيير كلمة المرور',
+        'search_by_id': 'البحث بالرقم',
+        'search_by_name': 'البحث بالاسم',
+        'search_by_phone': 'البحث بالهاتف',
+        'add_new_member': 'إضافة عضو جديد',
+        'member_id': 'رقم العضو',
+        'member_name': 'اسم العضو',
+        'phone_number': 'رقم الهاتف',
+        'name': 'الاسم',
+        'email': 'البريد الإلكتروني',
+        'phone': 'الهاتف',
+        'birthdate': 'تاريخ الميلاد',
+        'gender': 'الجنس',
+        'male': 'ذكر',
+        'female': 'أنثى',
+        'actual_starting_date': 'تاريخ البدء الفعلي',
+        'starting_date': 'تاريخ البدء',
+        'membership_package': 'باقة العضوية',
+        'add_member': 'إضافة عضو',
+        'view_all_members': 'عرض جميع الأعضاء',
+        'view_edit_logs': 'عرض سجلات التعديل',
+        'renewal_log': 'سجل التجديد',
+        'all_invoices': 'جميع الفواتير',
+        'undo_actions': 'تراجع عن الإجراءات',
+        'supplements_water': 'المكملات والماء',
+        'online_users': 'المستخدمون المتصلون',
+        'attendance_table': 'جدول الحضور',
+        'attendance_backup': 'نسخة احتياطية للحضور',
+        'invitations': 'الدعوات',
+        'offers': 'العروض',
+        'data_management': 'إدارة البيانات',
+        'logout': 'تسجيل الخروج',
+        'enter_member_id': 'أدخل رقم العضو',
+        'enter_member_name': 'أدخل اسم العضو',
+        'enter_phone_number': 'أدخل رقم الهاتف',
+        'full_name': 'الاسم الكامل',
+        'email_address': 'عنوان البريد الإلكتروني',
+        'select_package': 'اختر الباقة',
+        'search': 'بحث',
+        'rival_gym_system': 'نظام ريڤال جيم',
+        'language': 'اللغة',
+        'arabic': 'العربية',
+        'english': 'الإنجليزية'
+    }
+}
+
+def get_language():
+    """Get current language from session, default to English"""
+    return session.get('language', 'en')
+
+def get_translation(key, language=None):
+    """Get translation for a key"""
+    if language is None:
+        language = get_language()
+    return TRANSLATIONS.get(language, TRANSLATIONS['en']).get(key, key)
+
+@app.context_processor
+def inject_translations():
+    """Make translations available to all templates"""
+    lang = get_language()
+    return {
+        't': TRANSLATIONS.get(lang, TRANSLATIONS['en']),
+        'current_lang': lang,
+        'is_rtl': lang == 'ar'
+    }
+
+@app.route('/toggle_language')
+@login_required
+def toggle_language():
+    """Toggle between English and Arabic"""
+    current_lang = session.get('language', 'en')
+    new_lang = 'ar' if current_lang == 'en' else 'en'
+    session['language'] = new_lang
+    session.permanent = True
+    return redirect(request.referrer or url_for('index'))
+
 @app.route('/')
 @app.route('/home')
 @login_required

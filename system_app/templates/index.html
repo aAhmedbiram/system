@@ -23,6 +23,27 @@
             overflow-x: hidden;
         }
 
+        body[dir="rtl"] {
+            direction: rtl;
+            font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif;
+        }
+
+        body[dir="rtl"] .header-content {
+            flex-direction: row-reverse;
+        }
+
+        body[dir="rtl"] .user-info {
+            flex-direction: row-reverse;
+        }
+
+        body[dir="rtl"] .quick-actions {
+            direction: rtl;
+        }
+
+        body[dir="rtl"] .nav-grid {
+            direction: rtl;
+        }
+
         /* Animated background particles */
         body::before {
             content: '';
@@ -168,6 +189,27 @@
         .change-password-btn:hover {
             background: rgba(76, 175, 80, 0.1);
             box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .language-toggle-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 16px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .language-toggle-btn:hover {
+            background: linear-gradient(135deg, #764ba2, #667eea);
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
         }
 
         /* Flash messages */
@@ -453,7 +495,7 @@
         }
     </style>
 </head>
-<body>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
     <div class="content-wrapper">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
@@ -472,14 +514,21 @@
                         <!-- If you have a logo image, replace the ::before content with: -->
                         <!-- <img src="{{ url_for('static', filename='images/rival_gym_logo.png') }}" alt="Rival Gym Logo"> -->
                     </div>
-                    <h1 class="header-title">Rival Gym System</h1>
+                    <h1 class="header-title">{{ t.rival_gym_system }}</h1>
                 </div>
                 <div class="user-info">
                     {% if session.username %}
-                        <span class="welcome-text">Welcome, {{ session.username }}</span>
+                        <span class="welcome-text">{{ t.welcome }}, {{ session.username }}</span>
                         <span id="datetime"></span>
                     {% endif %}
-                    <a href="{{ url_for('change_password') }}" class="change-password-btn">Change Password</a>
+                    <a href="{{ url_for('toggle_language') }}" class="language-toggle-btn">
+                        {% if current_lang == 'en' %}
+                            🇸🇦 {{ t.arabic }}
+                        {% else %}
+                            🇬🇧 {{ t.english }}
+                        {% endif %}
+                    </a>
+                    <a href="{{ url_for('change_password') }}" class="change-password-btn">{{ t.change_password }}</a>
                 </div>
             </div>
         </header>
@@ -489,70 +538,70 @@
             <div class="quick-actions">
                 <!-- Search by ID Card -->
                 <div class="action-card">
-                    <h3>🔍 Search by ID</h3>
+                    <h3>🔍 {{ t.search_by_id }}</h3>
                     <form action="{{ url_for('show_member_data') }}" method="post">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <label for="member_id">Member ID</label>
-                        <input type="text" id="member_id" name="member_id" required placeholder="Enter Member ID">
-                        <button type="submit">Search</button>
+                        <label for="member_id">{{ t.member_id }}</label>
+                        <input type="text" id="member_id" name="member_id" required placeholder="{{ t.enter_member_id }}">
+                        <button type="submit">{{ t.search }}</button>
                     </form>
                 </div>
 
                 <!-- Search by Name Card -->
                 <div class="action-card">
-                    <h3>👤 Search by Name</h3>
+                    <h3>👤 {{ t.search_by_name }}</h3>
                     <form method="post" action="{{ url_for('result') }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <label for="member_name">Member Name</label>
-                        <input type="text" id="member_name" name="member_name" required placeholder="Enter Member Name">
-                        <button type="submit">Search</button>
+                        <label for="member_name">{{ t.member_name }}</label>
+                        <input type="text" id="member_name" name="member_name" required placeholder="{{ t.enter_member_name }}">
+                        <button type="submit">{{ t.search }}</button>
                     </form>
                 </div>
 
                 <!-- Search by Phone Card -->
                 <div class="action-card">
-                    <h3>📱 Search by Phone</h3>
+                    <h3>📱 {{ t.search_by_phone }}</h3>
                     <form method="post" action="{{ url_for('search_by_mobile_number') }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <label for="member_phone">Phone Number</label>
-                        <input type="number" id="member_phone" name="member_phone" required placeholder="Enter Phone Number">
-                        <button type="submit">Search</button>
+                        <label for="member_phone">{{ t.phone_number }}</label>
+                        <input type="number" id="member_phone" name="member_phone" required placeholder="{{ t.enter_phone_number }}">
+                        <button type="submit">{{ t.search }}</button>
                     </form>
                 </div>
 
                 <!-- Add New Member Card -->
                 <div class="action-card">
-                    <h3>➕ Add New Member</h3>
+                    <h3>➕ {{ t.add_new_member }}</h3>
                     <form action="{{ url_for('add_member_route') }}" method="post">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <label for="add_member_name">Name</label>
-                        <input type="text" id="add_member_name" name="member_name" required placeholder="Full Name">
+                        <label for="add_member_name">{{ t.name }}</label>
+                        <input type="text" id="add_member_name" name="member_name" required placeholder="{{ t.full_name }}">
                         
-                        <label for="add_member_email">Email</label>
-                        <input type="email" id="add_member_email" name="member_email" required placeholder="Email Address">
+                        <label for="add_member_email">{{ t.email }}</label>
+                        <input type="email" id="add_member_email" name="member_email" required placeholder="{{ t.email_address }}">
                         
-                        <label for="add_member_phone">Phone</label>
-                        <input type="text" id="add_member_phone" name="member_phone" required placeholder="Phone Number">
+                        <label for="add_member_phone">{{ t.phone }}</label>
+                        <input type="text" id="add_member_phone" name="member_phone" required placeholder="{{ t.phone_number }}">
                         
-                        <label for="add_member_birthdate">Birthdate</label>
+                        <label for="add_member_birthdate">{{ t.birthdate }}</label>
                         <input type="date" id="add_member_birthdate" name="member_birthdate" required>
                         
-                        <div class="label_gender">Gender</div>
+                        <div class="label_gender">{{ t.gender }}</div>
                         <div class="gender-radio-group">
-                            <label for="male">Male</label>
+                            <label for="male">{{ t.male }}</label>
                             <input type="radio" id="male" name="choice" value="Male" required>
-                            <label for="female">Female</label>
+                            <label for="female">{{ t.female }}</label>
                             <input type="radio" id="female" name="choice" value="Female" required>
                         </div>
                         
-                        <label for="add_actual_starting_date">Actual Starting Date</label>
+                        <label for="add_actual_starting_date">{{ t.actual_starting_date }}</label>
                         <input type="date" id="add_actual_starting_date" name="member_actual_starting_date" required>
                         
-                        <label for="add_starting_date">Starting Date</label>
+                        <label for="add_starting_date">{{ t.starting_date }}</label>
                         <input type="date" id="add_starting_date" name="member_starting_date" required>
                         
-                        <label for="add_membership_packages">Membership Package</label>
-                        <input list="membership_packages" id="add_membership_packages" name="member_membership_packages" required placeholder="Select Package">
+                        <label for="add_membership_packages">{{ t.membership_package }}</label>
+                        <input list="membership_packages" id="add_membership_packages" name="member_membership_packages" required placeholder="{{ t.select_package }}">
                         <datalist id="membership_packages">
                             <option value="1 Month">
                             <option value="2 Months">
@@ -562,21 +611,21 @@
                             <option value="12 Months">
                         </datalist>
                         
-                        <button type="submit">Add Member</button>
+                        <button type="submit">{{ t.add_member }}</button>
                     </form>
                 </div>
             </div>
 
             <!-- Navigation Grid -->
             <div class="nav-grid">
-                <a href="{{ url_for('all_members') }}" class="nav-btn"><span>👥 View All Members</span></a>
-                <a href="{{ url_for('logs') }}" class="nav-btn"><span>📋 View Edit Logs</span></a>
-                <a href="{{ url_for('renewal_log') }}" class="nav-btn blue"><span>📊 Renewal Log</span></a>
-                <a href="{{ url_for('invoices_list') }}" class="nav-btn purple"><span>📄 All Invoices</span></a>
-                <a href="{{ url_for('undo_page') }}" class="nav-btn orange"><span>↩️ Undo Actions</span></a>
-                <a href="{{ url_for('supplements') }}" class="nav-btn gradient"><span>💊 Supplements & Water</span></a>
+                <a href="{{ url_for('all_members') }}" class="nav-btn"><span>👥 {{ t.view_all_members }}</span></a>
+                <a href="{{ url_for('logs') }}" class="nav-btn"><span>📋 {{ t.view_edit_logs }}</span></a>
+                <a href="{{ url_for('renewal_log') }}" class="nav-btn blue"><span>📊 {{ t.renewal_log }}</span></a>
+                <a href="{{ url_for('invoices_list') }}" class="nav-btn purple"><span>📄 {{ t.all_invoices }}</span></a>
+                <a href="{{ url_for('undo_page') }}" class="nav-btn orange"><span>↩️ {{ t.undo_actions }}</span></a>
+                <a href="{{ url_for('supplements') }}" class="nav-btn gradient"><span>💊 {{ t.supplements_water }}</span></a>
                 {% if session.username == 'rino' %}
-                <a href="{{ url_for('online_users') }}" class="nav-btn cyan"><span>👥 Online Users</span></a>
+                <a href="{{ url_for('online_users') }}" class="nav-btn cyan"><span>👥 {{ t.online_users }}</span></a>
                 {% endif %}
             </div>
         </div>
@@ -584,15 +633,15 @@
         <!-- Bottom Action Bar -->
         <div class="bottom-bar">
             <div class="bottom-buttons">
-                <a href="{{ url_for('attendance_table') }}" class="bottom-btn">Attendance Table</a>
-                <a href="/attendance_backup" class="bottom-btn">Attendance Backup</a>
-                <a href="{{ url_for('invitations') }}" class="bottom-btn">Invitations</a>
-                <a href="{{ url_for('offers') }}" class="bottom-btn">Offers</a>
+                <a href="{{ url_for('attendance_table') }}" class="bottom-btn">{{ t.attendance_table }}</a>
+                <a href="/attendance_backup" class="bottom-btn">{{ t.attendance_backup }}</a>
+                <a href="{{ url_for('invitations') }}" class="bottom-btn">{{ t.invitations }}</a>
+                <a href="{{ url_for('offers') }}" class="bottom-btn">{{ t.offers }}</a>
                 {% if session.username == 'rino' %}
-                <a href="{{ url_for('data_management') }}" class="bottom-btn">Data Management</a>
+                <a href="{{ url_for('data_management') }}" class="bottom-btn">{{ t.data_management }}</a>
                 {% endif %}
                 <form action="{{ url_for('logout') }}" method="get" style="display: inline;">
-                    <button type="submit" class="bottom-btn logout-btn">Logout</button>
+                    <button type="submit" class="bottom-btn logout-btn">{{ t.logout }}</button>
                 </form>
             </div>
         </div>
