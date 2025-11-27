@@ -25,32 +25,60 @@
                 padding: 20px;
                 max-width: 100%;
             }
-            .header {
-                border-bottom: 3px solid #4caf50;
-            }
-            .gradient-bg {
-                background: linear-gradient(135deg, #4caf50 0%, #66d66a 100%) !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .info-card {
-                border: 1px solid #ddd;
+            .geometric-bg {
+                display: none;
             }
         }
         
         body {
-            font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
-            background-attachment: fixed;
-            color: #333;
+            background: #0a0e27;
+            color: #1a1a1a;
             min-height: 100vh;
+            position: relative;
+        }
+
+        /* Geometric background pattern */
+        .geometric-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.05;
+            pointer-events: none;
+        }
+
+        .geometric-bg::before,
+        .geometric-bg::after {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: 
+                repeating-linear-gradient(45deg, transparent, transparent 50px, rgba(76, 175, 80, 0.1) 50px, rgba(76, 175, 80, 0.1) 100px),
+                repeating-linear-gradient(-45deg, transparent, transparent 50px, rgba(33, 150, 243, 0.1) 50px, rgba(33, 150, 243, 0.1) 100px);
+            animation: rotate 20s linear infinite;
+        }
+
+        .geometric-bg::after {
+            animation-direction: reverse;
+            animation-duration: 15s;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .no-print {
             text-align: center;
             margin-bottom: 30px;
+            position: relative;
+            z-index: 10;
         }
 
         .action-buttons {
@@ -63,7 +91,7 @@
         .btn {
             display: inline-block;
             padding: 14px 28px;
-            background: linear-gradient(135deg, #4caf50, #66d66a);
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
             color: white;
             text-decoration: none;
             border-radius: 8px;
@@ -72,249 +100,380 @@
             cursor: pointer;
             border: none;
             transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+            box-shadow: 0 8px 30px rgba(0, 212, 255, 0.6);
+        }
+
+        .btn span {
+            position: relative;
+            z-index: 1;
         }
 
         .btn-secondary {
-            background: linear-gradient(135deg, #2196F3, #42a5f5);
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
         }
 
         .btn-secondary:hover {
-            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.5);
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
         }
 
         .back-link {
             display: inline-block;
             margin-bottom: 20px;
-            color: #4caf50;
+            color: #00d4ff;
             text-decoration: none;
             font-weight: 600;
             padding: 10px 20px;
-            background: rgba(76, 175, 80, 0.1);
+            background: rgba(0, 212, 255, 0.1);
             border-radius: 6px;
             transition: all 0.3s;
+            border: 1px solid rgba(0, 212, 255, 0.3);
         }
 
         .back-link:hover {
-            background: rgba(76, 175, 80, 0.2);
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
         }
         
         .invoice-container {
             max-width: 900px;
             margin: 0 auto;
-            background: white;
-            padding: 50px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            background: #ffffff;
+            padding: 0;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
             border-radius: 0;
             position: relative;
+            z-index: 1;
+            overflow: hidden;
         }
 
-        /* Futuristic header with gradient */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 50px;
-            padding-bottom: 30px;
-            border-bottom: 3px solid transparent;
-            border-image: linear-gradient(90deg, #4caf50, #66d66a, #4caf50) 1;
-            position: relative;
-        }
-
-        .header::after {
-            content: '';
-            position: absolute;
-            bottom: -3px;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, #4caf50, #66d66a, #4caf50);
+        /* Top accent bar */
+        .top-accent {
+            height: 8px;
+            background: linear-gradient(90deg, #00d4ff 0%, #0099cc 25%, #667eea 50%, #764ba2 75%, #00d4ff 100%);
             background-size: 200% 100%;
-            animation: gradientShift 3s ease infinite;
+            animation: gradientFlow 3s ease infinite;
         }
 
-        @keyframes gradientShift {
+        @keyframes gradientFlow {
             0%, 100% { background-position: 0% center; }
             50% { background-position: 100% center; }
         }
 
-        .company-info {
+        /* Header section */
+        .header-section {
+            padding: 50px 50px 40px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-bottom: 1px solid #e9ecef;
+            position: relative;
+        }
+
+        .header-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .company-section {
             flex: 1;
         }
 
-        .company-info h1 {
-            background: linear-gradient(135deg, #4caf50, #66d66a);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin: 0 0 10px 0;
-            font-size: 42px;
+        .company-logo {
+            display: inline-block;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border-radius: 12px;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
+        }
+
+        .company-logo::before {
+            content: 'RG';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
             font-weight: 700;
+            font-size: 20px;
             letter-spacing: -1px;
         }
 
-        .company-info .tagline {
-            color: #666;
-            font-size: 16px;
-            margin-bottom: 15px;
+        .company-section h1 {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00d4ff, #667eea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0 0 8px 0;
+            letter-spacing: -2px;
+        }
+
+        .company-section .tagline {
+            color: #6c757d;
+            font-size: 15px;
             font-weight: 500;
-        }
-
-        .company-info p {
-            margin: 8px 0;
-            color: #555;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .company-info p::before {
-            content: '▸';
-            color: #4caf50;
-            font-weight: bold;
-        }
-
-        .invoice-info {
-            text-align: right;
-            background: linear-gradient(135deg, #4caf50, #66d66a);
-            padding: 25px 35px;
-            border-radius: 12px;
-            color: white;
-            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
-            min-width: 280px;
-        }
-
-        .invoice-info h2 {
-            margin: 0 0 20px 0;
-            font-size: 32px;
-            font-weight: 700;
+            margin-bottom: 20px;
             text-transform: uppercase;
             letter-spacing: 2px;
         }
 
-        .invoice-info .invoice-number {
-            font-size: 24px;
-            font-weight: 700;
-            margin: 15px 0;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            backdrop-filter: blur(10px);
+        .company-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        .invoice-info p {
-            margin: 10px 0;
+        .company-info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #495057;
             font-size: 14px;
-            opacity: 0.95;
         }
 
-        .invoice-info strong {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 12px;
+        .company-info-item::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #00d4ff;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .invoice-badge {
+            text-align: right;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 30px;
+            border-radius: 16px;
+            color: white;
+            min-width: 300px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .invoice-badge::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 70%);
+            animation: pulse 4s ease infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .invoice-badge h2 {
+            font-size: 14px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            opacity: 0.8;
+            letter-spacing: 3px;
+            margin: 0 0 20px 0;
+            color: #00d4ff;
+            position: relative;
+            z-index: 1;
         }
 
-        /* Info cards */
-        .info-section {
+        .invoice-number-large {
+            font-size: 36px;
+            font-weight: 800;
+            margin: 15px 0;
+            background: linear-gradient(135deg, #00d4ff, #667eea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .invoice-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .invoice-meta-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .invoice-meta-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #6c757d;
+            font-weight: 600;
+        }
+
+        .invoice-meta-value {
+            font-size: 14px;
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        /* Content section */
+        .content-section {
+            padding: 50px;
+        }
+
+        .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 30px;
             margin-bottom: 40px;
         }
 
-        .info-card {
+        .info-box {
             background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
             border: 2px solid #e9ecef;
+            border-left: 4px solid #00d4ff;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
         }
 
-        .info-card h3 {
-            color: #4caf50;
-            margin-bottom: 20px;
-            font-size: 20px;
+        .info-box:hover {
+            border-color: #00d4ff;
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .info-box-title {
+            font-size: 13px;
             font-weight: 700;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #4caf50;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #00d4ff;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .info-card h3::before {
-            content: '◉';
-            font-size: 12px;
+        .info-box-title::before {
+            content: '◼';
+            font-size: 8px;
         }
 
-        .info-card table {
+        .info-table {
             width: 100%;
             border-collapse: collapse;
         }
 
-        .info-card th {
-            text-align: left;
-            padding: 10px 0;
-            color: #666;
-            font-weight: 600;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            width: 40%;
+        .info-table tr {
+            border-bottom: 1px solid #e9ecef;
         }
 
-        .info-card td {
-            padding: 10px 0;
-            color: #333;
-            font-weight: 500;
+        .info-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .info-table th {
+            text-align: left;
+            padding: 12px 0;
+            color: #6c757d;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 35%;
+        }
+
+        .info-table td {
+            padding: 12px 0;
+            color: #1a1a1a;
+            font-weight: 600;
             font-size: 15px;
         }
 
-        /* Invoice details table */
-        .invoice-details {
+        /* Details table */
+        .details-section {
             margin: 40px 0;
         }
 
-        .invoice-details h3 {
-            color: #4caf50;
-            margin-bottom: 20px;
-            font-size: 22px;
+        .details-section-title {
+            font-size: 18px;
             font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #1a1a2e;
+            margin-bottom: 20px;
             padding-bottom: 10px;
-            border-bottom: 2px solid #4caf50;
+            border-bottom: 3px solid #00d4ff;
+            display: inline-block;
         }
 
         .details-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            border-radius: 8px;
+            margin: 25px 0;
+            background: white;
+            border-radius: 12px;
             overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
 
         .details-table thead {
-            background: linear-gradient(135deg, #4caf50, #66d66a);
-            color: white;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
         }
 
         .details-table th {
-            padding: 18px;
+            padding: 20px;
             text-align: left;
             font-weight: 700;
-            font-size: 14px;
+            font-size: 12px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            color: #00d4ff;
         }
 
         .details-table tbody tr {
@@ -331,24 +490,38 @@
         }
 
         .details-table td {
-            padding: 18px;
-            color: #333;
+            padding: 20px;
+            color: #1a1a1a;
             font-size: 15px;
+            font-weight: 500;
         }
 
         .details-table td:last-child {
             font-weight: 700;
-            color: #4caf50;
-            font-size: 16px;
+            color: #00d4ff;
+            font-size: 18px;
         }
 
         /* Total section */
         .total-section {
             margin-top: 40px;
             padding: 30px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-            border-radius: 12px;
-            border: 2px solid #e9ecef;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 16px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .total-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
         }
 
         .total-row {
@@ -358,37 +531,40 @@
             margin: 15px 0;
             padding: 12px 0;
             font-size: 16px;
+            position: relative;
+            z-index: 1;
         }
 
         .total-label {
             font-weight: 600;
-            color: #666;
+            color: #adb5bd;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 14px;
+            letter-spacing: 1.5px;
+            font-size: 13px;
         }
 
         .total-amount {
             font-weight: 700;
-            color: #333;
+            color: #ffffff;
             font-size: 18px;
         }
 
         .grand-total {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 3px solid #4caf50;
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 2px solid rgba(0, 212, 255, 0.3);
             font-size: 24px;
         }
 
         .grand-total .total-label {
-            font-size: 20px;
-            color: #4caf50;
+            font-size: 16px;
+            color: #00d4ff;
         }
 
         .grand-total .total-amount {
-            font-size: 28px;
-            color: #4caf50;
+            font-size: 32px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
         }
 
         /* Notes section */
@@ -397,195 +573,220 @@
             padding: 25px;
             background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
             border-left: 4px solid #ffc107;
-            border-radius: 8px;
+            border-radius: 12px;
         }
 
         .notes-section strong {
             color: #856404;
             display: block;
             margin-bottom: 10px;
-            font-size: 14px;
+            font-size: 12px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
         }
 
         .notes-section p {
             color: #856404;
             margin: 0;
-            line-height: 1.6;
+            line-height: 1.8;
+            font-weight: 500;
         }
 
         /* Footer */
-        .footer {
-            margin-top: 50px;
-            padding-top: 30px;
-            border-top: 2px solid #e9ecef;
+        .footer-section {
+            padding: 40px 50px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-top: 1px solid #e9ecef;
             text-align: center;
-            color: #666;
+        }
+
+        .footer-section p {
+            margin: 8px 0;
+            line-height: 1.8;
+            color: #6c757d;
             font-size: 13px;
         }
 
-        .footer p {
-            margin: 8px 0;
-            line-height: 1.8;
-        }
-
-        .footer .thank-you {
-            color: #4caf50;
-            font-weight: 600;
-            font-size: 16px;
+        .footer-section .thank-you {
+            color: #00d4ff;
+            font-weight: 700;
+            font-size: 18px;
             margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
 
         /* Responsive */
         @media (max-width: 768px) {
             .invoice-container {
+                padding: 0;
+            }
+
+            .header-section,
+            .content-section,
+            .footer-section {
                 padding: 30px 20px;
             }
 
-            .header {
+            .header-content {
                 flex-direction: column;
                 gap: 30px;
             }
 
-            .invoice-info {
+            .invoice-badge {
                 width: 100%;
-                text-align: left;
             }
 
-            .info-section {
+            .info-grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
+    <div class="geometric-bg"></div>
+    
     <div class="no-print">
         <a href="{{ url_for('invoices_list') }}" class="back-link">← Back to Invoices</a>
         <div class="action-buttons">
-            <button onclick="window.print()" class="btn">🖨️ Print Invoice</button>
-            <a href="{{ url_for('download_invoice_pdf', invoice_id=invoice.id) }}" class="btn btn-secondary">📥 Download PDF</a>
+            <button onclick="window.print()" class="btn"><span>🖨️ Print Invoice</span></button>
+            <a href="{{ url_for('download_invoice_pdf', invoice_id=invoice.id) }}" class="btn btn-secondary"><span>📥 Download PDF</span></a>
         </div>
     </div>
     
     <div class="invoice-container">
-        <div class="header">
-            <div class="company-info">
-                <h1>RIVAL GYM</h1>
-                <p class="tagline">Membership Management System</p>
-                <p>📧 Rival.gym1@gmail.com</p>
-                <p>📞 +20 1003527758</p>
-            </div>
-            <div class="invoice-info gradient-bg">
-                <h2>INVOICE</h2>
-                <div class="invoice-number">#{{ invoice.invoice_number }}</div>
-                <p>
-                    <strong>Date</strong>
-                    {% if invoice.invoice_date %}
-                        {% if invoice.invoice_date is string %}
-                            {{ invoice.invoice_date }}
-                        {% else %}
-                            {{ invoice.invoice_date.strftime('%B %d, %Y') }}
-                        {% endif %}
-                    {% else %}
-                        N/A
-                    {% endif %}
-                </p>
-                <p>
-                    <strong>Type</strong>
-                    {% if invoice.invoice_type == 'new_member' %}
-                        New Member Registration
-                    {% elif invoice.invoice_type == 'renewal' %}
-                        Membership Renewal
-                    {% else %}
-                        {{ invoice.invoice_type }}
-                    {% endif %}
-                </p>
+        <div class="top-accent"></div>
+        
+        <div class="header-section">
+            <div class="header-content">
+                <div class="company-section">
+                    <div class="company-logo"></div>
+                    <h1>RIVAL GYM</h1>
+                    <p class="tagline">Membership Management System</p>
+                    <div class="company-info">
+                        <div class="company-info-item">Rival.gym1@gmail.com</div>
+                        <div class="company-info-item">+20 1003527758</div>
+                    </div>
+                </div>
+                <div class="invoice-badge">
+                    <h2>Invoice</h2>
+                    <div class="invoice-number-large">#{{ invoice.invoice_number }}</div>
+                    <div class="invoice-meta">
+                        <div class="invoice-meta-item">
+                            <span class="invoice-meta-label">Date</span>
+                            <span class="invoice-meta-value">
+                                {% if invoice.invoice_date %}
+                                    {% if invoice.invoice_date is string %}
+                                        {{ invoice.invoice_date }}
+                                    {% else %}
+                                        {{ invoice.invoice_date.strftime('%B %d, %Y') }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="invoice-meta-item">
+                            <span class="invoice-meta-label">Type</span>
+                            <span class="invoice-meta-value">
+                                {% if invoice.invoice_type == 'new_member' %}
+                                    New Member Registration
+                                {% elif invoice.invoice_type == 'renewal' %}
+                                    Membership Renewal
+                                {% else %}
+                                    {{ invoice.invoice_type }}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div class="info-section">
-            <div class="info-card">
-                <h3>Bill To</h3>
-                <table>
-                    <tr>
-                        <th>Member Name</th>
-                        <td>{{ invoice.member_name }}</td>
-                    </tr>
-                    {% if member %}
-                    <tr>
-                        <th>Member ID</th>
-                        <td>#{{ invoice.member_id }}</td>
-                    </tr>
-                    <tr>
-                        <th>Email</th>
-                        <td>{{ member.email or 'N/A' }}</td>
-                    </tr>
-                    <tr>
-                        <th>Phone</th>
-                        <td>{{ member.phone or 'N/A' }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <th>Member ID</th>
-                        <td>#{{ invoice.member_id or 'N/A' }}</td>
-                    </tr>
-                    {% endif %}
+        <div class="content-section">
+            <div class="info-grid">
+                <div class="info-box">
+                    <div class="info-box-title">Bill To</div>
+                    <table class="info-table">
+                        <tr>
+                            <th>Member Name</th>
+                            <td>{{ invoice.member_name }}</td>
+                        </tr>
+                        {% if member %}
+                        <tr>
+                            <th>Member ID</th>
+                            <td>#{{ invoice.member_id }}</td>
+                        </tr>
+                        <tr>
+                            <th>Email</th>
+                            <td>{{ member.email or 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Phone</th>
+                            <td>{{ member.phone or 'N/A' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <th>Member ID</th>
+                            <td>#{{ invoice.member_id or 'N/A' }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+            
+            <div class="details-section">
+                <div class="details-section-title">Invoice Details</div>
+                <table class="details-table">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th>Package</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                {% if invoice.invoice_type == 'new_member' %}
+                                    New Member Registration
+                                {% elif invoice.invoice_type == 'renewal' %}
+                                    Membership Renewal
+                                {% else %}
+                                    {{ invoice.invoice_type }}
+                                {% endif %}
+                            </td>
+                            <td>{{ invoice.package_name or 'N/A' }}</td>
+                            <td>${{ "%.2f"|format(invoice.amount or 0) }}</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
-        </div>
-        
-        <div class="invoice-details">
-            <h3>Invoice Details</h3>
-            <table class="details-table">
-                <thead>
-                    <tr>
-                        <th>Description</th>
-                        <th>Package</th>
-                        <th>Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            {% if invoice.invoice_type == 'new_member' %}
-                                New Member Registration
-                            {% elif invoice.invoice_type == 'renewal' %}
-                                Membership Renewal
-                            {% else %}
-                                {{ invoice.invoice_type }}
-                            {% endif %}
-                        </td>
-                        <td>{{ invoice.package_name or 'N/A' }}</td>
-                        <td>${{ "%.2f"|format(invoice.amount or 0) }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="total-section">
-            <div class="total-row">
-                <div class="total-label">Subtotal</div>
-                <div class="total-amount">${{ "%.2f"|format(invoice.amount or 0) }}</div>
+            
+            <div class="total-section">
+                <div class="total-row">
+                    <div class="total-label">Subtotal</div>
+                    <div class="total-amount">${{ "%.2f"|format(invoice.amount or 0) }}</div>
+                </div>
+                <div class="total-row">
+                    <div class="total-label">Tax</div>
+                    <div class="total-amount">$0.00</div>
+                </div>
+                <div class="total-row grand-total">
+                    <div class="total-label">Total Amount</div>
+                    <div class="total-amount">${{ "%.2f"|format(invoice.amount or 0) }}</div>
+                </div>
             </div>
-            <div class="total-row">
-                <div class="total-label">Tax</div>
-                <div class="total-amount">$0.00</div>
+            
+            {% if invoice.notes %}
+            <div class="notes-section">
+                <strong>Additional Notes</strong>
+                <p>{{ invoice.notes }}</p>
             </div>
-            <div class="total-row grand-total">
-                <div class="total-label">Total Amount</div>
-                <div class="total-amount">${{ "%.2f"|format(invoice.amount or 0) }}</div>
-            </div>
+            {% endif %}
         </div>
         
-        {% if invoice.notes %}
-        <div class="notes-section">
-            <strong>Additional Notes</strong>
-            <p>{{ invoice.notes }}</p>
-        </div>
-        {% endif %}
-        
-        <div class="footer">
+        <div class="footer-section">
             <p class="thank-you">Thank you for your business!</p>
             <p>This is a computer-generated invoice. No signature required.</p>
             {% if invoice.created_by %}
@@ -596,7 +797,6 @@
     </div>
 
     <script>
-        // Set current year in footer
         document.getElementById('current-year').textContent = new Date().getFullYear();
     </script>
 </body>

@@ -2053,7 +2053,7 @@ def view_invoice(invoice_id):
         return redirect(url_for('invoices_list'))
 
 def generate_invoice_pdf_response(invoice):
-    """Helper function to generate invoice PDF response"""
+    """Helper function to generate invoice PDF response with futuristic design"""
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
     from reportlab.lib.units import inch
@@ -2069,45 +2069,123 @@ def generate_invoice_pdf_response(invoice):
     
     # Create PDF buffer
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    
+    # Custom colors matching the new design
+    primary_color = colors.HexColor('#00d4ff')
+    dark_bg = colors.HexColor('#1a1a2e')
+    dark_bg2 = colors.HexColor('#16213e')
+    text_color = colors.HexColor('#1a1a1a')
+    light_text = colors.HexColor('#6c757d')
+    
+    # Create document with custom margins
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                            rightMargin=50, leftMargin=50,
+                            topMargin=50, bottomMargin=50)
     elements = []
     styles = getSampleStyleSheet()
     
-    # Title
-    title_style = ParagraphStyle(
-        'CustomTitle',
+    # Custom styles
+    company_title_style = ParagraphStyle(
+        'CompanyTitle',
         parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor('#4caf50'),
-        spaceAfter=30,
+        fontSize=42,
+        textColor=primary_color,
+        spaceAfter=8,
+        fontName='Helvetica-Bold',
+        leading=48,
     )
-    elements.append(Paragraph("RIVAL GYM", title_style))
-    elements.append(Paragraph("INVOICE", styles['Heading2']))
-    elements.append(Spacer(1, 0.3*inch))
     
-    # Invoice details
-    invoice_date_str = invoice['invoice_date'].strftime('%B %d, %Y') if hasattr(invoice['invoice_date'], 'strftime') else str(invoice['invoice_date'])
-    invoice_data = [
-        ['Invoice Number:', invoice['invoice_number']],
-        ['Date:', invoice_date_str],
-        ['Type:', 'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal'],
+    tagline_style = ParagraphStyle(
+        'Tagline',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=light_text,
+        spaceAfter=20,
+        fontName='Helvetica',
+        leading=14,
+    )
+    
+    invoice_badge_title_style = ParagraphStyle(
+        'InvoiceBadgeTitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=primary_color,
+        spaceAfter=15,
+        fontName='Helvetica-Bold',
+        leading=12,
+    )
+    
+    invoice_number_style = ParagraphStyle(
+        'InvoiceNumber',
+        parent=styles['Heading1'],
+        fontSize=32,
+        textColor=primary_color,
+        spaceAfter=20,
+        fontName='Helvetica-Bold',
+        leading=38,
+    )
+    
+    section_title_style = ParagraphStyle(
+        'SectionTitle',
+        parent=styles['Normal'],
+        fontSize=14,
+        textColor=text_color,
+        spaceAfter=15,
+        fontName='Helvetica-Bold',
+        leading=18,
+    )
+    
+    # Header section
+    header_data = [
+        [Paragraph("RIVAL GYM", company_title_style), 
+         Paragraph("INVOICE", invoice_badge_title_style)],
+        [Paragraph("Membership Management System", tagline_style),
+         Paragraph(f"#{invoice['invoice_number']}", invoice_number_style)],
     ]
     
-    invoice_table = Table(invoice_data, colWidths=[2*inch, 4*inch])
-    invoice_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+    header_table = Table(header_data, colWidths=[4*inch, 2.5*inch])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('BACKGROUND', (1, 0), (1, -1), dark_bg),
+        ('TEXTCOLOR', (1, 0), (1, 0), primary_color),
+        ('TEXTCOLOR', (1, 1), (1, 1), primary_color),
+        ('LEFTPADDING', (1, 0), (1, -1), 20),
+        ('RIGHTPADDING', (1, 0), (1, -1), 20),
+        ('TOPPADDING', (1, 0), (1, -1), 20),
+        ('BOTTOMPADDING', (1, 0), (1, -1), 20),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.white]),
     ]))
-    elements.append(invoice_table)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.4*inch))
     
-    # Bill To
-    elements.append(Paragraph("<b>Bill To:</b>", styles['Normal']))
+    # Company info and invoice meta
+    invoice_date_str = invoice['invoice_date'].strftime('%B %d, %Y') if hasattr(invoice['invoice_date'], 'strftime') else str(invoice['invoice_date'])
+    invoice_type_str = 'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal'
+    
+    company_info = [
+        ['Email: Rival.gym1@gmail.com', f'Date: {invoice_date_str}'],
+        ['Phone: +20 1003527758', f'Type: {invoice_type_str}'],
+    ]
+    
+    info_table = Table(company_info, colWidths=[3.5*inch, 3*inch])
+    info_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), light_text),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 0.4*inch))
+    
+    # Bill To section
+    elements.append(Paragraph("<b>BILL TO</b>", section_title_style))
     bill_to_data = [
         ['Member Name:', invoice['member_name']],
-        ['Member ID:', str(invoice['member_id']) if invoice['member_id'] else 'N/A'],
+        ['Member ID:', f"#{invoice['member_id']}" if invoice['member_id'] else 'N/A'],
     ]
     if member:
         if member.get('email'):
@@ -2115,67 +2193,114 @@ def generate_invoice_pdf_response(invoice):
         if member.get('phone'):
             bill_to_data.append(['Phone:', member['phone']])
     
-    bill_to_table = Table(bill_to_data, colWidths=[2*inch, 4*inch])
+    bill_to_table = Table(bill_to_data, colWidths=[1.5*inch, 5*inch])
     bill_to_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('TEXTCOLOR', (0, 0), (0, -1), light_text),
+        ('TEXTCOLOR', (1, 0), (1, -1), text_color),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 15),
     ]))
     elements.append(bill_to_table)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.4*inch))
     
-    # Invoice items
-    elements.append(Paragraph("<b>Invoice Details:</b>", styles['Normal']))
+    # Invoice Details section
+    elements.append(Paragraph("<b>INVOICE DETAILS</b>", section_title_style))
     items_data = [
         ['Description', 'Package', 'Amount'],
         [
-            'New Member Registration' if invoice['invoice_type'] == 'new_member' else 'Membership Renewal',
+            invoice_type_str,
             invoice['package_name'] or 'N/A',
             f"${float(invoice['amount']):.2f}" if invoice.get('amount') else '$0.00'
         ]
     ]
     
-    items_table = Table(items_data, colWidths=[3*inch, 2*inch, 1*inch])
+    items_table = Table(items_data, colWidths=[3.5*inch, 2*inch, 1*inch])
     items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4caf50')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('BACKGROUND', (0, 0), (-1, 0), dark_bg),
+        ('TEXTCOLOR', (0, 0), (-1, 0), primary_color),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, 1), 11),
+        ('FONTSIZE', (2, 1), (2, 1), 12),
+        ('TEXTCOLOR', (2, 1), (2, 1), primary_color),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('LEFTPADDING', (0, 0), (-1, -1), 15),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e9ecef')),
     ]))
     elements.append(items_table)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.4*inch))
     
-    # Total
+    # Total section with dark background
     invoice_amount = float(invoice['amount']) if invoice['amount'] else 0.0
     total_data = [
         ['Subtotal:', f"${invoice_amount:.2f}"],
         ['Tax:', '$0.00'],
-        ['Total:', f"${invoice_amount:.2f}"],
+        ['Total Amount:', f"${invoice_amount:.2f}"],
     ]
     
-    total_table = Table(total_data, colWidths=[4*inch, 2*inch])
+    total_table = Table(total_data, colWidths=[4.5*inch, 2*inch])
     total_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), dark_bg),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#adb5bd')),
+        ('TEXTCOLOR', (1, 0), (1, -1), colors.white),
+        ('TEXTCOLOR', (0, 2), (0, 2), primary_color),
+        ('TEXTCOLOR', (1, 2), (1, 2), primary_color),
         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 12),
-        ('FONTSIZE', (0, 2), (-1, 2), 16),
-        ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#4caf50')),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('TOPPADDING', (0, 2), (-1, 2), 12),
-        ('LINEABOVE', (0, 2), (-1, 2), 2, colors.HexColor('#4caf50')),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (0, 1), 11),
+        ('FONTSIZE', (1, 0), (1, 1), 12),
+        ('FONTSIZE', (0, 2), (0, 2), 13),
+        ('FONTSIZE', (1, 2), (1, 2), 20),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+        ('TOPPADDING', (0, 2), (-1, 2), 20),
+        ('LEFTPADDING', (0, 0), (-1, -1), 20),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+        ('LINEABOVE', (0, 2), (-1, 2), 2, primary_color),
     ]))
     elements.append(total_table)
     
     # Footer
     elements.append(Spacer(1, 0.5*inch))
-    elements.append(Paragraph("Thank you for your business!", styles['Normal']))
-    elements.append(Paragraph("This is a computer-generated invoice. No signature required.", styles['Normal']))
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=light_text,
+        spaceAfter=8,
+        alignment=1,  # Center
+        fontName='Helvetica',
+    )
+    
+    thank_you_style = ParagraphStyle(
+        'ThankYou',
+        parent=styles['Normal'],
+        fontSize=14,
+        textColor=primary_color,
+        spaceAfter=10,
+        alignment=1,
+        fontName='Helvetica-Bold',
+    )
+    
+    elements.append(Paragraph("THANK YOU FOR YOUR BUSINESS!", thank_you_style))
+    elements.append(Paragraph("This is a computer-generated invoice. No signature required.", footer_style))
     if invoice.get('created_by'):
-        elements.append(Paragraph(f"Created by: {invoice['created_by']}", styles['Normal']))
+        elements.append(Paragraph(f"Created by: {invoice['created_by']}", footer_style))
+    
+    from datetime import datetime
+    current_year = datetime.now().year
+    elements.append(Paragraph(f"© {current_year} Rival Gym. All rights reserved.", footer_style))
     
     # Build PDF
     doc.build(elements)
