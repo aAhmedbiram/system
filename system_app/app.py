@@ -2219,12 +2219,10 @@ def invoices_list():
                 elif not invoice_date_str:
                     invoice_date_str = 'N/A'
                 
-                # Create public PDF download link (no login required)
-                # Generate a simple token from invoice number for basic security
-                import hashlib
+                # Create permanent PDF download link (no login required, no token needed)
+                # Simple permanent link using invoice number - can be opened anytime
                 invoice_number = invoice.get('invoice_number', '')
-                token = hashlib.md5(f"{invoice_number}{secret_key}".encode()).hexdigest()[:12]
-                pdf_url = f"{base_url}/invoice/{invoice.get('id')}/pdf/public/{token}"
+                pdf_url = f"{base_url}/invoice/{invoice_number}/pdf"
                 
                 invoice_message = f"📄 *Invoice {invoice.get('invoice_number', 'N/A')}*\n\n"
                 invoice_message += f"Member: {invoice.get('member_name', 'N/A')}\n"
@@ -2573,6 +2571,31 @@ def download_invoice_pdf_public(invoice_id, token):
         return generate_invoice_pdf_response(invoice)
     except Exception as e:
         print(f"Error generating public PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error generating PDF: {str(e)}", 500
+
+@app.route('/invoice/<path:invoice_number>/pdf')
+def download_invoice_pdf_by_number(invoice_number):
+    """Permanent PDF link using invoice number - can be opened anytime, no token needed
+    This link is permanent and can be shared - it will always work to download the PDF.
+    Format: /invoice/INV-2024-0001/pdf
+    """
+    try:
+        # Find invoice by invoice number
+        invoice = query_db(
+            'SELECT * FROM invoices WHERE invoice_number = %s',
+            (invoice_number,),
+            one=True
+        )
+        
+        if not invoice:
+            return "Invoice not found", 404
+        
+        # Generate and return PDF directly
+        return generate_invoice_pdf_response(invoice)
+    except Exception as e:
+        print(f"Error generating PDF by invoice number: {e}")
         import traceback
         traceback.print_exc()
         return f"Error generating PDF: {str(e)}", 500

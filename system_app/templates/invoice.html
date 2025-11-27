@@ -482,6 +482,12 @@
         <div class="action-buttons">
             <button onclick="window.print()" class="btn">🖨️ Print Invoice</button>
             <a href="{{ url_for('download_invoice_pdf', invoice_id=invoice.id) }}" class="btn btn-secondary">📥 Download PDF</a>
+            {% set permanent_pdf_url = request.host_url.rstrip('/') + '/invoice/' + invoice.invoice_number + '/pdf' %}
+            <div style="margin-top: 15px; padding: 15px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.3);">
+                <strong style="color: #00d4ff; display: block; margin-bottom: 8px;">🔗 Permanent PDF Link (Can be opened anytime):</strong>
+                <input type="text" value="{{ permanent_pdf_url }}" readonly style="width: 100%; padding: 10px; background: rgba(20, 20, 30, 0.6); border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 6px; color: #00d4ff; font-size: 12px; font-family: monospace;" onclick="this.select(); document.execCommand('copy'); alert('Link copied to clipboard!');">
+                <p style="color: #888; font-size: 11px; margin-top: 8px; margin-bottom: 0;">Click the link above to copy it. This link works permanently and can be shared.</p>
+            </div>
         </div>
     </div>
     
