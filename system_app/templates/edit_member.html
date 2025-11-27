@@ -284,6 +284,68 @@
             box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
             transform: translateY(-2px);
         }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+            header {
+                padding: 1em;
+            }
+
+            header h1 {
+                font-size: 18px;
+            }
+
+            .language-toggle-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            .main-content {
+                padding: 20px 15px;
+            }
+
+            .edit-member-section {
+                min-width: 100%;
+                max-width: 100%;
+                padding: 20px;
+            }
+
+            .edit-member-section h2 {
+                font-size: 20px;
+            }
+
+            input, textarea {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 12px;
+            }
+
+            button {
+                padding: 14px;
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 0.8em;
+            }
+
+            header h1 {
+                font-size: 16px;
+            }
+
+            .main-content {
+                padding: 15px 10px;
+            }
+
+            .edit-member-section {
+                padding: 15px;
+            }
+
+            .edit-member-section h2 {
+                font-size: 18px;
+            }
+        }
     </style>
 </head>
 <body {% if is_rtl %}dir="rtl"{% endif %}>

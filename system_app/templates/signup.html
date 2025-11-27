@@ -330,6 +330,72 @@
             color: #4caf50;
             text-align: left;
         }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+            header {
+                padding: 1em;
+            }
+
+            header h1 {
+                font-size: 18px;
+            }
+
+            .language-toggle-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            .signup-container {
+                padding: 20px 15px;
+                margin: 20px 10px;
+            }
+
+            .signup-container form {
+                padding: 25px 20px;
+            }
+
+            .signup-container h2 {
+                font-size: 22px;
+            }
+
+            .signup-container input {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 14px;
+            }
+
+            .signup-container button {
+                padding: 14px;
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 0.8em;
+            }
+
+            header h1 {
+                font-size: 16px;
+            }
+
+            .signup-container {
+                padding: 15px 10px;
+                margin: 15px 5px;
+            }
+
+            .signup-container form {
+                padding: 20px 15px;
+            }
+
+            .signup-container h2 {
+                font-size: 20px;
+            }
+
+            .password-strength {
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>

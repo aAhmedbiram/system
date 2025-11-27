@@ -371,6 +371,102 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(33, 150, 243, 0.5);
         }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+            header {
+                padding: 1em;
+            }
+
+            header h1 {
+                font-size: 18px;
+            }
+
+            .language-toggle-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            section {
+                margin: 15px 10px;
+            }
+
+            .index-btn, .filter-btn, .download-btn {
+                width: 100%;
+                margin-left: 0;
+                margin-bottom: 10px;
+                text-align: center;
+            }
+
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
+                font-size: 12px;
+                min-width: 800px;
+            }
+
+            th, td {
+                padding: 8px 6px;
+                font-size: 11px;
+            }
+
+            .filter-section {
+                padding: 15px;
+            }
+
+            .filter-section input {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .filter-section button {
+                width: 100%;
+                margin-left: 0;
+            }
+
+            .pagination {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+
+            .pagination-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .pagination-info {
+                width: 100%;
+                text-align: center;
+                margin: 10px 0;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 0.8em;
+            }
+
+            header h1 {
+                font-size: 16px;
+            }
+
+            section {
+                margin: 10px 5px;
+            }
+
+            table {
+                font-size: 10px;
+                min-width: 700px;
+            }
+
+            th, td {
+                padding: 6px 4px;
+                font-size: 10px;
+            }
+        }
     </style>
 </head>
 <body {% if is_rtl %}dir="rtl"{% endif %}>

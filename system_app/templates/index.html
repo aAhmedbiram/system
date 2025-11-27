@@ -480,17 +480,139 @@
 
         /* Responsive design */
         @media (max-width: 768px) {
+            header {
+                padding: 1em;
+            }
+
             .header-content {
                 flex-direction: column;
                 gap: 15px;
+                align-items: flex-start;
+            }
+
+            .logo-section {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .header-title {
+                font-size: 20px;
+            }
+
+            .user-info {
+                width: 100%;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .welcome-text {
+                font-size: 14px;
+            }
+
+            #datetime {
+                font-size: 12px;
+            }
+
+            .language-toggle-btn,
+            .change-password-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            .main-container {
+                padding: 20px 10px;
             }
 
             .quick-actions {
                 grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .action-card {
+                padding: 20px;
+            }
+
+            .action-card h3 {
+                font-size: 18px;
             }
 
             .nav-grid {
                 grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+
+            .nav-btn {
+                padding: 15px;
+                font-size: 14px;
+            }
+
+            .bottom-bar {
+                padding: 15px 10px;
+            }
+
+            .bottom-buttons {
+                gap: 10px;
+            }
+
+            .bottom-btn {
+                padding: 10px 16px;
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 0.8em;
+            }
+
+            .header-title {
+                font-size: 18px;
+            }
+
+            .logo-container {
+                width: 50px;
+                height: 50px;
+            }
+
+            .logo-container::before {
+                font-size: 28px;
+            }
+
+            .user-info {
+                flex-direction: column;
+                align-items: flex-start;
+                width: 100%;
+            }
+
+            .main-container {
+                padding: 15px 8px;
+            }
+
+            .action-card {
+                padding: 15px;
+            }
+
+            .action-card input,
+            .action-card button {
+                font-size: 14px;
+                padding: 12px;
+            }
+
+            .nav-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-btn {
+                padding: 12px;
+            }
+
+            .bottom-buttons {
+                flex-direction: column;
+            }
+
+            .bottom-btn {
+                width: 100%;
+                text-align: center;
             }
         }
     </style>

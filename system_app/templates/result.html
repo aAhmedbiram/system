@@ -282,6 +282,92 @@
                 box-shadow: 0 0 12px #f44336;
             }
         }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+            header {
+                padding: 1em;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+
+            header h1 {
+                font-size: 18px;
+            }
+
+            .language-toggle-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            section {
+                margin: 15px 10px;
+                padding: 20px 15px;
+            }
+
+            .table-container {
+                padding: 20px 15px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
+                font-size: 12px;
+                min-width: 800px;
+            }
+
+            th, td {
+                padding: 8px 6px;
+                font-size: 11px;
+            }
+
+            h3 {
+                font-size: 20px;
+            }
+
+            .back-btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 0.8em;
+            }
+
+            header h1 {
+                font-size: 16px;
+            }
+
+            section {
+                margin: 10px 5px;
+                padding: 15px 10px;
+            }
+
+            .table-container {
+                padding: 15px 10px;
+            }
+
+            table {
+                font-size: 10px;
+                min-width: 700px;
+            }
+
+            th, td {
+                padding: 6px 4px;
+                font-size: 10px;
+            }
+
+            .edit-link {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body {% if is_rtl %}dir="rtl"{% endif %}>

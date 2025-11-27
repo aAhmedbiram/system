@@ -278,6 +278,84 @@
             right: auto;
             left: 20px;
         }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+            header {
+                padding: 1em;
+            }
+
+            header h1 {
+                font-size: 18px;
+            }
+
+            .language-toggle-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+                top: 10px;
+                right: 10px;
+            }
+
+            .login-container {
+                padding: 20px 15px;
+                margin: 20px 10px;
+            }
+
+            .login-container form {
+                padding: 25px 20px;
+            }
+
+            .login-container h2 {
+                font-size: 22px;
+            }
+
+            .login-container input {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 14px;
+            }
+
+            .login-container button {
+                padding: 14px;
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 0.8em;
+            }
+
+            header h1 {
+                font-size: 16px;
+            }
+
+            .language-toggle-btn {
+                font-size: 11px;
+                padding: 5px 10px;
+            }
+
+            .login-container {
+                padding: 15px 10px;
+                margin: 15px 5px;
+            }
+
+            .login-container form {
+                padding: 20px 15px;
+            }
+
+            .login-container h2 {
+                font-size: 20px;
+            }
+
+            .link-text {
+                font-size: 13px;
+            }
+
+            .signup {
+                font-size: 14px;
+                padding: 12px;
+            }
+        }
     </style>
 </head>
 <body {% if is_rtl %}dir="rtl"{% endif %}>
