@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, g,jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from datetime import datetime, timedelta
 import os
+import json
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor, Json
+from psycopg2.extensions import register_adapter, AsIs
 from psycopg2 import pool
 from functools import wraps
 from email_validator import validate_email, EmailNotValidError
@@ -4029,6 +4031,389 @@ def add_staff_purchase_route(staff_id):
         flash(f'Error recording purchase: {str(e)}', 'error')
     return redirect(url_for('staff_management'))
 
+
+# ========================================
+# TRAINING TEMPLATES SYSTEM (نظام خطط تدريب جاهزة)
+# ========================================
+
+@app.route('/training_templates')
+@login_required
+def training_templates():
+    """Display all training templates"""
+    try:
+        templates = query_db(
+            'SELECT * FROM training_templates ORDER BY created_at DESC',
+            one=False
+        ) or []
+        return render_template('training_templates.html', templates=templates)
+    except Exception as e:
+        print(f"Error loading training templates: {e}")
+        flash(f"Error loading templates: {str(e)}", "error")
+        return render_template('training_templates.html', templates=[])
+
+@app.route('/training_templates/create', methods=['GET', 'POST'])
+@login_required
+def create_training_template():
+    """Create a new training template"""
+    if request.method == 'POST':
+        try:
+            template_name = request.form.get('template_name', '').strip()
+            category = request.form.get('category', '').strip()
+            description = request.form.get('description', '').strip()
+            exercises = request.form.get('exercises', '').strip()
+            created_by = session.get('username', 'Unknown')
+            
+            if not template_name or not category or not exercises:
+                flash('Template name, category, and exercises are required!', 'error')
+                return render_template('create_training_template.html')
+            
+            result = query_db(
+                '''INSERT INTO training_templates 
+                   (template_name, category, description, exercises, created_by)
+                   VALUES (%s, %s, %s, %s, %s)
+                   RETURNING id''',
+                (template_name, category, description, exercises, created_by),
+                one=True,
+                commit=True
+            )
+            
+            flash(f'Training template "{template_name}" created successfully!', 'success')
+            return redirect(url_for('training_templates'))
+        except Exception as e:
+            print(f"Error creating training template: {e}")
+            flash(f"Error creating template: {str(e)}", "error")
+    
+    return render_template('create_training_template.html')
+
+@app.route('/training_templates/<int:template_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_training_template(template_id):
+    """Edit a training template"""
+    template = query_db(
+        'SELECT * FROM training_templates WHERE id = %s',
+        (template_id,),
+        one=True
+    )
+    
+    if not template:
+        flash('Template not found!', 'error')
+        return redirect(url_for('training_templates'))
+    
+    if request.method == 'POST':
+        try:
+            template_name = request.form.get('template_name', '').strip()
+            category = request.form.get('category', '').strip()
+            description = request.form.get('description', '').strip()
+            exercises = request.form.get('exercises', '').strip()
+            
+            if not template_name or not category or not exercises:
+                flash('Template name, category, and exercises are required!', 'error')
+                return render_template('edit_training_template.html', template=template)
+            
+            query_db(
+                '''UPDATE training_templates 
+                   SET template_name = %s, category = %s, description = %s, 
+                       exercises = %s, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = %s''',
+                (template_name, category, description, exercises, template_id),
+                commit=True
+            )
+            
+            flash(f'Training template "{template_name}" updated successfully!', 'success')
+            return redirect(url_for('training_templates'))
+        except Exception as e:
+            print(f"Error updating training template: {e}")
+            flash(f"Error updating template: {str(e)}", "error")
+    
+    return render_template('edit_training_template.html', template=template)
+
+@app.route('/training_templates/<int:template_id>/delete', methods=['POST'])
+@login_required
+def delete_training_template(template_id):
+    """Delete a training template"""
+    try:
+        template = query_db(
+            'SELECT template_name FROM training_templates WHERE id = %s',
+            (template_id,),
+            one=True
+        )
+        
+        if not template:
+            flash('Template not found!', 'error')
+            return redirect(url_for('training_templates'))
+        
+        query_db(
+            'DELETE FROM training_templates WHERE id = %s',
+            (template_id,),
+            commit=True
+        )
+        
+        flash(f'Training template "{template["template_name"]}" deleted successfully!', 'success')
+    except Exception as e:
+        print(f"Error deleting training template: {e}")
+        flash(f"Error deleting template: {str(e)}", "error")
+    
+    return redirect(url_for('training_templates'))
+
+@app.route('/training_templates/<int:template_id>/assign', methods=['GET', 'POST'])
+@login_required
+def assign_training_template(template_id):
+    """Assign a training template to a member"""
+    template = query_db(
+        'SELECT * FROM training_templates WHERE id = %s',
+        (template_id,),
+        one=True
+    )
+    
+    if not template:
+        flash('Template not found!', 'error')
+        return redirect(url_for('training_templates'))
+    
+    if request.method == 'POST':
+        try:
+            member_id = request.form.get('member_id')
+            plan_name = request.form.get('plan_name', '').strip() or template['template_name']
+            exercises = request.form.get('exercises', '').strip() or template['exercises']
+            start_date = request.form.get('start_date', '')
+            end_date = request.form.get('end_date', '')
+            assigned_by = session.get('username', 'Unknown')
+            
+            if not member_id:
+                flash('Please select a member!', 'error')
+                members = query_db('SELECT id, name FROM members ORDER BY name', one=False) or []
+                return render_template('assign_training_template.html', template=template, members=members)
+            
+            query_db(
+                '''INSERT INTO member_training_plans 
+                   (member_id, template_id, plan_name, exercises, start_date, end_date, assigned_by)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)''',
+                (member_id, template_id, plan_name, exercises, start_date or None, end_date or None, assigned_by),
+                commit=True
+            )
+            
+            member = query_db('SELECT name FROM members WHERE id = %s', (member_id,), one=True)
+            flash(f'Training plan assigned to {member["name"] if member else "member"} successfully!', 'success')
+            return redirect(url_for('member_training_plans', member_id=member_id))
+        except Exception as e:
+            print(f"Error assigning training template: {e}")
+            flash(f"Error assigning template: {str(e)}", "error")
+    
+    members = query_db('SELECT id, name FROM members ORDER BY name', one=False) or []
+    return render_template('assign_training_template.html', template=template, members=members)
+
+@app.route('/member_training_plans/<int:member_id>')
+@login_required
+def member_training_plans(member_id):
+    """View training plans for a specific member"""
+    try:
+        member = query_db('SELECT * FROM members WHERE id = %s', (member_id,), one=True)
+        if not member:
+            flash('Member not found!', 'error')
+            return redirect(url_for('all_members'))
+        
+        plans = query_db(
+            '''SELECT mtp.*, tt.template_name, tt.category 
+               FROM member_training_plans mtp
+               LEFT JOIN training_templates tt ON mtp.template_id = tt.id
+               WHERE mtp.member_id = %s
+               ORDER BY mtp.created_at DESC''',
+            (member_id,),
+            one=False
+        ) or []
+        
+        return render_template('member_training_plans.html', member=member, plans=plans)
+    except Exception as e:
+        print(f"Error loading member training plans: {e}")
+        flash(f"Error loading plans: {str(e)}", "error")
+        return redirect(url_for('all_members'))
+
+# ========================================
+# PROGRESS TRACKING SYSTEM (نظام متابعة التقدم)
+# ========================================
+
+@app.route('/progress_tracking/<int:member_id>')
+@login_required
+def progress_tracking(member_id):
+    """View progress tracking for a member with graphs"""
+    try:
+        member = query_db('SELECT * FROM members WHERE id = %s', (member_id,), one=True)
+        if not member:
+            flash('Member not found!', 'error')
+            return redirect(url_for('all_members'))
+        
+        # Get all progress entries
+        progress_data = query_db(
+            '''SELECT * FROM progress_tracking 
+               WHERE member_id = %s 
+               ORDER BY tracking_date DESC''',
+            (member_id,),
+            one=False
+        ) or []
+        
+        # Prepare data for graphs - handle None values properly
+        dates = [str(p['tracking_date']) for p in reversed(progress_data) if p.get('tracking_date')]
+        weights = [float(p['weight']) for p in reversed(progress_data) if p.get('weight') is not None]
+        body_fat = [float(p['body_fat']) for p in reversed(progress_data) if p.get('body_fat') is not None]
+        muscle_mass = [float(p['muscle_mass']) for p in reversed(progress_data) if p.get('muscle_mass') is not None]
+        
+        # Process measurements and photos - handle JSON strings and arrays
+        for p in progress_data:
+            # Handle measurements JSON
+            if p.get('measurements') and isinstance(p['measurements'], str):
+                try:
+                    p['measurements'] = json.loads(p['measurements'])
+                except:
+                    p['measurements'] = None
+            
+            # Handle photos array - PostgreSQL returns arrays as lists
+            if p.get('photos'):
+                if isinstance(p['photos'], str):
+                    # Try to parse as JSON array or comma-separated
+                    try:
+                        p['photos'] = json.loads(p['photos'])
+                    except:
+                        # Try comma-separated
+                        p['photos'] = [x.strip() for x in p['photos'].split(',') if x.strip()]
+                elif not isinstance(p['photos'], list):
+                    p['photos'] = []
+        
+        # Get first and last photos for before/after comparison
+        first_progress = progress_data[-1] if progress_data else None
+        latest_progress = progress_data[0] if progress_data else None
+        
+        return render_template('progress_tracking.html', 
+                             member=member, 
+                             progress_data=progress_data,
+                             dates=dates,
+                             weights=weights,
+                             body_fat=body_fat,
+                             muscle_mass=muscle_mass,
+                             first_progress=first_progress,
+                             latest_progress=latest_progress)
+    except Exception as e:
+        print(f"Error loading progress tracking: {e}")
+        flash(f"Error loading progress: {str(e)}", "error")
+        return redirect(url_for('all_members'))
+
+@app.route('/progress_tracking/<int:member_id>/add', methods=['GET', 'POST'])
+@login_required
+def add_progress_entry(member_id):
+    """Add a new progress entry for a member"""
+    member = query_db('SELECT * FROM members WHERE id = %s', (member_id,), one=True)
+    if not member:
+        flash('Member not found!', 'error')
+        return redirect(url_for('all_members'))
+    
+    if request.method == 'POST':
+        try:
+            tracking_date = request.form.get('tracking_date', '')
+            weight = request.form.get('weight', '').strip()
+            body_fat = request.form.get('body_fat', '').strip()
+            muscle_mass = request.form.get('muscle_mass', '').strip()
+            notes = request.form.get('notes', '').strip()
+            tracked_by = session.get('username', 'Unknown')
+            
+            # Handle measurements JSON
+            measurements = {}
+            measurement_fields = ['chest', 'waist', 'hips', 'thigh', 'arm', 'neck']
+            for field in measurement_fields:
+                value = request.form.get(f'measurement_{field}', '').strip()
+                if value:
+                    measurements[field] = float(value)
+            
+            # Handle photo uploads
+            uploaded_files = request.files.getlist('photos')
+            photo_paths = []
+            
+            if uploaded_files:
+                import uuid
+                from werkzeug.utils import secure_filename
+                import os
+                
+                upload_folder = os.path.join(app.root_path, 'static', 'progress_photos')
+                os.makedirs(upload_folder, exist_ok=True)
+                
+                for file in uploaded_files:
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        unique_filename = f"{uuid.uuid4()}_{filename}"
+                        filepath = os.path.join(upload_folder, unique_filename)
+                        file.save(filepath)
+                        photo_paths.append(f"progress_photos/{unique_filename}")
+            
+            # Prepare data for insertion
+            measurements_json = Json(measurements) if measurements else None
+            photos_array = photo_paths if photo_paths else None
+            
+            query_db(
+                '''INSERT INTO progress_tracking 
+                   (member_id, tracking_date, weight, body_fat, muscle_mass, measurements, photos, notes, tracked_by)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                (member_id, tracking_date or datetime.now().date(),
+                 float(weight) if weight else None,
+                 float(body_fat) if body_fat else None,
+                 float(muscle_mass) if muscle_mass else None,
+                 measurements_json,
+                 photos_array,  # PostgreSQL TEXT[] array
+                 notes, tracked_by),
+                commit=True
+            )
+            
+            flash('Progress entry added successfully!', 'success')
+            return redirect(url_for('progress_tracking', member_id=member_id))
+        except Exception as e:
+            print(f"Error adding progress entry: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error adding progress entry: {str(e)}", "error")
+    
+    return render_template('add_progress_entry.html', member=member)
+
+@app.route('/progress_tracking/<int:member_id>/<int:entry_id>/delete', methods=['POST'])
+@login_required
+def delete_progress_entry(member_id, entry_id):
+    """Delete a progress entry"""
+    try:
+        entry = query_db(
+            'SELECT photos FROM progress_tracking WHERE id = %s AND member_id = %s',
+            (entry_id, member_id),
+            one=True
+        )
+        
+        if entry and entry.get('photos'):
+            import os
+            photos_list = entry['photos']
+            # Handle different formats (list, string, etc.)
+            if isinstance(photos_list, str):
+                try:
+                    photos_list = json.loads(photos_list)
+                except:
+                    # Try comma-separated or single path
+                    photos_list = [x.strip() for x in photos_list.replace('[', '').replace(']', '').replace('"', '').split(',') if x.strip()]
+            elif not isinstance(photos_list, list):
+                photos_list = []
+            
+            for photo_path in photos_list:
+                if photo_path:
+                    full_path = os.path.join(app.root_path, 'static', photo_path)
+                    if os.path.exists(full_path):
+                        try:
+                            os.remove(full_path)
+                        except Exception as e:
+                            print(f"Error deleting photo {photo_path}: {e}")
+        
+        query_db(
+            'DELETE FROM progress_tracking WHERE id = %s AND member_id = %s',
+            (entry_id, member_id),
+            commit=True
+        )
+        
+        flash('Progress entry deleted successfully!', 'success')
+    except Exception as e:
+        print(f"Error deleting progress entry: {e}")
+        flash(f"Error deleting entry: {str(e)}", "error")
+    
+    return redirect(url_for('progress_tracking', member_id=member_id))
 
 # === Debug Route (for testing) ===
 @app.route('/debug/test')

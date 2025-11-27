@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Training Template - Rival Gym System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/create_template.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header h1 {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .main-container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .form-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 35px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            color: #4caf50;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 14px;
+            background: rgba(20, 20, 30, 0.6);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+            background: rgba(20, 20, 30, 0.8);
+        }
+
+        textarea {
+            min-height: 200px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(30, 30, 40, 0.8);
+            margin-right: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+    <div class="content-wrapper">
+        <header>
+            <div class="header-content">
+                <h1>💪 Edit Training Template</h1>
+                <a href="{{ url_for('toggle_language') }}" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; font-size: 14px; padding: 8px 16px; border-radius: 6px; font-weight: 600;">
+                    {% if current_lang == 'en' %}🇸🇦 Arabic{% else %}🇬🇧 English{% endif %}
+                </a>
+            </div>
+        </header>
+
+        <div class="main-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div style="padding: 15px; margin-bottom: 20px; border-radius: 8px; text-align: center; {% if category == 'error' %}background: rgba(198, 40, 40, 0.9);{% else %}background: rgba(46, 125, 50, 0.9);{% endif %}">
+                            {{ message | safe }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-card">
+                <form method="POST" action="{{ url_for('edit_training_template', template_id=template.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="form-group">
+                        <label for="template_name">Template Name *</label>
+                        <input type="text" id="template_name" name="template_name" value="{{ template.template_name }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category">Category *</label>
+                        <select id="category" name="category" required>
+                            <option value="Weight Loss" {% if template.category == 'Weight Loss' %}selected{% endif %}>Weight Loss</option>
+                            <option value="Muscle Gain" {% if template.category == 'Muscle Gain' %}selected{% endif %}>Muscle Gain</option>
+                            <option value="General Fitness" {% if template.category == 'General Fitness' %}selected{% endif %}>General Fitness</option>
+                            <option value="Strength Training" {% if template.category == 'Strength Training' %}selected{% endif %}>Strength Training</option>
+                            <option value="Cardio" {% if template.category == 'Cardio' %}selected{% endif %}>Cardio</option>
+                            <option value="Flexibility" {% if template.category == 'Flexibility' %}selected{% endif %}>Flexibility</option>
+                            <option value="Rehabilitation" {% if template.category == 'Rehabilitation' %}selected{% endif %}>Rehabilitation</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Description (Optional)</label>
+                        <textarea id="description" name="description">{{ template.description or '' }}</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="exercises">Exercises / Training Plan *</label>
+                        <textarea id="exercises" name="exercises" required>{{ template.exercises }}</textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 30px;">
+                        <a href="{{ url_for('training_templates') }}" class="btn-secondary">Cancel</a>
+                        <button type="submit" class="btn">Update Template</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

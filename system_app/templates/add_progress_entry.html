@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Progress Entry - {{ member.name }} - Rival Gym System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header h1 {
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .main-container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .member-info {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .member-info h2 {
+            color: #4caf50;
+            font-size: 24px;
+        }
+
+        .form-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 35px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            color: #4caf50;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 14px;
+            background: rgba(20, 20, 30, 0.6);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+            background: rgba(20, 20, 30, 0.8);
+        }
+
+        .measurements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(30, 30, 40, 0.8);
+            margin-right: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .info-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #4caf50;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .measurements-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+    <div class="content-wrapper">
+        <header>
+            <div class="header-content">
+                <h1>📈 Add Progress Entry</h1>
+                <a href="{{ url_for('toggle_language') }}" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; font-size: 14px; padding: 8px 16px; border-radius: 6px; font-weight: 600;">
+                    {% if current_lang == 'en' %}🇸🇦 Arabic{% else %}🇬🇧 English{% endif %}
+                </a>
+            </div>
+        </header>
+
+        <div class="main-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div style="padding: 15px; margin-bottom: 20px; border-radius: 8px; text-align: center; {% if category == 'error' %}background: rgba(198, 40, 40, 0.9);{% else %}background: rgba(46, 125, 50, 0.9);{% endif %}">
+                            {{ message | safe }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="member-info">
+                <h2>{{ member.name }}</h2>
+                <p>Member ID: {{ member.id }}</p>
+            </div>
+
+            <div class="form-card">
+                <div class="info-box">
+                    💡 <strong>Tip:</strong> Track progress weekly for best results! Upload photos to see visual progress over time.
+                </div>
+
+                <form method="POST" action="{{ url_for('add_progress_entry', member_id=member.id) }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="form-group">
+                        <label for="tracking_date">Date *</label>
+                        <input type="date" id="tracking_date" name="tracking_date" value="{{ datetime.now().strftime('%Y-%m-%d') }}" required>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="weight">Weight (kg)</label>
+                            <input type="number" id="weight" name="weight" step="0.1" placeholder="e.g., 75.5">
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="body_fat">Body Fat %</label>
+                            <input type="number" id="body_fat" name="body_fat" step="0.1" placeholder="e.g., 15.5">
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="muscle_mass">Muscle Mass (kg)</label>
+                            <input type="number" id="muscle_mass" name="muscle_mass" step="0.1" placeholder="e.g., 60.0">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Body Measurements (cm)</label>
+                        <div class="measurements-grid">
+                            <div>
+                                <label for="measurement_chest" style="font-size: 14px;">Chest</label>
+                                <input type="number" id="measurement_chest" name="measurement_chest" step="0.1" placeholder="cm">
+                            </div>
+                            <div>
+                                <label for="measurement_waist" style="font-size: 14px;">Waist</label>
+                                <input type="number" id="measurement_waist" name="measurement_waist" step="0.1" placeholder="cm">
+                            </div>
+                            <div>
+                                <label for="measurement_hips" style="font-size: 14px;">Hips</label>
+                                <input type="number" id="measurement_hips" name="measurement_hips" step="0.1" placeholder="cm">
+                            </div>
+                            <div>
+                                <label for="measurement_thigh" style="font-size: 14px;">Thigh</label>
+                                <input type="number" id="measurement_thigh" name="measurement_thigh" step="0.1" placeholder="cm">
+                            </div>
+                            <div>
+                                <label for="measurement_arm" style="font-size: 14px;">Arm</label>
+                                <input type="number" id="measurement_arm" name="measurement_arm" step="0.1" placeholder="cm">
+                            </div>
+                            <div>
+                                <label for="measurement_neck" style="font-size: 14px;">Neck</label>
+                                <input type="number" id="measurement_neck" name="measurement_neck" step="0.1" placeholder="cm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="photos">Progress Photos (Optional)</label>
+                        <input type="file" id="photos" name="photos" multiple accept="image/*">
+                        <small style="color: #888; font-size: 12px; margin-top: 5px; display: block;">You can upload multiple photos</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Notes (Optional)</label>
+                        <textarea id="notes" name="notes" rows="4" placeholder="Any additional notes about this progress entry..."></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 30px;">
+                        <a href="{{ url_for('progress_tracking', member_id=member.id) }}" class="btn-secondary">Cancel</a>
+                        <button type="submit" class="btn">Save Progress Entry</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

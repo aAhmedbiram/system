@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progress Tracking - {{ member.name }} - Rival Gym System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body[dir="rtl"] {
+            direction: rtl;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header h1 {
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.5);
+        }
+
+        .member-info {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .member-info h2 {
+            color: #4caf50;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .member-info p {
+            color: #ccc;
+            font-size: 16px;
+        }
+
+        .graphs-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .graph-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .graph-card h3 {
+            color: #4caf50;
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .before-after-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .photo-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .photo-card h3 {
+            color: #4caf50;
+            margin-bottom: 15px;
+        }
+
+        .photo-card img {
+            max-width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .progress-table {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 25px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(76, 175, 80, 0.2);
+        }
+
+        th {
+            color: #4caf50;
+            font-weight: 700;
+        }
+
+        .photos-grid {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .photos-grid img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .photos-grid img:hover {
+            transform: scale(1.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #4caf50;
+        }
+
+        @media (max-width: 768px) {
+            .graphs-section {
+                grid-template-columns: 1fr;
+            }
+
+            .before-after-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+    <div class="content-wrapper">
+        <header>
+            <div class="header-content">
+                <h1>📈 Progress Tracking - {{ member.name }}</h1>
+                <a href="{{ url_for('toggle_language') }}" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; font-size: 14px; padding: 8px 16px; border-radius: 6px; font-weight: 600;">
+                    {% if current_lang == 'en' %}🇸🇦 Arabic{% else %}🇬🇧 English{% endif %}
+                </a>
+            </div>
+        </header>
+
+        <div class="main-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div style="padding: 15px; margin-bottom: 20px; border-radius: 8px; text-align: center; {% if category == 'error' %}background: rgba(198, 40, 40, 0.9);{% else %}background: rgba(46, 125, 50, 0.9);{% endif %}">
+                            {{ message | safe }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="action-buttons">
+                <a href="{{ url_for('all_members') }}" class="btn">← Back to Members</a>
+                <a href="{{ url_for('add_progress_entry', member_id=member.id) }}" class="btn btn-primary">➕ Add Progress Entry</a>
+                <a href="{{ url_for('member_training_plans', member_id=member.id) }}" class="btn" style="background: linear-gradient(135deg, #ff9800, #ffb74d);">💪 View Training Plans</a>
+            </div>
+
+            <div class="member-info">
+                <h2>{{ member.name }}</h2>
+                <p>Member ID: {{ member.id }} | Age: {{ member.age or 'N/A' }} | Gender: {{ member.gender or 'N/A' }}</p>
+            </div>
+
+            {% if progress_data %}
+                <!-- Before/After Photo Comparison -->
+                {% if first_progress and latest_progress and (first_progress.photos or latest_progress.photos) %}
+                <div class="before-after-section">
+                    <div class="photo-card">
+                        <h3>📸 Before</h3>
+                        {% if first_progress.photos %}
+                            <img src="{{ url_for('static', filename=first_progress.photos[0]) }}" alt="Before" style="max-width: 100%;">
+                            <p style="margin-top: 10px; color: #888; font-size: 12px;">{{ first_progress.tracking_date }}</p>
+                        {% else %}
+                            <p style="color: #888;">No photo available</p>
+                        {% endif %}
+                    </div>
+                    <div class="photo-card">
+                        <h3>📸 After</h3>
+                        {% if latest_progress.photos %}
+                            <img src="{{ url_for('static', filename=latest_progress.photos[0]) }}" alt="After" style="max-width: 100%;">
+                            <p style="margin-top: 10px; color: #888; font-size: 12px;">{{ latest_progress.tracking_date }}</p>
+                        {% else %}
+                            <p style="color: #888;">No photo available</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Progress Graphs -->
+                {% if dates %}
+                <div class="graphs-section">
+                    {% if weights %}
+                    <div class="graph-card">
+                        <h3>⚖️ Weight Progress (kg)</h3>
+                        <div class="chart-container">
+                            <canvas id="weightChart"></canvas>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if body_fat %}
+                    <div class="graph-card">
+                        <h3>📊 Body Fat %</h3>
+                        <div class="chart-container">
+                            <canvas id="bodyFatChart"></canvas>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if muscle_mass %}
+                    <div class="graph-card">
+                        <h3>💪 Muscle Mass (kg)</h3>
+                        <div class="chart-container">
+                            <canvas id="muscleMassChart"></canvas>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Progress Entries Table -->
+                <div class="progress-table">
+                    <h3 style="color: #4caf50; margin-bottom: 20px; font-size: 22px;">Progress History</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Weight (kg)</th>
+                                <th>Body Fat %</th>
+                                <th>Muscle Mass (kg)</th>
+                                <th>Measurements</th>
+                                <th>Photos</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in progress_data %}
+                            <tr>
+                                <td>{{ entry.tracking_date.strftime('%Y-%m-%d') if entry.tracking_date else 'N/A' }}</td>
+                                <td>{{ entry.weight or '-' }}</td>
+                                <td>{{ entry.body_fat or '-' }}</td>
+                                <td>{{ entry.muscle_mass or '-' }}</td>
+                                <td>
+                                    {% if entry.measurements %}
+                                        {% if entry.measurements is mapping %}
+                                            {% if entry.measurements.get('chest') %}Chest: {{ entry.measurements.chest }}<br>{% endif %}
+                                            {% if entry.measurements.get('waist') %}Waist: {{ entry.measurements.waist }}<br>{% endif %}
+                                            {% if entry.measurements.get('hips') %}Hips: {{ entry.measurements.hips }}<br>{% endif %}
+                                            {% if entry.measurements.get('thigh') %}Thigh: {{ entry.measurements.thigh }}<br>{% endif %}
+                                            {% if entry.measurements.get('arm') %}Arm: {{ entry.measurements.arm }}<br>{% endif %}
+                                            {% if entry.measurements.get('neck') %}Neck: {{ entry.measurements.neck }}{% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if entry.photos %}
+                                    <div class="photos-grid">
+                                        {% for photo in entry.photos %}
+                                        <img src="{{ url_for('static', filename=photo) }}" alt="Progress Photo" onclick="window.open('{{ url_for('static', filename=photo) }}', '_blank')">
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td style="max-width: 200px; word-wrap: break-word;">{{ entry.notes or '-' }}</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('delete_progress_entry', member_id=member.id, entry_id=entry.id) }}" style="display: inline;" onsubmit="return confirm('Delete this progress entry?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" style="background: linear-gradient(135deg, #e53935, #f44336); color: white; padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <h3>No Progress Data Yet</h3>
+                    <p>Start tracking {{ member.name }}'s progress by adding the first entry!</p>
+                    <a href="{{ url_for('add_progress_entry', member_id=member.id) }}" class="btn" style="margin-top: 20px; display: inline-block;">Add First Entry</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if dates and (weights or body_fat or muscle_mass) %}
+    <script>
+        Chart.defaults.color = '#fff';
+        Chart.defaults.borderColor = 'rgba(76, 175, 80, 0.3)';
+        Chart.defaults.backgroundColor = 'rgba(76, 175, 80, 0.1)';
+
+        const dates = {{ dates | tojson }};
+
+        {% if weights %}
+        new Chart(document.getElementById('weightChart'), {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Weight (kg)',
+                    data: {{ weights | tojson }},
+                    borderColor: '#4caf50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(76, 175, 80, 0.2)' }
+                    },
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(76, 175, 80, 0.2)' }
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        {% if body_fat %}
+        new Chart(document.getElementById('bodyFatChart'), {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Body Fat %',
+                    data: {{ body_fat | tojson }},
+                    borderColor: '#f44336',
+                    backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(76, 175, 80, 0.2)' }
+                    },
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(76, 175, 80, 0.2)' }
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        {% if muscle_mass %}
+        new Chart(document.getElementById('muscleMassChart'), {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Muscle Mass (kg)',
+                    data: {{ muscle_mass | tojson }},
+                    borderColor: '#2196F3',
+                    backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(76, 175, 80, 0.2)' }
+                    },
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(76, 175, 80, 0.2)' }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    </script>
+    {% endif %}
+</body>
+</html>
+

@@ -280,6 +280,54 @@ def create_table():
             )
         ''')
 
+        # Create training_templates table (نظام خطط تدريب جاهزة)
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS training_templates (
+                id SERIAL PRIMARY KEY,
+                template_name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                description TEXT,
+                exercises TEXT NOT NULL,
+                created_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create member_training_plans table (الخطط المخصصة للأعضاء)
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS member_training_plans (
+                id SERIAL PRIMARY KEY,
+                member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+                template_id INTEGER REFERENCES training_templates(id) ON DELETE SET NULL,
+                plan_name TEXT NOT NULL,
+                exercises TEXT NOT NULL,
+                start_date DATE,
+                end_date DATE,
+                status TEXT DEFAULT 'active',
+                assigned_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create progress_tracking table (نظام متابعة التقدم)
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS progress_tracking (
+                id SERIAL PRIMARY KEY,
+                member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+                tracking_date DATE NOT NULL,
+                weight REAL,
+                body_fat REAL,
+                muscle_mass REAL,
+                measurements JSONB,
+                photos TEXT[],
+                notes TEXT,
+                tracked_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         # Create indexes for better query performance
         try:
             # Indexes for members table (frequently queried columns)
@@ -287,6 +335,15 @@ def create_table():
             cr.execute('CREATE INDEX IF NOT EXISTS idx_members_phone ON members(phone)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_members_email ON members(email)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_members_id ON members(id)')
+            
+            # Indexes for training templates and plans
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_training_templates_category ON training_templates(category)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_member_training_plans_member_id ON member_training_plans(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_member_training_plans_template_id ON member_training_plans(template_id)')
+            
+            # Indexes for progress tracking
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_progress_tracking_member_id ON progress_tracking(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_progress_tracking_date ON progress_tracking(tracking_date)')
             
             # Indexes for attendance table
             cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_member_id ON attendance(member_id)')

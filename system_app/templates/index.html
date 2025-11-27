@@ -746,6 +746,9 @@
                 <a href="{{ url_for('invoices_list') }}" class="nav-btn purple"><span>📄 {{ t.all_invoices }}</span></a>
                 <a href="{{ url_for('undo_page') }}" class="nav-btn orange"><span>↩️ {{ t.undo_actions }}</span></a>
                 <a href="{{ url_for('supplements') }}" class="nav-btn gradient"><span>💊 {{ t.supplements_water }}</span></a>
+                <a href="{{ url_for('training_templates') }}" class="nav-btn" style="border-color: rgba(255, 193, 7, 0.3);">
+                    <span>💪 Training Templates</span>
+                </a>
                 {% if session.username == 'rino' %}
                 <a href="{{ url_for('online_users') }}" class="nav-btn cyan"><span>👥 {{ t.online_users }}</span></a>
                 {% endif %}
