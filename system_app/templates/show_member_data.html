@@ -120,6 +120,55 @@
             color: #fff;
             margin: 20px;
         }
+
+        /* Status light indicators */
+        .status-light {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin: 0 auto;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .status-light.val {
+            background-color: #4caf50;
+            color: #4caf50;
+            animation: pulse-green 2s infinite;
+        }
+
+        .status-light.ex {
+            background-color: #f44336;
+            color: #f44336;
+            animation: pulse-red 2s infinite;
+        }
+
+        .status-light.unknown {
+            background-color: #888;
+            color: #888;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 8px #4caf50;
+            }
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 12px #4caf50;
+            }
+        }
+
+        @keyframes pulse-red {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 8px #f44336;
+            }
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 12px #f44336;
+            }
+        }
     </style>
 </head>
 <body>
@@ -163,7 +212,15 @@
                             <td>{{ member_data.end_date }}</td>
                             <td>{{ member_data.membership_packages }}</td>
                             <td>{{ member_data.membership_fees }}</td>
-                            <td>{{ member_data.membership_status }}</td>
+                            <td>
+                                {% if member_data.membership_status == 'VAL' %}
+                                    <span class="status-light val" title="Valid - Active Membership"></span>
+                                {% elif member_data.membership_status == 'EX' %}
+                                    <span class="status-light ex" title="Expired - Membership Ended"></span>
+                                {% else %}
+                                    <span class="status-light unknown" title="Unknown Status"></span>
+                                {% endif %}
+                            </td>
                             <td style="text-align: left; max-width: 200px; word-wrap: break-word;">{{ member_data.comment or '-' }}</td>
                             <td>
                                 <a class="edit-link" href="{{ url_for('edit_member', member_id=member_data.id) }}">Edit</a>
