@@ -10,6 +10,8 @@ from functools import wraps
 from email_validator import validate_email, EmailNotValidError
 import re
 import secrets
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 app = Flask(__name__)
 
@@ -90,6 +92,18 @@ def track_user_activity():
                 del _active_users[uid]
     except Exception as e:
         print(f"Error tracking user activity: {e}")
+
+def scheduled_daily_status_update():
+    """Scheduled task to update membership statuses daily at midnight"""
+    with app.app_context():
+        try:
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running scheduled daily membership status update...")
+            updated_count = update_all_membership_statuses()
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Daily status update completed. Updated {updated_count} member(s).")
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error in scheduled status update: {e}")
+            import traceback
+            traceback.print_exc()
 
 def get_online_users():
     """Get list of currently online users"""
@@ -217,6 +231,22 @@ with app.app_context():
     except Exception as e:
         print(f"Warning: Could not create tables on startup: {e}")
         print("Tables may already exist or database connection failed.")
+
+# Initialize scheduler for daily status updates at midnight
+scheduler = BackgroundScheduler(daemon=True)
+scheduler.add_job(
+    func=scheduled_daily_status_update,
+    trigger=CronTrigger(hour=0, minute=0),  # Run at midnight (00:00) every day
+    id='daily_status_update',
+    name='Daily Membership Status Update',
+    replace_existing=True
+)
+scheduler.start()
+print("Scheduler started: Daily membership status update scheduled for 12:00 AM every day")
+
+# Ensure scheduler shuts down when app stops
+import atexit
+atexit.register(lambda: scheduler.shutdown())
 
 
 # === Authentication Decorator ===
@@ -439,6 +469,75 @@ def online_users():
         traceback.print_exc()
         flash(f'Error loading online users: {str(e)}', 'error')
         return redirect(url_for('index'))
+
+def update_all_membership_statuses():
+    """Update all membership statuses in the database based on current end dates"""
+    try:
+        today = datetime.now().date()
+        all_members = query_db('SELECT id, end_date, membership_status FROM members WHERE end_date IS NOT NULL AND end_date != %s', ('',))
+        
+        updated_count = 0
+        for member in all_members:
+            end_date_str = member.get('end_date', '').strip()
+            if not end_date_str:
+                continue
+            
+            # Parse end date
+            try:
+                # Try different date formats
+                date_formats = [
+                    '%Y-%m-%d',      # 2024-12-31
+                    '%m/%d/%Y',       # 12/31/2024
+                    '%d/%m/%Y',       # 31/12/2024
+                    '%m-%d-%Y',       # 12-31-2024
+                    '%d-%m-%Y',       # 31-12-2024
+                    '%Y/%m/%d',       # 2024/12/31
+                ]
+                
+                end_date_parsed = None
+                for fmt in date_formats:
+                    try:
+                        end_date_parsed = datetime.strptime(end_date_str[:10], fmt).date()
+                        break
+                    except (ValueError, IndexError):
+                        continue
+                
+                if end_date_parsed:
+                    # Calculate correct status
+                    new_status = "VAL" if end_date_parsed >= today else "EX"
+                    old_status = member.get('membership_status', '')
+                    
+                    # Only update if status changed
+                    if new_status != old_status:
+                        query_db(
+                            'UPDATE members SET membership_status = %s WHERE id = %s',
+                            (new_status, member['id']),
+                            commit=True
+                        )
+                        updated_count += 1
+                        print(f"Updated member {member['id']}: {old_status} -> {new_status}")
+            except Exception as e:
+                print(f"Error updating status for member {member.get('id')}: {e}")
+                continue
+        
+        return updated_count
+    except Exception as e:
+        print(f"Error in update_all_membership_statuses: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
+
+@app.route('/admin/update_all_statuses')
+@rino_required
+def update_all_statuses():
+    """Update all membership statuses in database (Rino only)"""
+    try:
+        updated_count = update_all_membership_statuses()
+        flash(f'Successfully updated {updated_count} membership status(es) in the database.', 'success')
+    except Exception as e:
+        print(f"Error updating statuses: {e}")
+        flash(f'Error updating statuses: {str(e)}', 'error')
+    return redirect(url_for('all_members'))
 
 def validate_strong_password(password):
     """Validate password strength - must have uppercase, lowercase, number, and special char"""
@@ -909,6 +1008,7 @@ def all_members():
             )
         
         # Process members to add is_expired flag for freeze button logic
+        # Also recalculate status based on current date to ensure accuracy
         from datetime import datetime
         today = datetime.now().date()
         
@@ -918,7 +1018,7 @@ def all_members():
                 member_dict = dict(member) if hasattr(member, 'keys') else member
                 is_expired = False
                 
-                # Check if end_date is expired
+                # Check if end_date is expired and recalculate status
                 end_date_str = member_dict.get('end_date')
                 if end_date_str:
                     try:
@@ -940,8 +1040,16 @@ def all_members():
                             except (ValueError, IndexError):
                                 continue
                         
-                        if end_date_parsed and end_date_parsed < today:
-                            is_expired = True
+                        if end_date_parsed:
+                            if end_date_parsed < today:
+                                is_expired = True
+                            # Recalculate status based on current date
+                            # This ensures the displayed status is always accurate
+                            recalculated_status = compare_dates(end_date_str)
+                            if recalculated_status and recalculated_status != member_dict.get('membership_status'):
+                                # Update the displayed status (but don't update DB unless explicitly requested)
+                                member_dict['membership_status'] = recalculated_status
+                                member_dict['status_updated'] = True  # Flag to show it was recalculated
                     except Exception as e:
                         print(f"Error parsing end_date for member {member_dict.get('id')}: {e}")
                 
