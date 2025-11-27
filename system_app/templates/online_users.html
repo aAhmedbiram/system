@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Users - Rival Gym System</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #fff;
+        }
+
+        header {
+            background-color: rgba(34, 34, 34, 0.95);
+            color: #4caf50;
+            padding: 0.8em 1em;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        h2 {
+            color: #4caf50;
+            margin-bottom: 10px;
+        }
+
+        .index-btn {
+            background-color: #4caf50;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .index-btn:hover {
+            background-color: #66d66a;
+            transform: scale(1.03);
+        }
+
+        .refresh-btn {
+            background-color: #2196F3;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+            margin-left: 10px;
+        }
+
+        .refresh-btn:hover {
+            background-color: #42a5f5;
+            transform: scale(1.03);
+        }
+
+        .stats-container {
+            background: rgba(34, 34, 34, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            display: inline-block;
+            margin-right: 30px;
+            padding: 15px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 8px;
+            border: 1px solid #4caf50;
+        }
+
+        .stat-label {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: #4caf50;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .table-container {
+            max-height: 70vh;
+            border: 1px solid #444;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: rgba(34, 34, 34, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #222;
+            min-width: 800px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+        }
+
+        th {
+            background-color: #333;
+            color: #4caf50;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background-color: #2a2a2a;
+        }
+
+        .online-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #4caf50;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .no-users {
+            text-align: center;
+            padding: 40px;
+            color: #aaa;
+            font-size: 18px;
+        }
+
+        .time-format {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .ip-address {
+            font-family: monospace;
+            color: #888;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Rival Gym System - Online Users</h1>
+    </header>
+
+    <section>
+        <a href="{{ url_for('index') }}" class="index-btn">← Back to Home</a>
+        <button onclick="location.reload()" class="refresh-btn">🔄 Refresh</button>
+
+        <div class="stats-container">
+            <div class="stat-item">
+                <div class="stat-label">Total Online</div>
+                <div class="stat-value">{{ online_users|length }}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Last Updated</div>
+                <div class="stat-value" id="last-update">{{ current_time.strftime('%H:%M:%S') }}</div>
+            </div>
+        </div>
+
+        <h2>Currently Online Users</h2>
+        
+        {% if online_users %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Username</th>
+                        <th>User ID</th>
+                        <th>IP Address</th>
+                        <th>Login Time</th>
+                        <th>Last Activity</th>
+                        <th>Time Online</th>
+                        <th>Time Since Activity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in online_users %}
+                    <tr>
+                        <td>
+                            <span class="online-indicator"></span>
+                            <span style="color: #4caf50;">Online</span>
+                        </td>
+                        <td><strong>{{ user.username }}</strong></td>
+                        <td class="time-format">#{{ user.user_id }}</td>
+                        <td class="ip-address">{{ user.ip_address }}</td>
+                        <td class="time-format">{{ user.login_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="time-format">{{ user.last_activity.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="time-format">
+                            {% set hours = (user.time_online.total_seconds() // 3600)|int %}
+                            {% set minutes = ((user.time_online.total_seconds() % 3600) // 60)|int %}
+                            {% set seconds = (user.time_online.total_seconds() % 60)|int %}
+                            {% if hours > 0 %}{{ hours }}h {% endif %}{{ minutes }}m {{ seconds }}s
+                        </td>
+                        <td class="time-format">
+                            {% set minutes_ago = (user.time_since_activity.total_seconds() // 60)|int %}
+                            {% set seconds_ago = (user.time_since_activity.total_seconds() % 60)|int %}
+                            {% if minutes_ago > 0 %}{{ minutes_ago }}m {% endif %}{{ seconds_ago }}s ago
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="no-users">
+            <p>No users are currently online.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <script>
+        // Auto-refresh every 10 seconds
+        setTimeout(function() {
+            location.reload();
+        }, 10000);
+
+        // Update last update time
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-update').textContent = timeString;
+        }
+        
+        // Update time every second
+        setInterval(updateLastUpdateTime, 1000);
+    </script>
+</body>
+
+</html>
+

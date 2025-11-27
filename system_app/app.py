@@ -54,6 +54,75 @@ def log_request_info():
     except Exception as e:
         print(f"Error in log_request_info: {e}")
 
+@app.before_request
+def track_user_activity():
+    """Track active users for online status"""
+    try:
+        if 'user_id' in session:
+            user_id = session['user_id']
+            username = session.get('username', 'Unknown')
+            now = datetime.now()
+            
+            # Get IP address
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+            if isinstance(ip_address, str) and ',' in ip_address:
+                ip_address = ip_address.split(',')[0].strip()
+            
+            # Update or create user activity record
+            if user_id not in _active_users:
+                _active_users[user_id] = {
+                    'username': username,
+                    'login_time': now,
+                    'last_activity': now,
+                    'ip_address': ip_address
+                }
+            else:
+                _active_users[user_id]['last_activity'] = now
+                _active_users[user_id]['ip_address'] = ip_address
+            
+            # Clean up inactive users (older than timeout)
+            inactive_users = []
+            for uid, data in _active_users.items():
+                if now - data['last_activity'] > _ACTIVITY_TIMEOUT:
+                    inactive_users.append(uid)
+            
+            for uid in inactive_users:
+                del _active_users[uid]
+    except Exception as e:
+        print(f"Error tracking user activity: {e}")
+
+def get_online_users():
+    """Get list of currently online users"""
+    now = datetime.now()
+    online_users = []
+    
+    # Clean up inactive users first
+    inactive_users = []
+    for user_id, data in _active_users.items():
+        if now - data['last_activity'] > _ACTIVITY_TIMEOUT:
+            inactive_users.append(user_id)
+    
+    for uid in inactive_users:
+        del _active_users[uid]
+    
+    # Return active users
+    for user_id, data in _active_users.items():
+        time_online = now - data['login_time']
+        time_since_activity = now - data['last_activity']
+        online_users.append({
+            'user_id': user_id,
+            'username': data['username'],
+            'login_time': data['login_time'],
+            'last_activity': data['last_activity'],
+            'ip_address': data['ip_address'],
+            'time_online': time_online,
+            'time_since_activity': time_since_activity
+        })
+    
+    # Sort by last activity (most recent first)
+    online_users.sort(key=lambda x: x['last_activity'], reverse=True)
+    return online_users
+
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 Internal Server Errors with detailed logging"""
@@ -206,6 +275,10 @@ _login_attempts = {}
 _MAX_LOGIN_ATTEMPTS = 5
 _LOGIN_LOCKOUT_TIME = timedelta(minutes=15)
 
+# Online users tracking (simple in-memory implementation)
+_active_users = {}  # user_id -> {'username': str, 'last_activity': datetime, 'ip_address': str, 'login_time': datetime}
+_ACTIVITY_TIMEOUT = timedelta(minutes=5)  # Consider user offline after 5 minutes of inactivity
+
 def check_rate_limit(ip_address):
     """Check if IP is rate limited"""
     now = datetime.now()
@@ -318,6 +391,16 @@ def login():
                 session['username'] = user['username']
                 session.permanent = True  # Enable permanent session
                 clear_login_attempts(ip_address)
+                
+                # Track user as online
+                now = datetime.now()
+                _active_users[user['id']] = {
+                    'username': user['username'],
+                    'login_time': now,
+                    'last_activity': now,
+                    'ip_address': ip_address
+                }
+                
                 flash('Login successful!', 'success')
                 return redirect(url_for('index'))
             else:
@@ -331,9 +414,31 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    # Remove user from online tracking
+    user_id = session.get('user_id')
+    if user_id and user_id in _active_users:
+        del _active_users[user_id]
+    
     session.clear()
     flash('Logout successful', 'success')
     return redirect(url_for('login'))
+
+@app.route('/online_users')
+@rino_required
+def online_users():
+    """Show who is currently online and logged in (Rino only)"""
+    try:
+        online_users_list = get_online_users()
+        current_time = datetime.now()
+        return render_template('online_users.html', 
+                             online_users=online_users_list,
+                             current_time=current_time)
+    except Exception as e:
+        print(f"Error getting online users: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Error loading online users: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 def validate_strong_password(password):
     """Validate password strength - must have uppercase, lowercase, number, and special char"""
