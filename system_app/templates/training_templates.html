@@ -359,7 +359,7 @@
                     </div>
                     
                     <div class="template-actions" onclick="event.stopPropagation();">
-                        <a href="{{ url_for('view_template_plans', template_id=template.id) }}" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #2196F3, #42a5f5); box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);">📋 View Plans</a>
+                        <button onclick="openTemplateSheet({{ template.id }})" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #2196F3, #42a5f5); box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3); cursor: pointer; border: none;">📋 View Plan</button>
                         <a href="{{ url_for('assign_training_template', template_id=template.id) }}" class="btn btn-warning btn-sm">Assign to Member</a>
                         <a href="{{ url_for('edit_training_template', template_id=template.id) }}" class="btn btn-secondary btn-sm">Edit</a>
                         <form method="POST" action="{{ url_for('delete_training_template', template_id=template.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this template?'); event.stopPropagation();">
@@ -384,6 +384,334 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Template Sheet Modal -->
+    <div id="templateSheetModal" class="modal-sheet" style="display: none;">
+        <div class="modal-sheet-content">
+            <div class="modal-sheet-header">
+                <h2 id="modalTemplateName">Training Plan</h2>
+                <span class="close-modal" onclick="closeTemplateSheet()">&times;</span>
+            </div>
+            <div class="modal-sheet-body">
+                <div class="sheet-info">
+                    <div class="info-row">
+                        <span class="info-label">Category:</span>
+                        <span class="info-value" id="modalCategory">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Template Name:</span>
+                        <span class="info-value" id="modalTemplateNameValue">-</span>
+                    </div>
+                </div>
+                <div class="exercises-table-container">
+                    <table class="exercises-sheet-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">#</th>
+                                <th>Exercise Name</th>
+                                <th>Machine/Equipment</th>
+                                <th style="text-align: center; width: 100px;">Sets</th>
+                                <th style="text-align: center; width: 100px;">Reps</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalExercisesTable">
+                            <!-- Exercises will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-sheet-footer">
+                <button onclick="closeTemplateSheet()" class="btn btn-secondary">Close</button>
+                <button onclick="window.print()" class="btn btn-print">🖨️ Print</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .modal-sheet {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-sheet-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s ease;
+            position: relative;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-sheet-header {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .modal-sheet-header h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .close-modal {
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            line-height: 1;
+        }
+
+        .close-modal:hover {
+            transform: rotate(90deg);
+        }
+
+        .modal-sheet-body {
+            padding: 30px;
+        }
+
+        .sheet-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .info-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            min-width: 150px;
+            font-size: 14px;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .exercises-table-container {
+            overflow-x: auto;
+        }
+
+        .exercises-sheet-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .exercises-sheet-table thead {
+            background: #4caf50;
+            color: white;
+        }
+
+        .exercises-sheet-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .exercises-sheet-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .exercises-sheet-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .exercises-sheet-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .exercise-number {
+            font-weight: 700;
+            color: #4caf50;
+            text-align: center;
+        }
+
+        .exercise-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .exercise-details {
+            color: #666;
+        }
+
+        .modal-sheet-footer {
+            padding: 20px 30px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            position: sticky;
+            bottom: 0;
+            background: white;
+            border-radius: 0 0 16px 16px;
+        }
+
+        .btn-print {
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+        }
+
+        @media (max-width: 768px) {
+            .modal-sheet-content {
+                width: 95%;
+                max-height: 95vh;
+            }
+
+            .modal-sheet-body {
+                padding: 20px;
+            }
+
+            .exercises-sheet-table {
+                font-size: 12px;
+            }
+
+            .exercises-sheet-table th,
+            .exercises-sheet-table td {
+                padding: 10px 5px;
+            }
+        }
+
+        @media print {
+            .modal-sheet {
+                background: white;
+            }
+            .modal-sheet-footer {
+                display: none;
+            }
+            .close-modal {
+                display: none;
+            }
+        }
+    </style>
+
+    <script>
+        const templatesData = {
+            {% for template in templates %}
+            {{ template.id }}: {
+                name: {{ template.template_name|tojson }},
+                category: {{ template.category|tojson }},
+                exercises: {{ (template.exercises if (template.exercises is iterable and template.exercises is not string) else [])|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        };
+
+        function openTemplateSheet(templateId) {
+            const template = templatesData[templateId];
+            if (!template) {
+                alert('Template not found!');
+                return;
+            }
+
+            // Set template info
+            document.getElementById('modalTemplateName').textContent = template.name;
+            document.getElementById('modalTemplateNameValue').textContent = template.name;
+            document.getElementById('modalCategory').textContent = template.category || 'N/A';
+
+            // Populate exercises table
+            const tbody = document.getElementById('modalExercisesTable');
+            tbody.innerHTML = '';
+
+            if (template.exercises && Array.isArray(template.exercises) && template.exercises.length > 0) {
+                template.exercises.forEach((exercise, index) => {
+                    const row = document.createElement('tr');
+                    const exerciseName = exercise.name || (typeof exercise === 'object' ? exercise.name : 'N/A');
+                    const exerciseMachine = exercise.machine || (typeof exercise === 'object' ? exercise.machine : 'N/A');
+                    const exerciseSets = exercise.sets !== undefined ? exercise.sets : (typeof exercise === 'object' ? exercise.sets : 'N/A');
+                    const exerciseReps = exercise.reps !== undefined ? exercise.reps : (typeof exercise === 'object' ? exercise.reps : 'N/A');
+                    
+                    row.innerHTML = `
+                        <td class="exercise-number">${index + 1}</td>
+                        <td class="exercise-name">${exerciseName || 'N/A'}</td>
+                        <td class="exercise-details">${exerciseMachine || 'N/A'}</td>
+                        <td style="text-align: center; font-weight: 600; color: #4caf50;">${exerciseSets !== undefined ? exerciseSets : 'N/A'}</td>
+                        <td style="text-align: center; font-weight: 600; color: #4caf50;">${exerciseReps !== undefined ? exerciseReps : 'N/A'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="5" style="text-align: center; padding: 40px; color: #888;">No exercises defined</td>';
+                tbody.appendChild(row);
+            }
+
+            // Show modal
+            document.getElementById('templateSheetModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeTemplateSheet() {
+            document.getElementById('templateSheetModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('templateSheetModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTemplateSheet();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeTemplateSheet();
+            }
+        });
+    </script>
 </body>
 </html>
 
