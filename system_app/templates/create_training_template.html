@@ -324,29 +324,43 @@
             const exercises = [];
             const exerciseItems = document.querySelectorAll('.exercise-item');
             
-            exerciseItems.forEach((item, idx) => {
-                const name = item.querySelector(`input[name="exercise_name_${item.getAttribute('data-exercise-index')}"]`)?.value?.trim();
-                const machine = item.querySelector(`input[name="exercise_machine_${item.getAttribute('data-exercise-index')}"]`)?.value?.trim();
-                const sets = item.querySelector(`input[name="exercise_sets_${item.getAttribute('data-exercise-index')}"]`)?.value?.trim();
-                const reps = item.querySelector(`input[name="exercise_reps_${item.getAttribute('data-exercise-index')}"]`)?.value?.trim();
+            if (exerciseItems.length === 0) {
+                alert('Please add at least one exercise!');
+                return false;
+            }
+            
+            exerciseItems.forEach((item) => {
+                const idx = item.getAttribute('data-exercise-index');
+                const nameInput = item.querySelector(`input[name="exercise_name_${idx}"]`);
+                const machineInput = item.querySelector(`input[name="exercise_machine_${idx}"]`);
+                const setsInput = item.querySelector(`input[name="exercise_sets_${idx}"]`);
+                const repsInput = item.querySelector(`input[name="exercise_reps_${idx}"]`);
                 
-                if (name && machine && sets && reps) {
-                    exercises.push({
-                        name: name,
-                        machine: machine,
-                        sets: parseInt(sets),
-                        reps: parseInt(reps)
-                    });
+                if (nameInput && machineInput && setsInput && repsInput) {
+                    const name = nameInput.value?.trim();
+                    const machine = machineInput.value?.trim();
+                    const sets = setsInput.value?.trim();
+                    const reps = repsInput.value?.trim();
+                    
+                    if (name && machine && sets && reps) {
+                        exercises.push({
+                            name: name,
+                            machine: machine,
+                            sets: parseInt(sets) || 0,
+                            reps: parseInt(reps) || 0
+                        });
+                    }
                 }
             });
             
             if (exercises.length === 0) {
-                alert('Please add at least one exercise!');
-                return;
+                alert('Please fill in all fields for at least one exercise!');
+                return false;
             }
             
             document.getElementById('exercises_json').value = JSON.stringify(exercises);
             event.target.closest('form').submit();
+            return true;
         }
     </script>
 </body>

@@ -4116,8 +4116,34 @@ def edit_training_template(template_id):
             description = request.form.get('description', '').strip()
             exercises_json = request.form.get('exercises', '').strip()
             
-            if not template_name or not category or not exercises_json:
-                flash('Template name, category, and exercises are required!', 'error')
+            if not template_name or not category:
+                flash('Template name and category are required!', 'error')
+                # Re-process exercises before rendering
+                if template.get('exercises'):
+                    if isinstance(template['exercises'], str):
+                        try:
+                            template['exercises'] = json.loads(template['exercises'])
+                        except:
+                            template['exercises'] = []
+                    elif not isinstance(template['exercises'], list):
+                        template['exercises'] = []
+                else:
+                    template['exercises'] = []
+                return render_template('edit_training_template.html', template=template)
+            
+            if not exercises_json:
+                flash('Please add at least one exercise!', 'error')
+                # Re-process exercises before rendering
+                if template.get('exercises'):
+                    if isinstance(template['exercises'], str):
+                        try:
+                            template['exercises'] = json.loads(template['exercises'])
+                        except:
+                            template['exercises'] = []
+                    elif not isinstance(template['exercises'], list):
+                        template['exercises'] = []
+                else:
+                    template['exercises'] = []
                 return render_template('edit_training_template.html', template=template)
             
             # Validate JSON format
@@ -4128,6 +4154,17 @@ def edit_training_template(template_id):
                     return render_template('edit_training_template.html', template=template)
             except json.JSONDecodeError:
                 flash('Invalid exercises data format!', 'error')
+                # Re-process exercises before rendering
+                if template.get('exercises'):
+                    if isinstance(template['exercises'], str):
+                        try:
+                            template['exercises'] = json.loads(template['exercises'])
+                        except:
+                            template['exercises'] = []
+                    elif not isinstance(template['exercises'], list):
+                        template['exercises'] = []
+                else:
+                    template['exercises'] = []
                 return render_template('edit_training_template.html', template=template)
             
             query_db(
@@ -4144,6 +4181,18 @@ def edit_training_template(template_id):
         except Exception as e:
             print(f"Error updating training template: {e}")
             flash(f"Error updating template: {str(e)}", "error")
+    
+    # Process exercises JSON before rendering template
+    if template.get('exercises'):
+        if isinstance(template['exercises'], str):
+            try:
+                template['exercises'] = json.loads(template['exercises'])
+            except:
+                template['exercises'] = []
+        elif not isinstance(template['exercises'], list):
+            template['exercises'] = []
+    else:
+        template['exercises'] = []
     
     return render_template('edit_training_template.html', template=template)
 
@@ -4229,6 +4278,61 @@ def assign_training_template(template_id):
     
     members = query_db('SELECT id, name FROM members ORDER BY name', one=False) or []
     return render_template('assign_training_template.html', template=template, members=members)
+
+@app.route('/training_templates/<int:template_id>/plans')
+@login_required
+def view_template_plans(template_id):
+    """View all plans that use this template"""
+    try:
+        template = query_db(
+            'SELECT * FROM training_templates WHERE id = %s',
+            (template_id,),
+            one=True
+        )
+        
+        if not template:
+            flash('Template not found!', 'error')
+            return redirect(url_for('training_templates'))
+        
+        # Process exercises JSON
+        if template.get('exercises'):
+            if isinstance(template['exercises'], str):
+                try:
+                    template['exercises'] = json.loads(template['exercises'])
+                except:
+                    template['exercises'] = []
+            elif not isinstance(template['exercises'], list):
+                template['exercises'] = []
+        else:
+            template['exercises'] = []
+        
+        # Get all plans using this template
+        plans = query_db(
+            '''SELECT mtp.*, m.name as member_name, m.id as member_id, m.phone as member_phone
+               FROM member_training_plans mtp
+               JOIN members m ON mtp.member_id = m.id
+               WHERE mtp.template_id = %s
+               ORDER BY mtp.created_at DESC''',
+            (template_id,),
+            one=False
+        ) or []
+        
+        # Process exercises JSON for each plan
+        for plan in plans:
+            if plan.get('exercises'):
+                if isinstance(plan['exercises'], str):
+                    try:
+                        plan['exercises'] = json.loads(plan['exercises'])
+                    except:
+                        plan['exercises'] = []
+                elif not isinstance(plan['exercises'], list):
+                    plan['exercises'] = []
+        
+        return render_template('template_plans.html', template=template, plans=plans)
+    except Exception as e:
+        print(f"Error loading template plans: {e}")
+        flash(f"Error loading plans: {str(e)}", "error")
+        return redirect(url_for('training_templates'))
 
 @app.route('/member_training_plans/<int:member_id>')
 @login_required
@@ -4396,7 +4500,9 @@ def add_progress_entry(member_id):
             traceback.print_exc()
             flash(f"Error adding progress entry: {str(e)}", "error")
     
-    return render_template('add_progress_entry.html', member=member)
+    # Get today's date for the form
+    today = datetime.now().strftime('%Y-%m-%d')
+    return render_template('add_progress_entry.html', member=member, today=today)
 
 @app.route('/progress_tracking/<int:member_id>/<int:entry_id>/delete', methods=['POST'])
 @login_required
