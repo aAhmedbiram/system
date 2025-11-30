@@ -320,6 +320,88 @@
             </div>
         </div>
     </div>
+
+    <script>
+        let exerciseIndex = {{ template.exercises|length if (template.exercises is iterable and template.exercises is not string) else 0 }};
+
+        function addExercise() {
+            const container = document.getElementById('exercises-container');
+            const exerciseDiv = document.createElement('div');
+            exerciseDiv.className = 'exercise-item';
+            exerciseDiv.setAttribute('data-exercise-index', exerciseIndex);
+            exerciseDiv.style.marginBottom = '15px';
+            exerciseDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: 2fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; padding: 15px; background: rgba(20, 20, 30, 0.4); border-radius: 8px; border: 1px solid rgba(76, 175, 80, 0.2);">
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Exercise Name</label>
+                        <input type="text" name="exercise_name_${exerciseIndex}" placeholder="e.g., Bench Press" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Machine/Equipment</label>
+                        <input type="text" name="exercise_machine_${exerciseIndex}" placeholder="e.g., Smith Machine" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Sets</label>
+                        <input type="number" name="exercise_sets_${exerciseIndex}" min="1" max="10" placeholder="4" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Reps</label>
+                        <input type="number" name="exercise_reps_${exerciseIndex}" min="1" max="50" placeholder="8" required>
+                    </div>
+                    <button type="button" onclick="removeExercise(${exerciseIndex})" style="background: rgba(229, 57, 53, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-size: 14px;">✕</button>
+                </div>
+            `;
+            container.appendChild(exerciseDiv);
+            exerciseIndex++;
+            
+            // Smooth scroll and focus
+            setTimeout(() => {
+                exerciseDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                const firstInput = exerciseDiv.querySelector('input[type="text"]');
+                if (firstInput) {
+                    firstInput.focus();
+                }
+            }, 50);
+        }
+
+        function removeExercise(index) {
+            const exerciseItem = document.querySelector(`[data-exercise-index="${index}"]`);
+            if (exerciseItem) {
+                // Smooth fade out animation
+                exerciseItem.style.transition = 'all 0.3s ease';
+                exerciseItem.style.opacity = '0';
+                exerciseItem.style.transform = 'translateX(-20px)';
+                setTimeout(() => {
+                    exerciseItem.remove();
+                }, 300);
+            }
+        }
+
+        // Prepare exercises data before form submission
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const exercises = [];
+            const exerciseItems = document.querySelectorAll('.exercise-item');
+            
+            exerciseItems.forEach((item) => {
+                const idx = item.getAttribute('data-exercise-index');
+                const name = item.querySelector(`input[name="exercise_name_${idx}"]`)?.value;
+                const machine = item.querySelector(`input[name="exercise_machine_${idx}"]`)?.value;
+                const sets = item.querySelector(`input[name="exercise_sets_${idx}"]`)?.value;
+                const reps = item.querySelector(`input[name="exercise_reps_${idx}"]`)?.value;
+                
+                if (name && machine && sets && reps) {
+                    exercises.push({
+                        name: name,
+                        machine: machine,
+                        sets: parseInt(sets),
+                        reps: parseInt(reps)
+                    });
+                }
+            });
+            
+            document.getElementById('exercises_json').value = JSON.stringify(exercises);
+        });
+    </script>
 </body>
 </html>
 
