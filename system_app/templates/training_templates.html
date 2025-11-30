@@ -665,20 +665,23 @@
             const tbody = document.getElementById('modalExercisesTable');
             tbody.innerHTML = '';
 
+            console.log('Template exercises:', template.exercises); // Debug
+            
             if (template.exercises && Array.isArray(template.exercises) && template.exercises.length > 0) {
                 template.exercises.forEach((exercise, index) => {
                     const row = document.createElement('tr');
-                    const exerciseName = exercise.name || (typeof exercise === 'object' ? exercise.name : 'N/A');
-                    const exerciseMachine = exercise.machine || (typeof exercise === 'object' ? exercise.machine : 'N/A');
-                    const exerciseSets = exercise.sets !== undefined ? exercise.sets : (typeof exercise === 'object' ? exercise.sets : 'N/A');
-                    const exerciseReps = exercise.reps !== undefined ? exercise.reps : (typeof exercise === 'object' ? exercise.reps : 'N/A');
+                    // Handle both object and direct property access
+                    const exerciseName = exercise.name || (exercise && typeof exercise === 'object' ? exercise.name : 'N/A');
+                    const exerciseMachine = exercise.machine || (exercise && typeof exercise === 'object' ? exercise.machine : 'N/A');
+                    const exerciseSets = exercise.sets !== undefined && exercise.sets !== null ? exercise.sets : (exercise && typeof exercise === 'object' ? (exercise.sets !== undefined ? exercise.sets : 'N/A') : 'N/A');
+                    const exerciseReps = exercise.reps !== undefined && exercise.reps !== null ? exercise.reps : (exercise && typeof exercise === 'object' ? (exercise.reps !== undefined ? exercise.reps : 'N/A') : 'N/A');
                     
                     row.innerHTML = `
                         <td class="exercise-number">${index + 1}</td>
                         <td class="exercise-name">${exerciseName || 'N/A'}</td>
                         <td class="exercise-details">${exerciseMachine || 'N/A'}</td>
-                        <td style="text-align: center; font-weight: 600; color: #4caf50;">${exerciseSets !== undefined ? exerciseSets : 'N/A'}</td>
-                        <td style="text-align: center; font-weight: 600; color: #4caf50;">${exerciseReps !== undefined ? exerciseReps : 'N/A'}</td>
+                        <td style="text-align: center; font-weight: 600; color: #4caf50;">${exerciseSets !== undefined && exerciseSets !== null ? exerciseSets : 'N/A'}</td>
+                        <td style="text-align: center; font-weight: 600; color: #4caf50;">${exerciseReps !== undefined && exerciseReps !== null ? exerciseReps : 'N/A'}</td>
                     `;
                     tbody.appendChild(row);
                 });

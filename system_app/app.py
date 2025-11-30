@@ -4045,6 +4045,20 @@ def training_templates():
             'SELECT * FROM training_templates ORDER BY created_at DESC',
             one=False
         ) or []
+        
+        # Process exercises JSON for each template
+        for template in templates:
+            if template.get('exercises'):
+                if isinstance(template['exercises'], str):
+                    try:
+                        template['exercises'] = json.loads(template['exercises'])
+                    except:
+                        template['exercises'] = []
+                elif not isinstance(template['exercises'], list):
+                    template['exercises'] = []
+            else:
+                template['exercises'] = []
+        
         return render_template('training_templates.html', templates=templates)
     except Exception as e:
         print(f"Error loading training templates: {e}")
