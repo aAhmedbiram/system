@@ -4060,11 +4060,21 @@ def create_training_template():
             template_name = request.form.get('template_name', '').strip()
             category = request.form.get('category', '').strip()
             description = request.form.get('description', '').strip()
-            exercises = request.form.get('exercises', '').strip()
+            exercises_json = request.form.get('exercises', '').strip()
             created_by = session.get('username', 'Unknown')
             
-            if not template_name or not category or not exercises:
+            if not template_name or not category or not exercises_json:
                 flash('Template name, category, and exercises are required!', 'error')
+                return render_template('create_training_template.html')
+            
+            # Validate JSON format
+            try:
+                exercises_data = json.loads(exercises_json)
+                if not isinstance(exercises_data, list) or len(exercises_data) == 0:
+                    flash('Please add at least one exercise!', 'error')
+                    return render_template('create_training_template.html')
+            except json.JSONDecodeError:
+                flash('Invalid exercises data format!', 'error')
                 return render_template('create_training_template.html')
             
             result = query_db(
@@ -4072,7 +4082,7 @@ def create_training_template():
                    (template_name, category, description, exercises, created_by)
                    VALUES (%s, %s, %s, %s, %s)
                    RETURNING id''',
-                (template_name, category, description, exercises, created_by),
+                (template_name, category, description, Json(exercises_data), created_by),
                 one=True,
                 commit=True
             )
@@ -4104,10 +4114,20 @@ def edit_training_template(template_id):
             template_name = request.form.get('template_name', '').strip()
             category = request.form.get('category', '').strip()
             description = request.form.get('description', '').strip()
-            exercises = request.form.get('exercises', '').strip()
+            exercises_json = request.form.get('exercises', '').strip()
             
-            if not template_name or not category or not exercises:
+            if not template_name or not category or not exercises_json:
                 flash('Template name, category, and exercises are required!', 'error')
+                return render_template('edit_training_template.html', template=template)
+            
+            # Validate JSON format
+            try:
+                exercises_data = json.loads(exercises_json)
+                if not isinstance(exercises_data, list) or len(exercises_data) == 0:
+                    flash('Please add at least one exercise!', 'error')
+                    return render_template('edit_training_template.html', template=template)
+            except json.JSONDecodeError:
+                flash('Invalid exercises data format!', 'error')
                 return render_template('edit_training_template.html', template=template)
             
             query_db(
@@ -4115,7 +4135,7 @@ def edit_training_template(template_id):
                    SET template_name = %s, category = %s, description = %s, 
                        exercises = %s, updated_at = CURRENT_TIMESTAMP
                    WHERE id = %s''',
-                (template_name, category, description, exercises, template_id),
+                (template_name, category, description, Json(exercises_data), template_id),
                 commit=True
             )
             
@@ -4173,7 +4193,7 @@ def assign_training_template(template_id):
         try:
             member_id = request.form.get('member_id')
             plan_name = request.form.get('plan_name', '').strip() or template['template_name']
-            exercises = request.form.get('exercises', '').strip() or template['exercises']
+            exercises_json = request.form.get('exercises', '').strip()
             start_date = request.form.get('start_date', '')
             end_date = request.form.get('end_date', '')
             assigned_by = session.get('username', 'Unknown')
@@ -4183,11 +4203,20 @@ def assign_training_template(template_id):
                 members = query_db('SELECT id, name FROM members ORDER BY name', one=False) or []
                 return render_template('assign_training_template.html', template=template, members=members)
             
+            # Use provided exercises or template exercises
+            if exercises_json:
+                try:
+                    exercises_data = json.loads(exercises_json)
+                except:
+                    exercises_data = template.get('exercises', [])
+            else:
+                exercises_data = template.get('exercises', [])
+            
             query_db(
                 '''INSERT INTO member_training_plans 
                    (member_id, template_id, plan_name, exercises, start_date, end_date, assigned_by)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)''',
-                (member_id, template_id, plan_name, exercises, start_date or None, end_date or None, assigned_by),
+                (member_id, template_id, plan_name, Json(exercises_data), start_date or None, end_date or None, assigned_by),
                 commit=True
             )
             

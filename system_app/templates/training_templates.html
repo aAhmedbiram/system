@@ -336,7 +336,22 @@
                     <div class="template-description">{{ template.description }}</div>
                     {% endif %}
                     
-                    <div class="template-exercises">{{ template.exercises }}</div>
+                    <div class="template-exercises">
+                        {% if template.exercises is iterable and template.exercises is not string %}
+                            {% for exercise in template.exercises %}
+                            <div style="margin-bottom: 12px; padding: 10px; background: rgba(20, 20, 30, 0.5); border-radius: 6px; border-left: 3px solid #4caf50;">
+                                <div style="font-weight: 700; color: #4caf50; margin-bottom: 5px;">{{ exercise.name or exercise.get('name', 'N/A') }}</div>
+                                <div style="font-size: 13px; color: #ccc;">
+                                    <span style="color: #888;">Machine:</span> {{ exercise.machine or exercise.get('machine', 'N/A') }} | 
+                                    <span style="color: #888;">Sets:</span> {{ exercise.sets or exercise.get('sets', 'N/A') }} | 
+                                    <span style="color: #888;">Reps:</span> {{ exercise.reps or exercise.get('reps', 'N/A') }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            {{ template.exercises }}
+                        {% endif %}
+                    </div>
                     
                     <div class="template-actions">
                         <a href="{{ url_for('assign_training_template', template_id=template.id) }}" class="btn btn-warning btn-sm">Assign to Member</a>

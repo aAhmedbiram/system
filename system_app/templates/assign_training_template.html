@@ -231,7 +231,22 @@
             <div class="template-preview">
                 <h3>{{ template.template_name }}</h3>
                 <span class="category">{{ template.category }}</span>
-                <div class="exercises">{{ template.exercises }}</div>
+                <div class="exercises">
+                    {% if template.exercises is iterable and template.exercises is not string %}
+                        {% for exercise in template.exercises %}
+                        <div style="margin-bottom: 10px; padding: 10px; background: rgba(20, 20, 30, 0.5); border-radius: 6px;">
+                            <strong style="color: #4caf50;">{{ exercise.name or exercise.get('name', 'N/A') }}</strong><br>
+                            <span style="font-size: 13px; color: #ccc;">
+                                Machine: {{ exercise.machine or exercise.get('machine', 'N/A') }} | 
+                                Sets: {{ exercise.sets or exercise.get('sets', 'N/A') }} | 
+                                Reps: {{ exercise.reps or exercise.get('reps', 'N/A') }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        {{ template.exercises }}
+                    {% endif %}
+                </div>
             </div>
 
             <div class="form-card">
@@ -254,8 +269,36 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="exercises">Customize Exercises (Optional)</label>
-                        <textarea id="exercises" name="exercises" placeholder="Modify the exercises as needed...">{{ template.exercises }}</textarea>
+                        <label>Customize Exercises (Optional)</label>
+                        <div id="exercises-container">
+                            {% if template.exercises is iterable and template.exercises is not string %}
+                                {% for exercise in template.exercises %}
+                                <div class="exercise-item" data-exercise-index="{{ loop.index0 }}" style="margin-bottom: 15px;">
+                                    <div style="display: grid; grid-template-columns: 2fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; padding: 15px; background: rgba(20, 20, 30, 0.4); border-radius: 8px; border: 1px solid rgba(76, 175, 80, 0.2);">
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Exercise Name</label>
+                                            <input type="text" name="exercise_name_{{ loop.index0 }}" value="{{ exercise.name or exercise.get('name', '') }}" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Machine/Equipment</label>
+                                            <input type="text" name="exercise_machine_{{ loop.index0 }}" value="{{ exercise.machine or exercise.get('machine', '') }}" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Sets</label>
+                                            <input type="number" name="exercise_sets_{{ loop.index0 }}" value="{{ exercise.sets or exercise.get('sets', '') }}" min="1" max="10" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Reps</label>
+                                            <input type="number" name="exercise_reps_{{ loop.index0 }}" value="{{ exercise.reps or exercise.get('reps', '') }}" min="1" max="50" required>
+                                        </div>
+                                        <button type="button" onclick="removeExercise({{ loop.index0 }})" style="background: rgba(229, 57, 53, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer;">✕</button>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <button type="button" onclick="addExercise()" style="background: rgba(76, 175, 80, 0.3); color: #4caf50; border: 1px solid rgba(76, 175, 80, 0.5); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px;">+ Add Exercise</button>
+                        <input type="hidden" id="exercises_json" name="exercises">
                         <small style="color: #888; font-size: 12px; margin-top: 5px; display: block;">You can edit the exercises to customize them for this member</small>
                     </div>
 

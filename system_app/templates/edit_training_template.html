@@ -219,18 +219,141 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="exercises">Exercises / Training Plan *</label>
-                        <textarea id="exercises" name="exercises" required>{{ template.exercises }}</textarea>
+                        <label>Exercises / Training Plan *</label>
+                        <div id="exercises-container">
+                            {% if template.exercises is iterable and template.exercises is not string %}
+                                {% for exercise in template.exercises %}
+                                <div class="exercise-item" data-exercise-index="{{ loop.index0 }}">
+                                    <div style="display: grid; grid-template-columns: 2fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; background: rgba(20, 20, 30, 0.4); border-radius: 8px; border: 1px solid rgba(76, 175, 80, 0.2);">
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Exercise Name</label>
+                                            <input type="text" name="exercise_name_{{ loop.index0 }}" value="{{ exercise.name or exercise.get('name', '') }}" placeholder="e.g., Bench Press" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Machine/Equipment</label>
+                                            <input type="text" name="exercise_machine_{{ loop.index0 }}" value="{{ exercise.machine or exercise.get('machine', '') }}" placeholder="e.g., Smith Machine" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Sets</label>
+                                            <input type="number" name="exercise_sets_{{ loop.index0 }}" value="{{ exercise.sets or exercise.get('sets', '') }}" min="1" max="10" placeholder="4" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Reps</label>
+                                            <input type="number" name="exercise_reps_{{ loop.index0 }}" value="{{ exercise.reps or exercise.get('reps', '') }}" min="1" max="50" placeholder="8" required>
+                                        </div>
+                                        <button type="button" class="remove-exercise-btn" onclick="removeExercise({{ loop.index0 }})" style="background: rgba(229, 57, 53, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-size: 14px;">✕</button>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="exercise-item" data-exercise-index="0">
+                                    <div style="display: grid; grid-template-columns: 2fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; background: rgba(20, 20, 30, 0.4); border-radius: 8px; border: 1px solid rgba(76, 175, 80, 0.2);">
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Exercise Name</label>
+                                            <input type="text" name="exercise_name_0" placeholder="e.g., Bench Press" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Machine/Equipment</label>
+                                            <input type="text" name="exercise_machine_0" placeholder="e.g., Smith Machine" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Sets</label>
+                                            <input type="number" name="exercise_sets_0" min="1" max="10" placeholder="4" required>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 12px; color: #888;">Reps</label>
+                                            <input type="number" name="exercise_reps_0" min="1" max="50" placeholder="8" required>
+                                        </div>
+                                        <button type="button" class="remove-exercise-btn" onclick="removeExercise(0)" style="background: rgba(229, 57, 53, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-size: 14px;">✕</button>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button type="button" onclick="addExercise()" style="background: rgba(76, 175, 80, 0.3); color: #4caf50; border: 1px solid rgba(76, 175, 80, 0.5); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px;">+ Add Exercise</button>
+                        <input type="hidden" id="exercises_json" name="exercises" required>
                     </div>
 
                     <div style="display: flex; gap: 10px; margin-top: 30px;">
                         <a href="{{ url_for('training_templates') }}" class="btn-secondary">Cancel</a>
-                        <button type="submit" class="btn">Update Template</button>
+                        <button type="submit" class="btn" onclick="prepareExercisesData(event)">Update Template</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
+    <script>
+        let exerciseIndex = {{ template.exercises|length if (template.exercises is iterable and template.exercises is not string) else 1 }};
+
+        function addExercise() {
+            const container = document.getElementById('exercises-container');
+            const exerciseDiv = document.createElement('div');
+            exerciseDiv.className = 'exercise-item';
+            exerciseDiv.setAttribute('data-exercise-index', exerciseIndex);
+            exerciseDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: 2fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; background: rgba(20, 20, 30, 0.4); border-radius: 8px; border: 1px solid rgba(76, 175, 80, 0.2);">
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Exercise Name</label>
+                        <input type="text" name="exercise_name_${exerciseIndex}" placeholder="e.g., Bench Press" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Machine/Equipment</label>
+                        <input type="text" name="exercise_machine_${exerciseIndex}" placeholder="e.g., Smith Machine" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Sets</label>
+                        <input type="number" name="exercise_sets_${exerciseIndex}" min="1" max="10" placeholder="4" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #888;">Reps</label>
+                        <input type="number" name="exercise_reps_${exerciseIndex}" min="1" max="50" placeholder="8" required>
+                    </div>
+                    <button type="button" class="remove-exercise-btn" onclick="removeExercise(${exerciseIndex})" style="background: rgba(229, 57, 53, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-size: 14px;">✕</button>
+                </div>
+            `;
+            container.appendChild(exerciseDiv);
+            exerciseIndex++;
+        }
+
+        function removeExercise(index) {
+            const exerciseItem = document.querySelector(`[data-exercise-index="${index}"]`);
+            if (exerciseItem) {
+                exerciseItem.remove();
+            }
+        }
+
+        function prepareExercisesData(event) {
+            event.preventDefault();
+            
+            const exercises = [];
+            const exerciseItems = document.querySelectorAll('.exercise-item');
+            
+            exerciseItems.forEach((item) => {
+                const idx = item.getAttribute('data-exercise-index');
+                const name = item.querySelector(`input[name="exercise_name_${idx}"]`)?.value?.trim();
+                const machine = item.querySelector(`input[name="exercise_machine_${idx}"]`)?.value?.trim();
+                const sets = item.querySelector(`input[name="exercise_sets_${idx}"]`)?.value?.trim();
+                const reps = item.querySelector(`input[name="exercise_reps_${idx}"]`)?.value?.trim();
+                
+                if (name && machine && sets && reps) {
+                    exercises.push({
+                        name: name,
+                        machine: machine,
+                        sets: parseInt(sets),
+                        reps: parseInt(reps)
+                    });
+                }
+            });
+            
+            if (exercises.length === 0) {
+                alert('Please add at least one exercise!');
+                return;
+            }
+            
+            document.getElementById('exercises_json').value = JSON.stringify(exercises);
+            event.target.closest('form').submit();
+        }
+    </script>
 </body>
 </html>
 
