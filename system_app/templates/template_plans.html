@@ -405,8 +405,9 @@
                     </div>
                     
                     <div class="plan-actions">
-                        <a href="{{ url_for('member_training_plans', member_id=plan.member_id) }}" class="btn btn-primary btn-sm">View Member Plans</a>
-                        <a href="{{ url_for('progress_tracking', member_id=plan.member_id) }}" class="btn btn-sm" style="background: linear-gradient(135deg, #2196F3, #42a5f5);">📈 Progress</a>
+                        <a href="{{ url_for('view_training_plan', plan_id=plan.id) }}" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #2196F3, #42a5f5); box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);">📄 View Sheet</a>
+                        <a href="{{ url_for('member_training_plans', member_id=plan.member_id) }}" class="btn btn-sm" style="background: rgba(30, 30, 40, 0.8);">View Member Plans</a>
+                        <a href="{{ url_for('progress_tracking', member_id=plan.member_id) }}" class="btn btn-sm" style="background: linear-gradient(135deg, #4caf50, #66d66a);">📈 Progress</a>
                     </div>
                 </div>
                 {% endfor %}

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Plan Sheet - {{ plan.plan_name }} - Rival Gym System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .sheet-container {
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+            }
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        body[dir="rtl"] {
+            direction: rtl;
+        }
+
+        .sheet-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-section {
+            text-align: center;
+            border-bottom: 3px solid #4caf50;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .gym-logo {
+            font-size: 32px;
+            font-weight: 700;
+            color: #4caf50;
+            margin-bottom: 10px;
+        }
+
+        .sheet-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .plan-name {
+            font-size: 24px;
+            color: #ff9800;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .exercises-section {
+            margin-top: 30px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #4caf50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4caf50;
+        }
+
+        .exercises-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .exercises-table thead {
+            background: #4caf50;
+            color: white;
+        }
+
+        .exercises-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .exercises-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 15px;
+        }
+
+        .exercises-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .exercises-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .exercise-number {
+            font-weight: 700;
+            color: #4caf50;
+            width: 50px;
+            text-align: center;
+        }
+
+        .exercise-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .exercise-details {
+            color: #666;
+        }
+
+        .footer-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(30, 30, 40, 0.8);
+            color: white;
+        }
+
+        .btn-print {
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+        }
+
+        @media (max-width: 768px) {
+            .sheet-container {
+                padding: 20px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .exercises-table {
+                font-size: 12px;
+            }
+
+            .exercises-table th,
+            .exercises-table td {
+                padding: 10px 5px;
+            }
+        }
+    </style>
+</head>
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+    <div class="no-print action-buttons">
+        <a href="{{ url_for('member_training_plans', member_id=plan.member_id) }}" class="btn btn-secondary">← Back</a>
+        <button onclick="window.print()" class="btn btn-print">🖨️ Print</button>
+        <a href="{{ url_for('toggle_language') }}" class="btn btn-secondary">
+            {% if current_lang == 'en' %}🇸🇦 Arabic{% else %}🇬🇧 English{% endif %}
+        </a>
+    </div>
+
+    <div class="sheet-container">
+        <div class="header-section">
+            <div class="gym-logo">💪 RIVAL GYM</div>
+            <div class="sheet-title">Training Plan</div>
+            <div class="plan-name">{{ plan.plan_name }}</div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Member Name</div>
+                <div class="info-value">{{ plan.member_name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Member ID</div>
+                <div class="info-value">#{{ plan.member_id }}</div>
+            </div>
+            {% if plan.member_phone %}
+            <div class="info-item">
+                <div class="info-label">Phone</div>
+                <div class="info-value">{{ plan.member_phone }}</div>
+            </div>
+            {% endif %}
+            {% if plan.member_age %}
+            <div class="info-item">
+                <div class="info-label">Age</div>
+                <div class="info-value">{{ plan.member_age }}</div>
+            </div>
+            {% endif %}
+            {% if plan.member_gender %}
+            <div class="info-item">
+                <div class="info-label">Gender</div>
+                <div class="info-value">{{ plan.member_gender }}</div>
+            </div>
+            {% endif %}
+            {% if plan.category %}
+            <div class="info-item">
+                <div class="info-label">Category</div>
+                <div class="info-value">{{ plan.category }}</div>
+            </div>
+            {% endif %}
+            {% if plan.start_date %}
+            <div class="info-item">
+                <div class="info-label">Start Date</div>
+                <div class="info-value">{{ plan.start_date.strftime('%Y-%m-%d') if plan.start_date else 'N/A' }}</div>
+            </div>
+            {% endif %}
+            {% if plan.end_date %}
+            <div class="info-item">
+                <div class="info-label">End Date</div>
+                <div class="info-value">{{ plan.end_date.strftime('%Y-%m-%d') if plan.end_date else 'N/A' }}</div>
+            </div>
+            {% endif %}
+            {% if plan.template_name %}
+            <div class="info-item">
+                <div class="info-label">Based on Template</div>
+                <div class="info-value">{{ plan.template_name }}</div>
+            </div>
+            {% endif %}
+            <div class="info-item">
+                <div class="info-label">Status</div>
+                <div class="info-value" style="color: {% if (plan.status or 'active') == 'active' %}#4caf50{% else %}#888{% endif %};">
+                    {{ (plan.status or 'active').upper() }}
+                </div>
+            </div>
+        </div>
+
+        <div class="exercises-section">
+            <div class="section-title">💪 Exercises</div>
+            {% if plan.exercises and plan.exercises|length > 0 %}
+            <table class="exercises-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Exercise Name</th>
+                        <th>Machine/Equipment</th>
+                        <th style="text-align: center;">Sets</th>
+                        <th style="text-align: center;">Reps</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exercise in plan.exercises %}
+                    <tr>
+                        <td class="exercise-number">{{ loop.index }}</td>
+                        <td class="exercise-name">
+                            {% if exercise.name is defined %}
+                                {{ exercise.name }}
+                            {% elif exercise is mapping %}
+                                {{ exercise.get('name', 'N/A') }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td class="exercise-details">
+                            {% if exercise.machine is defined %}
+                                {{ exercise.machine }}
+                            {% elif exercise is mapping %}
+                                {{ exercise.get('machine', 'N/A') }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center; font-weight: 600; color: #4caf50;">
+                            {% if exercise.sets is defined %}
+                                {{ exercise.sets }}
+                            {% elif exercise is mapping %}
+                                {{ exercise.get('sets', 'N/A') }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center; font-weight: 600; color: #4caf50;">
+                            {% if exercise.reps is defined %}
+                                {{ exercise.reps }}
+                            {% elif exercise is mapping %}
+                                {{ exercise.get('reps', 'N/A') }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="text-align: center; color: #888; padding: 40px;">No exercises defined in this plan.</p>
+            {% endif %}
+        </div>
+
+        <div class="footer-section">
+            <div style="margin-bottom: 10px;">
+                <strong>Assigned by:</strong> {{ plan.assigned_by or 'Unknown' }} | 
+                <strong>Created:</strong> {{ plan.created_at.strftime('%Y-%m-%d %H:%M') if plan.created_at else 'N/A' }}
+            </div>
+            <div>Rival Gym System © {{ "now"|strftime("%Y") }}</div>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -366,6 +366,10 @@
                         Assigned by: {{ plan.assigned_by or 'Unknown' }} | 
                         Created: {{ plan.created_at.strftime('%Y-%m-%d') if plan.created_at else 'N/A' }}
                     </div>
+                    
+                    <div class="plan-actions">
+                        <a href="{{ url_for('view_training_plan', plan_id=plan.id) }}" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #2196F3, #42a5f5); box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);">📄 View Sheet</a>
+                    </div>
                 </div>
                 {% endfor %}
             </div>

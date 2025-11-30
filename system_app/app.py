@@ -4360,6 +4360,45 @@ def member_training_plans(member_id):
         flash(f"Error loading plans: {str(e)}", "error")
         return redirect(url_for('all_members'))
 
+@app.route('/training_plan/<int:plan_id>/view')
+@login_required
+def view_training_plan(plan_id):
+    """View a single training plan in a formatted sheet"""
+    try:
+        plan = query_db(
+            '''SELECT mtp.*, m.name as member_name, m.id as member_id, m.phone as member_phone, 
+                      m.age as member_age, m.gender as member_gender,
+                      tt.template_name, tt.category
+               FROM member_training_plans mtp
+               JOIN members m ON mtp.member_id = m.id
+               LEFT JOIN training_templates tt ON mtp.template_id = tt.id
+               WHERE mtp.id = %s''',
+            (plan_id,),
+            one=True
+        )
+        
+        if not plan:
+            flash('Training plan not found!', 'error')
+            return redirect(url_for('all_members'))
+        
+        # Process exercises JSON
+        if plan.get('exercises'):
+            if isinstance(plan['exercises'], str):
+                try:
+                    plan['exercises'] = json.loads(plan['exercises'])
+                except:
+                    plan['exercises'] = []
+            elif not isinstance(plan['exercises'], list):
+                plan['exercises'] = []
+        else:
+            plan['exercises'] = []
+        
+        return render_template('view_training_plan_sheet.html', plan=plan)
+    except Exception as e:
+        print(f"Error loading training plan: {e}")
+        flash(f"Error loading plan: {str(e)}", "error")
+        return redirect(url_for('all_members'))
+
 # ========================================
 # PROGRESS TRACKING SYSTEM (نظام متابعة التقدم)
 # ========================================
