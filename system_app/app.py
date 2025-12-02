@@ -414,11 +414,11 @@ def permission_required(permission_key):
             perms = user.get('permissions') or {}
             if not perms.get(permission_key):
                 flash('You do not have permission to access this page!', 'error')
-                # Stay on current page (redirect back to referrer) or go to index if no referrer
+                # Stay on current page (redirect back to referrer) or go to attendance_table if no referrer
                 referrer = request.referrer
                 if referrer and referrer != request.url:
                     return redirect(referrer)
-                return redirect(url_for('index'))
+                return redirect(url_for('attendance_table'))
 
             return f(*args, **kwargs)
         return wrapped
