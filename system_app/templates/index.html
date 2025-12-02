@@ -740,15 +740,29 @@
 
             <!-- Navigation Grid -->
             <div class="nav-grid">
+                {% if user_permissions.get('super_admin') or user_permissions.get('members_view') %}
                 <a href="{{ url_for('all_members') }}" class="nav-btn"><span>👥 {{ t.view_all_members }}</span></a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('members_view') %}
                 <a href="{{ url_for('logs') }}" class="nav-btn"><span>📋 {{ t.view_edit_logs }}</span></a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('renewal_log') %}
                 <a href="{{ url_for('renewal_log') }}" class="nav-btn blue"><span>📊 {{ t.renewal_log }}</span></a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('invoices') %}
                 <a href="{{ url_for('invoices_list') }}" class="nav-btn purple"><span>📄 {{ t.all_invoices }}</span></a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('undo_action') %}
                 <a href="{{ url_for('undo_page') }}" class="nav-btn orange"><span>↩️ {{ t.undo_actions }}</span></a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('supplements_water') %}
                 <a href="{{ url_for('supplements') }}" class="nav-btn gradient"><span>💊 {{ t.supplements_water }}</span></a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('training_templates') %}
                 <a href="{{ url_for('training_templates') }}" class="nav-btn" style="border-color: rgba(255, 193, 7, 0.3);">
                     <span>💪 Training Templates</span>
                 </a>
+                {% endif %}
                 {% if session.username == 'rino' %}
                 <a href="{{ url_for('online_users') }}" class="nav-btn cyan"><span>👥 {{ t.online_users }}</span></a>
                 <a href="{{ url_for('user_permissions') }}" class="nav-btn" style="border-color: rgba(255, 152, 0, 0.3); background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 193, 7, 0.1));">
@@ -761,10 +775,18 @@
         <!-- Bottom Action Bar -->
         <div class="bottom-bar">
             <div class="bottom-buttons">
+                {% if user_permissions.get('super_admin') or user_permissions.get('attendance') %}
                 <a href="{{ url_for('attendance_table') }}" class="bottom-btn">{{ t.attendance_table }}</a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('attendance_backup') %}
                 <a href="/attendance_backup" class="bottom-btn">{{ t.attendance_backup }}</a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('invitations') %}
                 <a href="{{ url_for('invitations') }}" class="bottom-btn">{{ t.invitations }}</a>
+                {% endif %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('offers') %}
                 <a href="{{ url_for('offers') }}" class="bottom-btn">{{ t.offers }}</a>
+                {% endif %}
                 {% if session.username == 'rino' %}
                 <a href="{{ url_for('data_management') }}" class="bottom-btn">{{ t.data_management }}</a>
                 {% endif %}

@@ -297,6 +297,8 @@ def get_default_permissions_for_username(username):
         'undo_action': True,
         'data_management': True,
         'online_users': True,
+        'invoices': True,
+        'invitations': True,
     }
 
     if username == 'ahmed_adel':
@@ -782,9 +784,21 @@ def index():
         # Limit to recent 50 records for performance
         attendance_data = query_db('SELECT * FROM attendance ORDER BY num DESC LIMIT 50')
         members_data = query_db('SELECT * FROM members ORDER BY id DESC LIMIT 50')
+        
+        # Get current user permissions for template
+        user = get_current_user()
+        user_permissions = {}
+        if user:
+            if user.get('username') == 'rino':
+                # Rino has all permissions
+                user_permissions = {'super_admin': True}
+            else:
+                user_permissions = user.get('permissions') or {}
+        
         return render_template("index.html", 
                                 attendance_data=attendance_data or [], 
-                                members_data=members_data or [])
+                                members_data=members_data or [],
+                                user_permissions=user_permissions)
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback
@@ -792,7 +806,8 @@ def index():
         # Return empty data instead of crashing
         return render_template("index.html", 
                             attendance_data=[], 
-                            members_data=[])
+                            members_data=[],
+                            user_permissions={})
 
 
 # Rate limiting for login (simple in-memory implementation)
