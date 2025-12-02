@@ -355,6 +355,9 @@ def get_current_user():
         return user
 
     perms = _load_permissions(user.get('permissions'))
+    # If permissions are empty, get defaults for this username
+    if not perms:
+        perms = get_default_permissions_for_username(user.get('username'))
     user['permissions'] = perms
     return user
 
@@ -890,14 +893,24 @@ def reset_lockout_public():
 def login():
     # If already logged in, redirect based on permissions
     if 'user_id' in session:
-        user = get_current_user()
-        if user:
-            # Check if user has index permission, otherwise go to attendance
-            if user.get('username') == 'rino' or (user.get('permissions') or {}).get('index'):
-                return redirect(url_for('index'))
-            else:
-                return redirect(url_for('attendance_table'))
-        return redirect(url_for('attendance_table'))
+        try:
+            user = get_current_user()
+            if user:
+                # Check if user has index permission, otherwise go to attendance
+                if user.get('username') == 'rino':
+                    return redirect(url_for('index'))
+                
+                perms = user.get('permissions') or {}
+                if perms.get('index'):
+                    return redirect(url_for('index'))
+                else:
+                    return redirect(url_for('attendance_table'))
+            # If get_current_user failed, still redirect to attendance (safe default)
+            return redirect(url_for('attendance_table'))
+        except Exception as e:
+            print(f"Error in login redirect check: {e}")
+            # On error, redirect to attendance as safe default
+            return redirect(url_for('attendance_table'))
     
     if request.method == 'POST':
         # Get client IP for rate limiting
@@ -979,12 +992,17 @@ def login():
                 
                 # Load permissions to check
                 perms = user.get('permissions') or {}
-                if not perms:
+                if not perms or (isinstance(perms, str) and perms.strip() == ''):
+                    # If permissions are empty/None, load from DB or use defaults
                     perms = _load_permissions(user.get('permissions'))
+                    if not perms:
+                        # Get default permissions for this username
+                        perms = get_default_permissions_for_username(user.get('username'))
                 
                 if perms.get('index'):
                     return redirect(url_for('index'))
                 else:
+                    # Always redirect to attendance_table for users without index permission
                     return redirect(url_for('attendance_table'))
             else:
                 record_failed_login(ip_address)
