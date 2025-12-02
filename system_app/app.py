@@ -888,9 +888,16 @@ def reset_lockout_public():
 @app.route('/login', methods=['GET', 'POST'])
 @csrf.exempt  # Exempt login from CSRF (public endpoint, no authenticated session yet)
 def login():
-    # If already logged in, redirect to index
+    # If already logged in, redirect based on permissions
     if 'user_id' in session:
-        return redirect(url_for('index'))
+        user = get_current_user()
+        if user:
+            # Check if user has index permission, otherwise go to attendance
+            if user.get('username') == 'rino' or (user.get('permissions') or {}).get('index'):
+                return redirect(url_for('index'))
+            else:
+                return redirect(url_for('attendance_table'))
+        return redirect(url_for('attendance_table'))
     
     if request.method == 'POST':
         # Get client IP for rate limiting
@@ -964,7 +971,21 @@ def login():
                 }
                 
                 flash('Login successful!', 'success')
-                return redirect(url_for('index'))
+                
+                # Redirect based on user permissions
+                # Check if user has index permission, otherwise go to attendance
+                if user.get('username') == 'rino':
+                    return redirect(url_for('index'))
+                
+                # Load permissions to check
+                perms = user.get('permissions') or {}
+                if not perms:
+                    perms = _load_permissions(user.get('permissions'))
+                
+                if perms.get('index'):
+                    return redirect(url_for('index'))
+                else:
+                    return redirect(url_for('attendance_table'))
             else:
                 record_failed_login(ip_address)
                 flash('Username or password is incorrect!', 'error')
