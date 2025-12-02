@@ -2272,9 +2272,12 @@ def attendance_table():
             total_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
             total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
             
-            # Get paginated data
+            # Get paginated data - use actual end_date from members table
             data = query_db("""
-                SELECT a.*, m.comment 
+                SELECT a.num, a.member_id, a.name, 
+                       COALESCE(m.end_date, a.end_date) as end_date,
+                       COALESCE(m.membership_status, a.membership_status) as membership_status,
+                       a.attendance_time, a.attendance_date, a.day, m.comment 
                 FROM attendance a 
                 LEFT JOIN members m ON a.member_id = m.id 
                 ORDER BY a.num ASC
@@ -2318,9 +2321,12 @@ def attendance_table():
         total_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
         total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
         
-        # Get paginated data
+        # Get paginated data - use actual end_date from members table
         data = query_db("""
-            SELECT a.*, m.comment 
+            SELECT a.num, a.member_id, a.name, 
+                   COALESCE(m.end_date, a.end_date) as end_date,
+                   COALESCE(m.membership_status, a.membership_status) as membership_status,
+                   a.attendance_time, a.attendance_date, a.day, m.comment 
             FROM attendance a 
             LEFT JOIN members m ON a.member_id = m.id 
             ORDER BY a.num ASC
