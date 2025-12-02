@@ -2298,12 +2298,16 @@ def attendance_table():
                 print(f"Error getting user in attendance_table: {perm_error}")
                 user_permissions = {}
             
+            from datetime import date
+            today = date.today().strftime('%Y-%m-%d')
+            
             return render_template("attendance_table.html", 
                                 members_data=data or [],
                                 page=page,
                                 total_pages=total_pages,
                                 total_count=total_count['count'] if total_count else 0,
-                                user_permissions=user_permissions)
+                                user_permissions=user_permissions,
+                                today=today)
         except Exception as e:
             print(f"Error loading attendance data: {e}")
             import traceback
@@ -2347,12 +2351,16 @@ def attendance_table():
             print(f"Error getting user in attendance_table: {perm_error}")
             user_permissions = {}
         
+        from datetime import date
+        today = date.today().strftime('%Y-%m-%d')
+        
         return render_template("attendance_table.html", 
                             members_data=data or [], 
                             page=page,
                             total_pages=total_pages,
                             total_count=total_count['count'] if total_count else 0,
-                            user_permissions=user_permissions)
+                            user_permissions=user_permissions,
+                            today=today)
     except Exception as e:
         print(f"Error loading attendance data: {e}")
         import traceback

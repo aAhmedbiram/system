@@ -373,12 +373,22 @@
                     <td>{{ member.name }}</td>
                     <td>{{ member.end_date or '-' }}</td>
                     <td>
-                        {% if member.membership_status == 'VAL' %}
-                            <span class="status-light val" title="Valid - Active Membership"></span>
-                        {% elif member.membership_status == 'EX' %}
-                            <span class="status-light ex" title="Expired - Membership Ended"></span>
+                        {% set end_date_str = (member.end_date or '')|string %}
+                        {% if end_date_str and end_date_str != '-' and end_date_str != 'None' %}
+                            {% set end_date_only = end_date_str.split(' ')[0] %}
+                            {% if end_date_only|length >= 10 and end_date_only[:4]|int > 1900 %}
+                                {% if end_date_only > today %}
+                                    <span class="status-light val" title="Valid - Active Membership (Ends: {{ end_date_str }})"></span>
+                                {% elif end_date_only < today %}
+                                    <span class="status-light ex" title="Expired - Membership Ended (Expired: {{ end_date_str }})"></span>
+                                {% else %}
+                                    <span class="status-light val" title="Valid - Expires Today"></span>
+                                {% endif %}
+                            {% else %}
+                                <span class="status-light unknown" title="Invalid Date Format: {{ end_date_str }}"></span>
+                            {% endif %}
                         {% else %}
-                            <span class="status-light unknown" title="Unknown Status"></span>
+                            <span class="status-light unknown" title="No End Date"></span>
                         {% endif %}
                     </td>
                     <td>{{ member.attendance_time }}</td>
