@@ -393,8 +393,12 @@ def permission_required(permission_key):
             if username == 'rino':
                 return f(*args, **kwargs)
 
-            # Block unapproved users from everything except attendance (handled separately)
-            if not user.get('is_approved'):
+            # ahmed_adel and malit_deng can access pages even if not approved (they have default permissions)
+            if username in ['ahmed_adel', 'malit_deng']:
+                # They can proceed with their permissions check below
+                pass
+            # Block other unapproved users from everything except attendance
+            elif not user.get('is_approved'):
                 flash('Your account is pending Rino approval.', 'error')
                 return redirect(url_for('attendance_table'))
 
