@@ -405,7 +405,7 @@
                 </datalist>
                         
                 <label for="edit_actual_starting_date">{{ t.actual_starting_date }}:</label>
-                <input type="date" id="edit_actual_starting_date" name="edit_actual_starting_date" value="{{ member.actual_starting_date }}" required>
+                <input type="date" id="edit_actual_starting_date" name="edit_actual_starting_date" value="{{ member.actual_starting_date }}" readonly style="background-color: #333; cursor: not-allowed;">
                         
                 <label for="edit_starting_date">{{ t.starting_date }}:</label>
                 <input type="date" id="edit_starting_date" name="edit_starting_date" value="{{ member.starting_date }}" required>

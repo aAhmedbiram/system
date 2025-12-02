@@ -1766,7 +1766,7 @@ def edit_member(member_id):
             birthdate = request.form.get("edit_member_birthdate", "")
             age = calculate_age(birthdate)  # ← int always
             gender = request.form.get("edit_member_gender", "")
-            actual_starting_date = request.form.get("edit_actual_starting_date", "")
+            # actual_starting_date is not editable - will be set from database later
             starting_date = request.form.get("edit_starting_date", "")
             user_input = request.form.get("edit_membership_packages", "")
             numeric_value, unit = ("", "")
@@ -1793,6 +1793,9 @@ def edit_member(member_id):
             old_member = get_member(member_id)
             if old_member:
                 old_member_dict = dict(old_member)
+                
+                # Use original actual_starting_date (not editable)
+                actual_starting_date = old_member_dict.get('actual_starting_date', '')
                 
                 # If hossam_marghany is requesting approval, save to pending_edits instead
                 if ask_for_approval and username == 'hossam_marghany':
@@ -1902,9 +1905,10 @@ def edit_member(member_id):
                         print(f"Error comparing end dates: {e}")
                 
                 # Prepare update parameters
+                # Note: actual_starting_date is not editable, so we don't include it in update_params
                 update_params = {
                     'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
-                    'birthdate': birthdate, 'actual_starting_date': actual_starting_date,
+                    'birthdate': birthdate,
                     'starting_date': starting_date, 'end_date': end_date,
                     'membership_packages': f"{numeric_value} {unit}",
                     'membership_fees': fees, 'membership_status': status,
