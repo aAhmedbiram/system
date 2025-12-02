@@ -907,11 +907,7 @@ def login():
             if user and check_password_hash(user['password'], password):
                 # Email verification is now optional (auto-verified on signup)
                 # No need to check email_verified anymore
-
-                # Block login if account not yet approved (except rino)
-                if user.get('username') != 'rino' and not user.get('is_approved'):
-                    flash('Your account is pending Rino approval.', 'error')
-                    return render_template('login.html')
+                # Note: Approval is not required for login - it only controls permissions
 
                 # Initialize default permissions if none set yet
                 raw_perms = user.get('permissions')
