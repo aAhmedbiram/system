@@ -409,6 +409,20 @@ def permission_required(permission_key):
     return decorator
 
 
+# === Rino Only Decorator ===
+def rino_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('You must log in first!', 'error')
+            return redirect(url_for('login'))
+        if session.get('username') != 'rino':
+            flash('You do not have permission to access this page!', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 @app.route('/user_permissions', methods=['GET', 'POST'])
 @rino_required
 def user_permissions():
@@ -478,20 +492,6 @@ def user_permissions():
         users=normalized_users,
         all_permissions=all_permissions
     )
-
-
-# === Rino Only Decorator ===
-def rino_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('You must log in first!', 'error')
-            return redirect(url_for('login'))
-        if session.get('username') != 'rino':
-            flash('You do not have permission to access this page!', 'error')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 # === Ahmed Adel Only Decorator ===
