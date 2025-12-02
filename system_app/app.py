@@ -917,6 +917,10 @@ def login():
         try:
             user = get_current_user()
             if user and user.get('username'):
+                # Special handling for hossam - always redirect to attendance_table
+                if user.get('username') == 'hossam' or user.get('username') == 'hossam_marghany':
+                    return redirect(url_for('attendance_table'))
+                
                 # Check if user has index permission, otherwise go to attendance
                 if user.get('username') == 'rino':
                     return redirect(url_for('index'))
@@ -1016,6 +1020,10 @@ def login():
                 }
                 
                 flash('Login successful!', 'success')
+                
+                # Special handling for hossam - always redirect to attendance_table
+                if user.get('username') == 'hossam' or user.get('username') == 'hossam_marghany':
+                    return redirect(url_for('attendance_table'))
                 
                 # Redirect based on user permissions
                 # Check if user has index permission, otherwise go to attendance
