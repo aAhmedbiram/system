@@ -389,7 +389,7 @@
                 <input type="text" id="edit_member_name" name="edit_member_name" value="{{ member.name }}" required>
 
                 <label for="edit_member_email">{{ t.email }}:</label>
-                <input type="email" id="edit_member_email" name="edit_member_email" value="{{ member.email }}" required>
+                <input type="email" id="edit_member_email" name="edit_member_email" value="{{ member.email or '' }}">
 
                 <label for="edit_member_phone">{{ t.phone }}:</label>
                 <input type="text" id="edit_member_phone" name="edit_member_phone" value="{{ member.phone }}" required>

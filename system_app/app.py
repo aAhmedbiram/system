@@ -1759,7 +1759,9 @@ def edit_member(member_id):
     elif request.method == "POST":
         try:
             name = request.form.get("edit_member_name", "").capitalize()
-            email = request.form.get("edit_member_email", "")
+            email = request.form.get("edit_member_email", "").strip()
+            # Convert empty email to None to avoid UNIQUE constraint issues
+            email = email if email else None
             phone = request.form.get("edit_member_phone", "")
             birthdate = request.form.get("edit_member_birthdate", "")
             age = calculate_age(birthdate)  # ← int always
