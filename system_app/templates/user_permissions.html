@@ -329,6 +329,7 @@
 
                             <td colspan="{{ all_permissions|length + 1 }}" style="padding: 0;">
                                 <form method="post" action="{{ url_for('user_permissions') }}" style="display:flex; align-items:center; gap:10px; padding:6px 8px;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="user_id" value="{{ user.id }}">
 
                                     <div style="min-width:90px;">
