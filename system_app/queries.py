@@ -114,9 +114,21 @@ def create_table():
                 password TEXT NOT NULL,
                 email_verified BOOLEAN DEFAULT FALSE,
                 verification_token TEXT,
-                token_expires TIMESTAMP
+                token_expires TIMESTAMP,
+                is_approved BOOLEAN DEFAULT FALSE,
+                permissions JSONB
             )
         ''')
+
+        # Add authorization columns for existing databases
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT FALSE')
+        except:
+            pass
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB')
+        except:
+            pass
 
         cr.execute('''
             CREATE TABLE IF NOT EXISTS attendance_backup (

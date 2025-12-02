@@ -251,8 +251,114 @@ import atexit
 atexit.register(lambda: scheduler.shutdown())
 
 
-# === Authentication Decorator ===
+# === Authorization Helpers & Decorators ===
+
+def _load_permissions(raw_permissions):
+    """Safely load permissions from DB (JSONB or TEXT) into a dict."""
+    if not raw_permissions:
+        return {}
+    if isinstance(raw_permissions, dict):
+        return raw_permissions
+    try:
+        return json.loads(raw_permissions)
+    except Exception:
+        return {}
+
+
+def get_default_permissions_for_username(username):
+    """
+    Default permission sets:
+    - rino: super admin (access to everything)
+    - ahmed_adel: everything except delete_member, undo_action, data_management,
+                  online_users, training_templates, offers, renewal_log
+    - malit_deng: everything except undo_action, data_management, online_users,
+                  training_templates, offers, renewal_log, supplements_water,
+                  attendance_backup, delete_member
+    - others (new accounts): attendance only
+    """
+    username = (username or '').strip()
+
+    # Super admin
+    if username == 'rino':
+        return {'super_admin': True}
+
+    # Base full-access set
+    base = {
+        'index': True,
+        'attendance': True,
+        'members_view': True,
+        'members_edit': True,
+        'delete_member': True,
+        'training_templates': True,
+        'offers': True,
+        'renewal_log': True,
+        'supplements_water': True,
+        'attendance_backup': True,
+        'undo_action': True,
+        'data_management': True,
+        'online_users': True,
+    }
+
+    if username == 'ahmed_adel':
+        perms = base.copy()
+        perms.update({
+            'delete_member': False,
+            'undo_action': False,
+            'data_management': False,
+            'online_users': False,
+            'training_templates': False,
+            'offers': False,
+            'renewal_log': False,
+        })
+        return perms
+
+    if username == 'malit_deng':
+        perms = base.copy()
+        perms.update({
+            'delete_member': False,
+            'undo_action': False,
+            'data_management': False,
+            'online_users': False,
+            'training_templates': False,
+            'offers': False,
+            'renewal_log': False,
+            'supplements_water': False,
+            'attendance_backup': False,
+        })
+        return perms
+
+    # Default for any new / normal account → attendance only
+    return {
+        'attendance': True,
+    }
+
+
+def get_current_user():
+    """Return current user dict with 'permissions' (dict) included."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+
+    user = query_db(
+        'SELECT id, username, email, is_approved, permissions FROM users WHERE id = %s',
+        (user_id,),
+        one=True,
+    )
+    if not user:
+        return None
+
+    # Super admin shortcut
+    if user.get('username') == 'rino':
+        user['permissions'] = {'super_admin': True}
+        return user
+
+    perms = _load_permissions(user.get('permissions'))
+    user['permissions'] = perms
+    return user
+
+
 def login_required(f):
+    """Basic authentication check (no specific permission)."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -260,6 +366,47 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+def permission_required(permission_key):
+    """
+    Decorator for fine-grained authorization.
+    - Rino (super admin) always allowed.
+    - Unapproved users are blocked from everything except login/signup.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if 'user_id' not in session:
+                flash('You must log in first!', 'error')
+                return redirect(url_for('login'))
+
+            user = get_current_user()
+            if not user:
+                session.clear()
+                flash('Session expired. Please log in again.', 'error')
+                return redirect(url_for('login'))
+
+            username = user.get('username')
+
+            # Super admin bypass
+            if username == 'rino':
+                return f(*args, **kwargs)
+
+            # Block unapproved users from everything except attendance (handled separately)
+            if not user.get('is_approved'):
+                flash('Your account is pending Rino approval.', 'error')
+                return redirect(url_for('attendance_table'))
+
+            perms = user.get('permissions') or {}
+            if not perms.get(permission_key):
+                flash('You do not have permission to access this page!', 'error')
+                # For this app, unauthorized users are always redirected to attendance table
+                return redirect(url_for('attendance_table'))
+
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 # === Rino Only Decorator ===
@@ -553,7 +700,7 @@ def toggle_language():
 
 @app.route('/')
 @app.route('/home')
-@login_required
+@permission_required('index')
 def index():
     # Don't do any flash here ever
     try:
@@ -682,14 +829,33 @@ def login():
         
         try:
             user = query_db(
-                'SELECT id, username, password, email_verified FROM users WHERE username = %s',
+                'SELECT id, username, password, email_verified, is_approved, permissions FROM users WHERE username = %s',
                 (username,), one=True
             )
             # Fix: check_password_hash takes (hash, password) not (password, hash)
             if user and check_password_hash(user['password'], password):
                 # Email verification is now optional (auto-verified on signup)
                 # No need to check email_verified anymore
-                
+
+                # Block login if account not yet approved (except rino)
+                if user.get('username') != 'rino' and not user.get('is_approved'):
+                    flash('Your account is pending Rino approval.', 'error')
+                    return render_template('login.html')
+
+                # Initialize default permissions if none set yet
+                raw_perms = user.get('permissions')
+                if not raw_perms:
+                    default_perms = get_default_permissions_for_username(user.get('username'))
+                    try:
+                        query_db(
+                            'UPDATE users SET permissions = %s WHERE id = %s',
+                            (Json(default_perms), user['id']),
+                            commit=True
+                        )
+                        user['permissions'] = default_perms
+                    except Exception as perm_error:
+                        print(f\"Error initializing permissions for user {user.get('username')}: {perm_error}\")
+
                 session['user_id'] = user['id']
                 session['username'] = user['username']
                 session.permanent = True  # Enable permanent session
@@ -892,9 +1058,10 @@ def signup():
         # Hash password and create user
         hashed_password = generate_password_hash(password)
         try:
+            # New accounts are created as not approved; Rino must approve them
             query_db(
-                'INSERT INTO users (username, email, password, email_verified, verification_token, token_expires) VALUES (%s, %s, %s, %s, %s, %s)',
-                (username, email, hashed_password, False, verification_token, token_expires), commit=True
+                'INSERT INTO users (username, email, password, email_verified, verification_token, token_expires, is_approved) VALUES (%s, %s, %s, %s, %s, %s, %s)',
+                (username, email, hashed_password, False, verification_token, token_expires, False), commit=True
             )
             
             # Auto-verify email (no email sending)
@@ -903,7 +1070,7 @@ def signup():
                 (username,), commit=True
             )
             
-            flash('Account created successfully! You can now log in.', 'success')
+            flash('Account created successfully! Your account is pending Rino approval before you can log in.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             print(f"Error creating user: {e}")
@@ -1585,7 +1752,7 @@ def edit_member(member_id):
         return redirect(url_for("index"))
 
 @app.route("/delete_member/<int:member_id>", methods=["POST"])
-@login_required
+@permission_required('delete_member')
 def delete_member_route(member_id):
     """Delete a member"""
     try:
@@ -1834,7 +2001,7 @@ def change_password():
 
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
-@login_required
+@permission_required('attendance')
 def attendance_table():
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
@@ -2622,7 +2789,7 @@ def download_invoice_pdf(invoice_id):
         return redirect(url_for('view_invoice', invoice_id=invoice_id))
 
 @app.route('/renewal_log')
-@login_required
+@permission_required('renewal_log')
 def renewal_log():
     """Display renewal log with daily and monthly totals"""
     try:
@@ -3336,7 +3503,7 @@ def data_management():
         return render_template('data_management.html', member_count=0, attendance_count=0)
 
 @app.route('/offers', methods=['GET', 'POST'])
-@login_required
+@permission_required('offers')
 def offers():
     """Page for creating and processing offers with AI"""
     if request.method == 'POST':
@@ -3716,7 +3883,7 @@ def process_offer_with_pattern_matching(offer_text):
         return None
 
 @app.route('/supplements')
-@login_required
+@permission_required('supplements_water')
 def supplements():
     """Supplement and Water Management System"""
     try:
@@ -4037,7 +4204,7 @@ def add_staff_purchase_route(staff_id):
 # ========================================
 
 @app.route('/training_templates')
-@login_required
+@permission_required('training_templates')
 def training_templates():
     """Display all training templates"""
     try:
