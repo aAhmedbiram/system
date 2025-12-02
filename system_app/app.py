@@ -2194,17 +2194,27 @@ def attendance_table():
                 ORDER BY a.num ASC
                 LIMIT %s OFFSET %s
             """, (per_page, offset))
+            # Get current user permissions for template
+            user = get_current_user()
+            user_permissions = {}
+            if user:
+                if user.get('username') == 'rino':
+                    user_permissions = {'super_admin': True}
+                else:
+                    user_permissions = user.get('permissions') or {}
+            
             return render_template("attendance_table.html", 
                                 members_data=data or [],
                                 page=page,
                                 total_pages=total_pages,
-                                total_count=total_count['count'] if total_count else 0)
+                                total_count=total_count['count'] if total_count else 0,
+                                user_permissions=user_permissions)
         except Exception as e:
             print(f"Error loading attendance data: {e}")
             import traceback
             traceback.print_exc()
             flash(f"Error loading attendance: {str(e)}", "error")
-            return render_template("attendance_table.html", members_data=[], page=1, total_pages=1, total_count=0)
+            return render_template("attendance_table.html", members_data=[], page=1, total_pages=1, total_count=0, user_permissions={})
 
     try:
         # Pagination: 50 items per page
@@ -2224,17 +2234,27 @@ def attendance_table():
             ORDER BY a.num ASC
             LIMIT %s OFFSET %s
         """, (per_page, offset))
+        # Get current user permissions for template
+        user = get_current_user()
+        user_permissions = {}
+        if user:
+            if user.get('username') == 'rino':
+                user_permissions = {'super_admin': True}
+            else:
+                user_permissions = user.get('permissions') or {}
+        
         return render_template("attendance_table.html", 
                             members_data=data or [],
                             page=page,
                             total_pages=total_pages,
-                            total_count=total_count['count'] if total_count else 0)
+                            total_count=total_count['count'] if total_count else 0,
+                            user_permissions=user_permissions)
     except Exception as e:
         print(f"Error loading attendance data: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error loading attendance: {str(e)}", "error")
-        return render_template("attendance_table.html", members_data=[])
+        return render_template("attendance_table.html", members_data=[], user_permissions={})
 
 
 

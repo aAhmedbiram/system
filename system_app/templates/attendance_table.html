@@ -175,10 +175,16 @@
             border: none;
         }
 
-        .delete-all-btn:hover {
+        .delete-all-btn:hover:not(:disabled) {
             background: #e53935;
             transform: translateY(-2px);
             box-shadow: 0 6px 16px rgba(198, 40, 40, 0.5);
+        }
+
+        .delete-all-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #666;
         }
 
         .home-btn {
@@ -403,6 +409,7 @@
     </div>
 
     <div class="bottom-actions">
+        {% if session.username == 'rino' or (user_permissions and (user_permissions.get('super_admin') or user_permissions.get('attendance_backup'))) %}
         <form action="{{ url_for('delete_attendance_data') }}" method="post" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="delete-all-btn"
@@ -410,7 +417,17 @@
                 Move to Backup & Clear
             </button>
         </form>
+        {% else %}
+        <button type="button" class="delete-all-btn" disabled>
+            Move to Backup & Clear
+        </button>
+        {% endif %}
+        {% if user_permissions and (user_permissions.get('super_admin') or user_permissions.get('index')) %}
         <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
+        {% endif %}
+        <form action="{{ url_for('logout') }}" method="get" style="display:inline;">
+            <button type="submit" class="home-btn" style="background: #c62828; margin-left: 10px;">Logout</button>
+        </form>
     </div>
 
     <!-- Auto scroll + focus -->
