@@ -409,6 +409,77 @@ def permission_required(permission_key):
     return decorator
 
 
+@app.route('/user_permissions', methods=['GET', 'POST'])
+@rino_required
+def user_permissions():
+    """
+    Rino-only page to manage user approvals and fine-grained permissions.
+    """
+    # Define all known permission keys (keep in sync with get_default_permissions_for_username)
+    all_permissions = [
+        ('index', 'Dashboard / Home'),
+        ('attendance', 'Attendance Table'),
+        ('members_view', 'Members - View'),
+        ('members_edit', 'Members - Edit'),
+        ('delete_member', 'Delete Member'),
+        ('training_templates', 'Training Templates'),
+        ('offers', 'Offers / AI Offers'),
+        ('renewal_log', 'Renewal Log'),
+        ('supplements_water', 'Supplements & Water'),
+        ('attendance_backup', 'Attendance Backup'),
+        ('undo_action', 'Undo Actions'),
+        ('data_management', 'Data Management / Import'),
+        ('online_users', 'Online Users'),
+    ]
+
+    if request.method == 'POST':
+        user_id = request.form.get('user_id')
+        if user_id:
+            try:
+                user_id = int(user_id)
+                is_approved = True if request.form.get('is_approved') == 'on' else False
+                selected_perms = request.form.getlist('perms')
+
+                perms_dict = {}
+                for key, _label in all_permissions:
+                    perms_dict[key] = key in selected_perms
+
+                query_db(
+                    'UPDATE users SET is_approved = %s, permissions = %s WHERE id = %s',
+                    (is_approved, Json(perms_dict), user_id),
+                    commit=True
+                )
+                flash('User permissions updated successfully.', 'success')
+            except Exception as e:
+                print(f"Error updating user permissions: {e}")
+                import traceback
+                traceback.print_exc()
+                flash(f'Error updating permissions: {str(e)}', 'error')
+
+        return redirect(url_for('user_permissions'))
+
+    # GET: load all users
+    users = query_db(
+        'SELECT id, username, email, is_approved, permissions FROM users ORDER BY id ASC',
+        one=False
+    ) or []
+
+    # Normalize permissions for template
+    normalized_users = []
+    for u in users:
+        user_dict = dict(u) if hasattr(u, 'keys') else u
+        raw_perms = user_dict.get('permissions')
+        perms = _load_permissions(raw_perms)
+        user_dict['permissions'] = perms
+        normalized_users.append(user_dict)
+
+    return render_template(
+        'user_permissions.html',
+        users=normalized_users,
+        all_permissions=all_permissions
+    )
+
+
 # === Rino Only Decorator ===
 def rino_required(f):
     @wraps(f)
