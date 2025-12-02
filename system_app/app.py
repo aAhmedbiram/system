@@ -854,7 +854,7 @@ def login():
                         )
                         user['permissions'] = default_perms
                     except Exception as perm_error:
-                        print(f\"Error initializing permissions for user {user.get('username')}: {perm_error}\")
+                        print(f"Error initializing permissions for user {user.get('username')}: {perm_error}")
 
                 session['user_id'] = user['id']
                 session['username'] = user['username']
