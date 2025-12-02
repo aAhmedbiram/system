@@ -1402,13 +1402,28 @@ def add_member_route():
 
         user_input = request.form.get("member_membership_packages", "").strip()
         numeric_value, unit = ("", "")
+        package_to_save = user_input  # Save original format
+        numeric_for_date = ""  # For date calculation
+        
         if user_input:
             parts = user_input.split(maxsplit=1)
             numeric_value = parts[0]
-            unit = parts[1] if len(parts) > 1 else ""
+            unit = parts[1].lower() if len(parts) > 1 else ""
+            
+            # Handle "1 year" -> convert to "12" months for date calculation only
+            # But keep original format for saving in database
+            numeric_for_date = numeric_value
+            if unit and 'year' in unit:
+                try:
+                    num_years = int(numeric_value)
+                    numeric_for_date = str(num_years * 12)  # Convert years to months for date calc
+                except (ValueError, TypeError):
+                    numeric_for_date = numeric_value
+        else:
+            numeric_for_date = ""
 
         # --- Calculations ---
-        member_end_date = calculate_end_date(member_starting_date, numeric_value) or ""
+        member_end_date = calculate_end_date(member_starting_date, numeric_for_date) or ""
         member_membership_fees = membership_fees(user_input)
         member_membership_status = compare_dates(member_end_date) or "Unknown"
         member_invitations = calculate_invitations(user_input)
@@ -1435,7 +1450,7 @@ def add_member_route():
         added_id = add_member(
             member_name, member_email, member_phone, member_age, member_gender,
             member_birthdate, member_actual_starting_date, member_starting_date,
-            member_end_date, f"{numeric_value} {unit}", member_membership_fees,
+            member_end_date, package_to_save, member_membership_fees,
             member_membership_status,
             custom_id=new_member_id,
             invitations=member_invitations
@@ -1770,14 +1785,28 @@ def edit_member(member_id):
             starting_date = request.form.get("edit_starting_date", "")
             user_input = request.form.get("edit_membership_packages", "")
             numeric_value, unit = ("", "")
+            package_to_save = user_input  # Save original format
+            numeric_for_date = ""  # For date calculation
+            
             if user_input:
                 try:
                     parts = user_input.split(maxsplit=1)
                     numeric_value = parts[0]
-                    unit = parts[1] if len(parts) > 1 else ""
+                    unit = parts[1].lower() if len(parts) > 1 else ""
+                    
+                    # Handle "1 year" -> convert to "12" months for date calculation only
+                    # But keep original format for saving in database
+                    numeric_for_date = numeric_value
+                    if unit and 'year' in unit:
+                        try:
+                            num_years = int(numeric_value)
+                            numeric_for_date = str(num_years * 12)  # Convert years to months for date calc
+                        except (ValueError, TypeError):
+                            numeric_for_date = numeric_value
                 except:
-                    pass
-            end_date = calculate_end_date(starting_date, numeric_value) or ""
+                    numeric_for_date = numeric_value if numeric_value else ""
+            
+            end_date = calculate_end_date(starting_date, numeric_for_date) or ""
             fees = membership_fees(user_input)
             status = compare_dates(end_date) or "Unknown"
             invitations = calculate_invitations(user_input)
@@ -1804,7 +1833,7 @@ def edit_member(member_id):
                         'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
                         'birthdate': birthdate, 'actual_starting_date': actual_starting_date,
                         'starting_date': starting_date, 'end_date': end_date,
-                        'membership_packages': f"{numeric_value} {unit}",
+                        'membership_packages': package_to_save,
                         'membership_fees': fees, 'membership_status': status,
                         'invitations': invitations, 'comment': comment
                     }
@@ -1910,7 +1939,7 @@ def edit_member(member_id):
                     'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
                     'birthdate': birthdate,
                     'starting_date': starting_date, 'end_date': end_date,
-                    'membership_packages': f"{numeric_value} {unit}",
+                    'membership_packages': package_to_save,
                     'membership_fees': fees, 'membership_status': status,
                     'invitations': invitations, 'comment': comment,
                     'edited_by': username
@@ -1947,7 +1976,7 @@ def edit_member(member_id):
                     name=name, email=email, phone=phone, age=age, gender=gender,
                     birthdate=birthdate, actual_starting_date=actual_starting_date,
                     starting_date=starting_date, end_date=end_date,
-                    membership_packages=f"{numeric_value} {unit}",
+                    membership_packages=package_to_save,
                     membership_fees=fees, membership_status=status,
                     invitations=invitations, comment=comment,
                     edited_by=username
