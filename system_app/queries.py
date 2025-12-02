@@ -323,6 +323,21 @@ def create_table():
             )
         ''')
         
+        # Create pending_member_edits table for approval system
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS pending_member_edits (
+                id SERIAL PRIMARY KEY,
+                member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+                requested_by TEXT NOT NULL,
+                old_data JSONB NOT NULL,
+                new_data JSONB NOT NULL,
+                status TEXT DEFAULT 'pending',
+                approved_by TEXT,
+                approved_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # Create progress_tracking table (نظام متابعة التقدم)
         cr.execute('''
             CREATE TABLE IF NOT EXISTS progress_tracking (
@@ -352,6 +367,11 @@ def create_table():
             cr.execute('CREATE INDEX IF NOT EXISTS idx_training_templates_category ON training_templates(category)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_member_training_plans_member_id ON member_training_plans(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_member_training_plans_template_id ON member_training_plans(template_id)')
+            
+            # Indexes for pending member edits
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_pending_edits_status ON pending_member_edits(status)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_pending_edits_member_id ON pending_member_edits(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_pending_edits_requested_by ON pending_member_edits(requested_by)')
             
             # Indexes for progress tracking
             cr.execute('CREATE INDEX IF NOT EXISTS idx_progress_tracking_member_id ON progress_tracking(member_id)')

@@ -424,6 +424,16 @@
                 <label for="edit_comment">{{ t.comment }}:</label>
                 <textarea id="edit_comment" name="edit_comment" rows="3" placeholder="{{ t.comment }}">{{ member.comment or '' }}</textarea>
 
+                {% if session.username == 'hossam_marghany' %}
+                <div style="margin: 20px 0; padding: 15px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 8px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" name="ask_for_approval" id="ask_for_approval" style="width: 20px; height: 20px; cursor: pointer;">
+                        <span style="font-weight: 600; color: #ffc107;">💬 Save & Ask for Approval</span>
+                    </label>
+                    <p style="margin-top: 8px; font-size: 13px; color: #aaa;">Check this to submit your changes for approval. Changes will be applied after approval.</p>
+                </div>
+                {% endif %}
+
                 <button type="submit">{{ t.save }}</button>
             </form>
             <div style="text-align: center; margin-top: 20px;">

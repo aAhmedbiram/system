@@ -769,6 +769,16 @@
                     <span>🔐 User Permissions</span>
                 </a>
                 {% endif %}
+                {% if session.username in ['rino', 'ahmed_adel', 'malit_deng'] %}
+                <a href="{{ url_for('pending_approvals') }}" class="nav-btn" style="border-color: rgba(255, 193, 7, 0.3); background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 235, 59, 0.1)); position: relative;">
+                    <span>⏳ Pending Approvals</span>
+                    {% if pending_approvals_count and pending_approvals_count > 0 %}
+                    <span style="position: absolute; top: -8px; right: -8px; background: #f44336; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">
+                        {{ pending_approvals_count }}
+                    </span>
+                    {% endif %}
+                </a>
+                {% endif %}
             </div>
         </div>
 

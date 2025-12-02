@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pending Approvals - Rival Gym System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            color: #4caf50;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .back-btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+        }
+
+        .flash-message {
+            padding: 16px;
+            margin: 20px auto;
+            max-width: 1400px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(46, 125, 50, 0.95);
+            color: white;
+            border: 1px solid #4caf50;
+        }
+
+        .flash-message.error {
+            background: rgba(198, 40, 40, 0.95);
+            border-color: #e53935;
+        }
+
+        .approval-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .approval-card:hover {
+            border-color: rgba(76, 175, 80, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(76, 175, 80, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(76, 175, 80, 0.2);
+        }
+
+        .card-header h3 {
+            color: #4caf50;
+            font-size: 20px;
+        }
+
+        .card-meta {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .changes-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .change-section {
+            background: rgba(20, 20, 30, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(76, 175, 80, 0.1);
+        }
+
+        .change-section h4 {
+            color: #4caf50;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .change-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .change-item:last-child {
+            border-bottom: none;
+        }
+
+        .change-label {
+            color: #aaa;
+            font-weight: 500;
+        }
+
+        .change-value {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .old-value {
+            color: #f44336;
+        }
+
+        .new-value {
+            color: #4caf50;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn-approve {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-approve:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-reject {
+            background: linear-gradient(135deg, #c62828, #e53935);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-reject:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(198, 40, 40, 0.4);
+        }
+
+        .no-pending {
+            text-align: center;
+            padding: 100px 20px;
+            color: #666;
+            font-size: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .changes-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Pending Approval Requests</h1>
+            <a href="{{ url_for('index') }}" class="back-btn">← Back to Home</a>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message | safe }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if pending_edits %}
+            {% for edit in pending_edits %}
+            <div class="approval-card">
+                <div class="card-header">
+                    <div>
+                        <h3>Member: {{ edit.member_name }} (ID: {{ edit.member_id }})</h3>
+                        <div class="card-meta">
+                            Requested by: <strong>{{ edit.requested_by }}</strong> | 
+                            Date: {{ edit.created_at.strftime('%Y-%m-%d %H:%M') if edit.created_at else 'N/A' }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="changes-grid">
+                    <div class="change-section">
+                        <h4>📋 Old Values</h4>
+                        {% set old_data = edit.old_data if edit.old_data is mapping else {} %}
+                        {% for key, value in old_data.items() %}
+                            {% if key != 'id' %}
+                            <div class="change-item">
+                                <span class="change-label">{{ key.replace('_', ' ').title() }}:</span>
+                                <span class="change-value old-value">{{ value or '-' }}</span>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+
+                    <div class="change-section">
+                        <h4>✨ New Values</h4>
+                        {% set new_data = edit.new_data if edit.new_data is mapping else {} %}
+                        {% for key, value in new_data.items() %}
+                            {% if key != 'id' %}
+                            <div class="change-item">
+                                <span class="change-label">{{ key.replace('_', ' ').title() }}:</span>
+                                <span class="change-value new-value">{{ value or '-' }}</span>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <form action="{{ url_for('approve_edit', edit_id=edit.id) }}" method="post" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn-approve" onclick="return confirm('Are you sure you want to approve this edit?')">
+                            ✅ Approve
+                        </button>
+                    </form>
+                    <form action="{{ url_for('reject_edit', edit_id=edit.id) }}" method="post" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn-reject" onclick="return confirm('Are you sure you want to reject this edit?')">
+                            ❌ Reject
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-pending">
+                <p>🎉 No pending approval requests!</p>
+                <p style="font-size: 16px; margin-top: 10px; color: #888;">All requests have been processed.</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+

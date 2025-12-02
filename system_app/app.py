@@ -805,10 +805,25 @@ def index():
             else:
                 user_permissions = user.get('permissions') or {}
         
+        # Get pending approvals count for rino, ahmed_adel, malit_deng
+        pending_count = 0
+        username = session.get('username', '')
+        if username in ['rino', 'ahmed_adel', 'malit_deng']:
+            try:
+                count_result = query_db(
+                    'SELECT COUNT(*) as count FROM pending_member_edits WHERE status = %s',
+                    ('pending',),
+                    one=True
+                )
+                pending_count = count_result['count'] if count_result else 0
+            except:
+                pending_count = 0
+        
         return render_template("index.html", 
                                 attendance_data=attendance_data or [], 
                                 members_data=members_data or [],
-                                user_permissions=user_permissions)
+                                user_permissions=user_permissions,
+                                pending_approvals_count=pending_count)
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback
@@ -1744,11 +1759,39 @@ def edit_member(member_id):
             # Get username from session for logging
             username = session.get('username', 'Unknown')
             
+            # Check if this is a "Save & Ask for Approval" request (for hossam_marghany)
+            ask_for_approval = request.form.get('ask_for_approval') == 'on'
+            
             # Get old member data before update for undo
             old_member = get_member(member_id)
             if old_member:
                 old_member_dict = dict(old_member)
-                # Log the edit action for undo
+                
+                # If hossam_marghany is requesting approval, save to pending_edits instead
+                if ask_for_approval and username == 'hossam_marghany':
+                    # Prepare new data
+                    new_data = {
+                        'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
+                        'birthdate': birthdate, 'actual_starting_date': actual_starting_date,
+                        'starting_date': starting_date, 'end_date': end_date,
+                        'membership_packages': f"{numeric_value} {unit}",
+                        'membership_fees': fees, 'membership_status': status,
+                        'invitations': invitations, 'comment': comment
+                    }
+                    
+                    # Save to pending_member_edits table
+                    query_db(
+                        '''INSERT INTO pending_member_edits 
+                           (member_id, requested_by, old_data, new_data, status)
+                           VALUES (%s, %s, %s, %s, 'pending')''',
+                        (member_id, username, Json(old_member_dict), Json(new_data)),
+                        commit=True
+                    )
+                    
+                    flash("Edit request submitted successfully! Waiting for approval.", "success")
+                    return redirect(url_for('attendance_table'))
+                
+                # Log the edit action for undo (normal edit flow)
                 log_action('edit_member', member_id=member_id, member_name=old_member_dict.get('name'),
                           action_data={'old_values': old_member_dict}, performed_by=username)
                 
@@ -4921,6 +4964,154 @@ def delete_progress_entry(member_id, entry_id):
         flash(f"Error deleting entry: {str(e)}", "error")
     
     return redirect(url_for('progress_tracking', member_id=member_id))
+
+# === Approval System Routes ===
+
+@app.route('/pending_approvals')
+@login_required
+def pending_approvals():
+    """Display pending member edit requests for approval (rino, ahmed_adel, malit_deng only)"""
+    username = session.get('username', '')
+    if username not in ['rino', 'ahmed_adel', 'malit_deng']:
+        flash('You do not have permission to access this page!', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get all pending edit requests
+        pending_edits = query_db(
+            '''SELECT p.*, m.name as member_name 
+               FROM pending_member_edits p
+               JOIN members m ON p.member_id = m.id
+               WHERE p.status = 'pending'
+               ORDER BY p.created_at DESC''',
+            one=False
+        ) or []
+        
+        # Parse JSONB data for each request
+        for edit in pending_edits:
+            if isinstance(edit.get('old_data'), str):
+                try:
+                    edit['old_data'] = json.loads(edit['old_data'])
+                except:
+                    edit['old_data'] = {}
+            if isinstance(edit.get('new_data'), str):
+                try:
+                    edit['new_data'] = json.loads(edit['new_data'])
+                except:
+                    edit['new_data'] = {}
+        
+        return render_template('pending_approvals.html', pending_edits=pending_edits)
+    except Exception as e:
+        print(f"Error loading pending approvals: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading approvals: {str(e)}", "error")
+        return redirect(url_for('index'))
+
+@app.route('/approve_edit/<int:edit_id>', methods=['POST'])
+@login_required
+def approve_edit(edit_id):
+    """Approve a pending member edit request"""
+    username = session.get('username', '')
+    if username not in ['rino', 'ahmed_adel', 'malit_deng']:
+        flash('You do not have permission to perform this action!', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get the pending edit request
+        edit_request = query_db(
+            'SELECT * FROM pending_member_edits WHERE id = %s AND status = %s',
+            (edit_id, 'pending'),
+            one=True
+        )
+        
+        if not edit_request:
+            flash('Edit request not found or already processed!', 'error')
+            return redirect(url_for('pending_approvals'))
+        
+        # Parse JSONB data
+        old_data = edit_request.get('old_data')
+        new_data = edit_request.get('new_data')
+        
+        if isinstance(old_data, str):
+            old_data = json.loads(old_data)
+        if isinstance(new_data, str):
+            new_data = json.loads(new_data)
+        
+        member_id = edit_request['member_id']
+        requested_by = edit_request['requested_by']
+        
+        # Apply the changes to the member
+        from datetime import datetime
+        update_member(
+            member_id,
+            name=new_data.get('name'),
+            email=new_data.get('email'),
+            phone=new_data.get('phone'),
+            age=new_data.get('age'),
+            gender=new_data.get('gender'),
+            birthdate=new_data.get('birthdate'),
+            actual_starting_date=new_data.get('actual_starting_date'),
+            starting_date=new_data.get('starting_date'),
+            end_date=new_data.get('end_date'),
+            membership_packages=new_data.get('membership_packages'),
+            membership_fees=new_data.get('membership_fees'),
+            membership_status=new_data.get('membership_status'),
+            invitations=new_data.get('invitations'),
+            comment=new_data.get('comment'),
+            edited_by=requested_by
+        )
+        
+        # Log the edit action for undo
+        log_action('edit_member', member_id=member_id, member_name=new_data.get('name', 'Unknown'),
+                  action_data={'old_values': old_data}, performed_by=requested_by)
+        
+        # Update the pending edit status
+        query_db(
+            '''UPDATE pending_member_edits 
+               SET status = 'approved', approved_by = %s, approved_at = %s
+               WHERE id = %s''',
+            (username, datetime.now(), edit_id),
+            commit=True
+        )
+        
+        flash(f'Edit request approved successfully! Changes have been applied.', 'success')
+    except Exception as e:
+        print(f"Error approving edit: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error approving edit: {str(e)}", "error")
+    
+    return redirect(url_for('pending_approvals'))
+
+@app.route('/reject_edit/<int:edit_id>', methods=['POST'])
+@login_required
+def reject_edit(edit_id):
+    """Reject a pending member edit request"""
+    username = session.get('username', '')
+    if username not in ['rino', 'ahmed_adel', 'malit_deng']:
+        flash('You do not have permission to perform this action!', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Update the pending edit status to rejected
+        from datetime import datetime
+        query_db(
+            '''UPDATE pending_member_edits 
+               SET status = 'rejected', approved_by = %s, approved_at = %s
+               WHERE id = %s''',
+            (username, datetime.now(), edit_id),
+            commit=True
+        )
+        
+        flash('Edit request rejected successfully!', 'success')
+    except Exception as e:
+        print(f"Error rejecting edit: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error rejecting edit: {str(e)}", "error")
+    
+    return redirect(url_for('pending_approvals'))
 
 # === Debug Route (for testing) ===
 @app.route('/debug/test')
