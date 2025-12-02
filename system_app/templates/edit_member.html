@@ -425,19 +425,20 @@
                 <textarea id="edit_comment" name="edit_comment" rows="3" placeholder="{{ t.comment }}">{{ member.comment or '' }}</textarea>
 
                 {% if session.username == 'hossam_marghany' %}
-                <div style="margin: 20px 0; padding: 15px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 8px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="ask_for_approval" id="ask_for_approval" style="width: 20px; height: 20px; cursor: pointer;">
-                        <span style="font-weight: 600; color: #ffc107;">💬 Save & Ask for Approval</span>
-                    </label>
-                    <p style="margin-top: 8px; font-size: 13px; color: #aaa;">Check this to submit your changes for approval. Changes will be applied after approval.</p>
-                </div>
-                {% endif %}
-
+                <input type="hidden" name="ask_for_approval" value="on">
+                <button type="submit" style="background: linear-gradient(135deg, #ffc107, #ff9800); color: #000; font-weight: bold; padding: 14px 28px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: all 0.3s; box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);">
+                    💬 Save & Ask for Approval
+                </button>
+                {% else %}
                 <button type="submit">{{ t.save }}</button>
+                {% endif %}
             </form>
             <div style="text-align: center; margin-top: 20px;">
+                {% if session.username == 'hossam_marghany' %}
+                <a href="{{ url_for('attendance_table') }}" class="back-btn">Back to Attendance Table</a>
+                {% else %}
                 <a href="{{ url_for('index') }}" class="back-btn">{{ t.back_to_home }}</a>
+                {% endif %}
             </div>
         </section>
     </div>

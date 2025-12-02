@@ -432,7 +432,7 @@
             Move to Backup & Clear
         </button>
         {% endif %}
-        {% if user_permissions and (user_permissions.get('super_admin') or user_permissions.get('index')) %}
+        {% if user_permissions and (user_permissions.get('super_admin') or user_permissions.get('index')) and session.username != 'hossam_marghany' %}
         <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
         {% endif %}
         <form action="{{ url_for('logout') }}" method="get" style="display:inline;">
