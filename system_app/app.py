@@ -402,13 +402,20 @@ def permission_required(permission_key):
             # Block other unapproved users from everything except attendance
             elif not user.get('is_approved'):
                 flash('Your account is pending Rino approval.', 'error')
+                # Redirect back to previous page or attendance if no referrer
+                referrer = request.referrer
+                if referrer and referrer != request.url:
+                    return redirect(referrer)
                 return redirect(url_for('attendance_table'))
 
             perms = user.get('permissions') or {}
             if not perms.get(permission_key):
                 flash('You do not have permission to access this page!', 'error')
-                # For this app, unauthorized users are always redirected to attendance table
-                return redirect(url_for('attendance_table'))
+                # Stay on current page (redirect back to referrer) or go to index if no referrer
+                referrer = request.referrer
+                if referrer and referrer != request.url:
+                    return redirect(referrer)
+                return redirect(url_for('index'))
 
             return f(*args, **kwargs)
         return wrapped
@@ -2087,7 +2094,7 @@ def change_password():
 
 
 @app.route('/attendance_table', methods=['GET', 'POST'])
-@permission_required('attendance')
+@login_required
 def attendance_table():
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
