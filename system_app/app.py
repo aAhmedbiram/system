@@ -337,29 +337,35 @@ def get_default_permissions_for_username(username):
 
 def get_current_user():
     """Return current user dict with 'permissions' (dict) included."""
-    user_id = session.get('user_id')
-    if not user_id:
-        return None
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return None
 
-    user = query_db(
-        'SELECT id, username, email, is_approved, permissions FROM users WHERE id = %s',
-        (user_id,),
-        one=True,
-    )
-    if not user:
-        return None
+        user = query_db(
+            'SELECT id, username, email, is_approved, permissions FROM users WHERE id = %s',
+            (user_id,),
+            one=True,
+        )
+        if not user:
+            return None
 
-    # Super admin shortcut
-    if user.get('username') == 'rino':
-        user['permissions'] = {'super_admin': True}
+        # Super admin shortcut
+        if user.get('username') == 'rino':
+            user['permissions'] = {'super_admin': True}
+            return user
+
+        perms = _load_permissions(user.get('permissions'))
+        # If permissions are empty, get defaults for this username
+        if not perms:
+            perms = get_default_permissions_for_username(user.get('username'))
+        user['permissions'] = perms
         return user
-
-    perms = _load_permissions(user.get('permissions'))
-    # If permissions are empty, get defaults for this username
-    if not perms:
-        perms = get_default_permissions_for_username(user.get('username'))
-    user['permissions'] = perms
-    return user
+    except Exception as e:
+        print(f"Error in get_current_user: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 def login_required(f):
@@ -910,22 +916,33 @@ def login():
     if 'user_id' in session:
         try:
             user = get_current_user()
-            if user:
+            if user and user.get('username'):
                 # Check if user has index permission, otherwise go to attendance
                 if user.get('username') == 'rino':
                     return redirect(url_for('index'))
                 
                 perms = user.get('permissions') or {}
+                # Ensure perms is a dict
+                if not isinstance(perms, dict):
+                    perms = {}
+                
                 if perms.get('index'):
                     return redirect(url_for('index'))
                 else:
+                    # Always redirect to attendance_table for users without index permission
                     return redirect(url_for('attendance_table'))
-            # If get_current_user failed, still redirect to attendance (safe default)
-            return redirect(url_for('attendance_table'))
+            # If get_current_user failed or returned None, clear session and show login
+            session.clear()
+            flash('Session expired. Please login again.', 'info')
+            return render_template('login.html')
         except Exception as e:
             print(f"Error in login redirect check: {e}")
-            # On error, redirect to attendance as safe default
-            return redirect(url_for('attendance_table'))
+            import traceback
+            traceback.print_exc()
+            # On error, clear session and show login
+            session.clear()
+            flash('Session error. Please login again.', 'error')
+            return render_template('login.html')
     
     if request.method == 'POST':
         # Get client IP for rate limiting
@@ -2256,13 +2273,19 @@ def attendance_table():
                 LIMIT %s OFFSET %s
             """, (per_page, offset))
             # Get current user permissions for template
-            user = get_current_user()
-            user_permissions = {}
-            if user:
-                if user.get('username') == 'rino':
-                    user_permissions = {'super_admin': True}
-                else:
-                    user_permissions = user.get('permissions') or {}
+            try:
+                user = get_current_user()
+                user_permissions = {}
+                if user and user.get('username'):
+                    if user.get('username') == 'rino':
+                        user_permissions = {'super_admin': True}
+                    else:
+                        user_permissions = user.get('permissions') or {}
+                        if not isinstance(user_permissions, dict):
+                            user_permissions = {}
+            except Exception as perm_error:
+                print(f"Error getting user in attendance_table: {perm_error}")
+                user_permissions = {}
             
             return render_template("attendance_table.html", 
                                 members_data=data or [],
@@ -2296,16 +2319,22 @@ def attendance_table():
             LIMIT %s OFFSET %s
         """, (per_page, offset))
         # Get current user permissions for template
-        user = get_current_user()
-        user_permissions = {}
-        if user:
-            if user.get('username') == 'rino':
-                user_permissions = {'super_admin': True}
-            else:
-                user_permissions = user.get('permissions') or {}
+        try:
+            user = get_current_user()
+            user_permissions = {}
+            if user and user.get('username'):
+                if user.get('username') == 'rino':
+                    user_permissions = {'super_admin': True}
+                else:
+                    user_permissions = user.get('permissions') or {}
+                    if not isinstance(user_permissions, dict):
+                        user_permissions = {}
+        except Exception as perm_error:
+            print(f"Error getting user in attendance_table: {perm_error}")
+            user_permissions = {}
         
         return render_template("attendance_table.html", 
-                            members_data=data or [],
+                            members_data=data or [], 
                             page=page,
                             total_pages=total_pages,
                             total_count=total_count['count'] if total_count else 0,
