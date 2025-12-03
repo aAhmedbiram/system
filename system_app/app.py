@@ -1602,17 +1602,28 @@ def all_members():
             search_status_lower = search_status.lower().strip()
             if search_status_lower == 'active' or search_status_lower == 'val':
                 # Filter for active members (end_date >= today)
-                # Extract date part and compare
+                # Handle TEXT type end_date - extract first 10 chars (YYYY-MM-DD) and compare
+                # Use TRY-CATCH equivalent with CASE to handle invalid dates gracefully
                 where_conditions.append("""
                     (end_date IS NOT NULL AND end_date != '' AND 
-                     CAST(SUBSTRING(CAST(end_date AS TEXT), 1, 10) AS DATE) >= CURRENT_DATE)
+                     LENGTH(TRIM(end_date)) >= 10 AND
+                     CASE 
+                         WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                             CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                         ELSE FALSE
+                     END)
                 """)
             elif search_status_lower == 'expired' or search_status_lower == 'ex':
                 # Filter for expired members (end_date < today)
-                # Extract date part and compare
+                # Handle TEXT type end_date - extract first 10 chars (YYYY-MM-DD) and compare
                 where_conditions.append("""
                     (end_date IS NOT NULL AND end_date != '' AND 
-                     CAST(SUBSTRING(CAST(end_date AS TEXT), 1, 10) AS DATE) < CURRENT_DATE)
+                     LENGTH(TRIM(end_date)) >= 10 AND
+                     CASE 
+                         WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                             CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
+                         ELSE FALSE
+                     END)
                 """)
             elif search_status_lower != 'all':
                 # Text search in membership_status field
@@ -1715,7 +1726,22 @@ def all_members():
                 member_dict['is_expired'] = is_expired
                 member_dict['dynamic_status'] = dynamic_status  # For template use
                 member_dict['end_date_only'] = end_date_only
+                # Ensure freeze_used is included (default to False if not present)
+                if 'freeze_used' not in member_dict:
+                    member_dict['freeze_used'] = False
                 processed_members.append(member_dict)
+        
+        # Check if this is an AJAX request for infinite scroll
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
+            # Return JSON for AJAX requests
+            from flask import jsonify
+            return jsonify({
+                'members': processed_members,
+                'page': page,
+                'total_pages': total_pages,
+                'total_count': total_count['count'] if total_count else 0,
+                'has_more': page < total_pages
+            })
         
         return render_template("all_members.html", 
                             members_data=processed_members,
