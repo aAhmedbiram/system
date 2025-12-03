@@ -1597,9 +1597,27 @@ def all_members():
             where_conditions.append("CAST(membership_fees AS TEXT) ILIKE %s")
             params.append(f'%{search_fees}%')
         
+        # Handle status filter: "active", "expired", "all", or text search
         if search_status:
-            where_conditions.append("COALESCE(membership_status, '') ILIKE %s")
-            params.append(f'%{search_status}%')
+            search_status_lower = search_status.lower().strip()
+            if search_status_lower == 'active' or search_status_lower == 'val':
+                # Filter for active members (end_date >= today)
+                # Extract date part and compare
+                where_conditions.append("""
+                    (end_date IS NOT NULL AND end_date != '' AND 
+                     CAST(SUBSTRING(CAST(end_date AS TEXT), 1, 10) AS DATE) >= CURRENT_DATE)
+                """)
+            elif search_status_lower == 'expired' or search_status_lower == 'ex':
+                # Filter for expired members (end_date < today)
+                # Extract date part and compare
+                where_conditions.append("""
+                    (end_date IS NOT NULL AND end_date != '' AND 
+                     CAST(SUBSTRING(CAST(end_date AS TEXT), 1, 10) AS DATE) < CURRENT_DATE)
+                """)
+            elif search_status_lower != 'all':
+                # Text search in membership_status field
+                where_conditions.append("COALESCE(membership_status, '') ILIKE %s")
+                params.append(f'%{search_status}%')
         
         if search_invitations:
             where_conditions.append("CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s")
@@ -1635,52 +1653,68 @@ def all_members():
             )
         
         # Process members to add is_expired flag for freeze button logic
-        # Also recalculate status based on current date to ensure accuracy
+        # Also calculate dynamic status based on current date (like attendance_table)
         from datetime import datetime
         today = datetime.now().date()
+        today_str = today.strftime('%Y-%m-%d')  # Format for template comparison
         
         processed_members = []
         if members_data:
             for member in members_data:
                 member_dict = dict(member) if hasattr(member, 'keys') else member
                 is_expired = False
+                dynamic_status = 'unknown'  # Will be calculated dynamically
+                end_date_only = ''  # Initialize
                 
-                # Check if end_date is expired and recalculate status
+                # Check if end_date is expired and calculate dynamic status
                 end_date_str = member_dict.get('end_date')
                 if end_date_str:
                     try:
-                        # Try to parse various date formats
-                        date_formats = [
-                            '%Y-%m-%d',      # 2024-12-31
-                            '%m/%d/%Y',       # 12/31/2024
-                            '%d/%m/%Y',       # 31/12/2024
-                            '%m-%d-%Y',       # 12-31-2024
-                            '%d-%m-%Y',       # 31-12-2024
-                            '%Y/%m/%d',       # 2024/12/31
-                        ]
+                        # Extract date part only (first 10 characters)
+                        end_date_only = str(end_date_str).strip()[:10] if end_date_str else ''
                         
-                        end_date_parsed = None
-                        for fmt in date_formats:
+                        # Validate date format (should be YYYY-MM-DD or similar)
+                        if end_date_only and len(end_date_only) >= 10:
                             try:
-                                end_date_parsed = datetime.strptime(str(end_date_str).strip()[:10], fmt).date()
-                                break
-                            except (ValueError, IndexError):
-                                continue
-                        
-                        if end_date_parsed:
-                            if end_date_parsed < today:
-                                is_expired = True
-                            # Recalculate status based on current date
-                            # This ensures the displayed status is always accurate
-                            recalculated_status = compare_dates(end_date_str)
-                            if recalculated_status and recalculated_status != member_dict.get('membership_status'):
-                                # Update the displayed status (but don't update DB unless explicitly requested)
-                                member_dict['membership_status'] = recalculated_status
-                                member_dict['status_updated'] = True  # Flag to show it was recalculated
+                                # Try to parse as YYYY-MM-DD
+                                end_date_parsed = datetime.strptime(end_date_only, '%Y-%m-%d').date()
+                                
+                                if end_date_parsed < today:
+                                    is_expired = True
+                                    dynamic_status = 'ex'
+                                elif end_date_parsed > today:
+                                    dynamic_status = 'val'
+                                else:  # end_date == today
+                                    dynamic_status = 'val'
+                            except ValueError:
+                                # Try other date formats
+                                date_formats = [
+                                    '%m/%d/%Y', '%d/%m/%Y', '%m-%d-%Y', 
+                                    '%d-%m-%Y', '%Y/%m/%d'
+                                ]
+                                end_date_parsed = None
+                                for fmt in date_formats:
+                                    try:
+                                        end_date_parsed = datetime.strptime(end_date_only, fmt).date()
+                                        break
+                                    except ValueError:
+                                        continue
+                                
+                                if end_date_parsed:
+                                    if end_date_parsed < today:
+                                        is_expired = True
+                                        dynamic_status = 'ex'
+                                    elif end_date_parsed > today:
+                                        dynamic_status = 'val'
+                                    else:
+                                        dynamic_status = 'val'
                     except Exception as e:
                         print(f"Error parsing end_date for member {member_dict.get('id')}: {e}")
+                        dynamic_status = 'unknown'
                 
                 member_dict['is_expired'] = is_expired
+                member_dict['dynamic_status'] = dynamic_status  # For template use
+                member_dict['end_date_only'] = end_date_only
                 processed_members.append(member_dict)
         
         return render_template("all_members.html", 
@@ -1688,6 +1722,7 @@ def all_members():
                             page=page,
                             total_pages=total_pages,
                             total_count=total_count['count'] if total_count else 0,
+                            today=today_str,
                             search_id=search_id,
                             search_name=search_name,
                             search_email=search_email,
