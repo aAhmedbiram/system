@@ -1548,6 +1548,37 @@ def all_members():
         per_page = 50
         offset = (page - 1) * per_page
         
+        # Calculate counts for active and expired members (for statistics box)
+        from datetime import datetime
+        today = datetime.now().date()
+        today_str = today.strftime('%Y-%m-%d')
+        
+        # Get active count
+        active_count_result = query_db("""
+            SELECT COUNT(*) as count FROM members 
+            WHERE end_date IS NOT NULL AND end_date != '' AND 
+                  LENGTH(TRIM(end_date)) >= 10 AND
+                  CASE 
+                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                      ELSE FALSE
+                  END
+        """, one=True)
+        active_count = active_count_result['count'] if active_count_result else 0
+        
+        # Get expired count
+        expired_count_result = query_db("""
+            SELECT COUNT(*) as count FROM members 
+            WHERE end_date IS NOT NULL AND end_date != '' AND 
+                  LENGTH(TRIM(end_date)) >= 10 AND
+                  CASE 
+                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
+                      ELSE FALSE
+                  END
+        """, one=True)
+        expired_count = expired_count_result['count'] if expired_count_result else 0
+        
         # Build WHERE conditions for each column
         where_conditions = []
         params = []
@@ -1715,6 +1746,8 @@ def all_members():
                             total_pages=total_pages,
                             total_count=total_count['count'] if total_count else 0,
                             today=today_str,
+                            active_count=active_count,
+                            expired_count=expired_count,
                             search_id=search_id,
                             search_name=search_name,
                             search_email=search_email,

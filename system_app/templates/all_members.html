@@ -503,6 +503,50 @@
             font-size: 13px;
         }
 
+        /* Statistics box */
+        .stats-box {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            padding: 20px 40px;
+            text-align: center;
+            min-width: 200px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-card.active {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .stat-card.expired {
+            border-color: rgba(244, 67, 54, 0.5);
+        }
+
+        .stat-label {
+            color: #ccc;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #4caf50;
+        }
+
+        .stat-card.expired .stat-value {
+            color: #f44336;
+        }
     </style>
 </head>
 
@@ -524,6 +568,18 @@
 <section>
     <a class="index-btn" href="{{ url_for('index') }}">{{ t.home }}</a>
     <button class="download-btn" onclick="downloadCSV()">{{ t.download_csv }}</button>
+
+    <!-- Statistics Box -->
+    <div class="stats-box">
+        <div class="stat-card active">
+            <div class="stat-label">Active Members</div>
+            <div class="stat-value">{{ active_count }}</div>
+        </div>
+        <div class="stat-card expired">
+            <div class="stat-label">Expired Members</div>
+            <div class="stat-value">{{ expired_count }}</div>
+        </div>
+    </div>
 
 <div class="table-container">
 <table id="membersTable">

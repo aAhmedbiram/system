@@ -742,6 +742,7 @@
             <div class="nav-grid">
                 {% if user_permissions.get('super_admin') or user_permissions.get('members_view') %}
                 <a href="{{ url_for('all_members') }}" class="nav-btn"><span>👥 {{ t.view_all_members }}</span></a>
+                <a href="{{ url_for('filtered_members') }}" class="nav-btn" style="border-color: rgba(255, 152, 0, 0.3);"><span>🔍 Filtered Members</span></a>
                 {% endif %}
                 {% if user_permissions.get('super_admin') or user_permissions.get('members_view') %}
                 <a href="{{ url_for('logs') }}" class="nav-btn"><span>📋 {{ t.view_edit_logs }}</span></a>
