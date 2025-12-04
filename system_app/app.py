@@ -1528,6 +1528,11 @@ def add_member_done():
 @login_required
 def all_members():
     try:
+        # Get view parameter (active/expired/all) - replaces search_status dropdown
+        view = request.args.get('view', 'all').strip().lower()
+        if view not in ['active', 'expired', 'all']:
+            view = 'all'
+        
         # Get individual column search queries
         search_id = request.args.get('search_id', '').strip()
         search_name = request.args.get('search_name', '').strip()
@@ -1540,7 +1545,6 @@ def all_members():
         search_end_date = request.args.get('search_end_date', '').strip()
         search_package = request.args.get('search_package', '').strip()
         search_fees = request.args.get('search_fees', '').strip()
-        search_status = request.args.get('search_status', '').strip()
         search_invitations = request.args.get('search_invitations', '').strip()
         search_comment = request.args.get('search_comment', '').strip()
         
@@ -1548,6 +1552,37 @@ def all_members():
         page = request.args.get('page', 1, type=int)
         per_page = 50
         offset = (page - 1) * per_page
+        
+        # Calculate counts for active and expired members (for statistics box)
+        from datetime import datetime
+        today = datetime.now().date()
+        today_str = today.strftime('%Y-%m-%d')
+        
+        # Get active count
+        active_count_result = query_db("""
+            SELECT COUNT(*) as count FROM members 
+            WHERE end_date IS NOT NULL AND end_date != '' AND 
+                  LENGTH(TRIM(end_date)) >= 10 AND
+                  CASE 
+                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                      ELSE FALSE
+                  END
+        """, one=True)
+        active_count = active_count_result['count'] if active_count_result else 0
+        
+        # Get expired count
+        expired_count_result = query_db("""
+            SELECT COUNT(*) as count FROM members 
+            WHERE end_date IS NOT NULL AND end_date != '' AND 
+                  LENGTH(TRIM(end_date)) >= 10 AND
+                  CASE 
+                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
+                      ELSE FALSE
+                  END
+        """, one=True)
+        expired_count = expired_count_result['count'] if expired_count_result else 0
         
         # Build WHERE conditions for each column
         where_conditions = []
@@ -1597,38 +1632,30 @@ def all_members():
             where_conditions.append("CAST(membership_fees AS TEXT) ILIKE %s")
             params.append(f'%{search_fees}%')
         
-        # Handle status filter: "active", "expired", "all", or text search
-        if search_status:
-            search_status_lower = search_status.lower().strip()
-            if search_status_lower == 'active' or search_status_lower == 'val':
-                # Filter for active members (end_date >= today)
-                # Handle TEXT type end_date - extract first 10 chars (YYYY-MM-DD) and compare
-                # Use TRY-CATCH equivalent with CASE to handle invalid dates gracefully
-                where_conditions.append("""
-                    (end_date IS NOT NULL AND end_date != '' AND 
-                     LENGTH(TRIM(end_date)) >= 10 AND
-                     CASE 
-                         WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                             CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
-                         ELSE FALSE
-                     END)
-                """)
-            elif search_status_lower == 'expired' or search_status_lower == 'ex':
-                # Filter for expired members (end_date < today)
-                # Handle TEXT type end_date - extract first 10 chars (YYYY-MM-DD) and compare
-                where_conditions.append("""
-                    (end_date IS NOT NULL AND end_date != '' AND 
-                     LENGTH(TRIM(end_date)) >= 10 AND
-                     CASE 
-                         WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                             CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
-                         ELSE FALSE
-                     END)
-                """)
-            elif search_status_lower != 'all':
-                # Text search in membership_status field
-                where_conditions.append("COALESCE(membership_status, '') ILIKE %s")
-                params.append(f'%{search_status}%')
+        # Handle view filter: "active", "expired", or "all"
+        if view == 'active':
+            # Filter for active members (end_date >= today)
+            where_conditions.append("""
+                (end_date IS NOT NULL AND end_date != '' AND 
+                 LENGTH(TRIM(end_date)) >= 10 AND
+                 CASE 
+                     WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                     ELSE FALSE
+                 END)
+            """)
+        elif view == 'expired':
+            # Filter for expired members (end_date < today)
+            where_conditions.append("""
+                (end_date IS NOT NULL AND end_date != '' AND 
+                 LENGTH(TRIM(end_date)) >= 10 AND
+                 CASE 
+                     WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
+                     ELSE FALSE
+                 END)
+            """)
+        # If view == 'all', don't add any status filter
         
         if search_invitations:
             where_conditions.append("CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s")
@@ -1749,6 +1776,9 @@ def all_members():
                             total_pages=total_pages,
                             total_count=total_count['count'] if total_count else 0,
                             today=today_str,
+                            view=view,
+                            active_count=active_count,
+                            expired_count=expired_count,
                             search_id=search_id,
                             search_name=search_name,
                             search_email=search_email,
@@ -1760,7 +1790,6 @@ def all_members():
                             search_end_date=search_end_date,
                             search_package=search_package,
                             search_fees=search_fees,
-                            search_status=search_status,
                             search_invitations=search_invitations,
                             search_comment=search_comment)
     except Exception as e:

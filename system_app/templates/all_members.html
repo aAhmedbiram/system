@@ -502,6 +502,100 @@
             max-width: 200px;
             font-size: 13px;
         }
+
+        /* Menu buttons for Active/Expired */
+        .view-menu {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+
+        .view-menu-btn {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+        }
+
+        .view-menu-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .view-menu-btn.active {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            border-color: #4caf50;
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .view-menu-btn.expired {
+            background: linear-gradient(135deg, #f44336, #e53935);
+            border-color: #f44336;
+        }
+
+        .view-menu-btn.expired:hover {
+            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
+        }
+
+        .view-menu-btn.expired.active {
+            background: linear-gradient(135deg, #f44336, #e53935);
+            border-color: #f44336;
+            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.5);
+        }
+
+        /* Statistics box */
+        .stats-box {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            padding: 20px 40px;
+            text-align: center;
+            min-width: 200px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-card.active {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .stat-card.expired {
+            border-color: rgba(244, 67, 54, 0.5);
+        }
+
+        .stat-label {
+            color: #ccc;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #4caf50;
+        }
+
+        .stat-card.expired .stat-value {
+            color: #f44336;
+        }
     </style>
 </head>
 
@@ -523,6 +617,30 @@
 <section>
     <a class="index-btn" href="{{ url_for('index') }}">{{ t.home }}</a>
     <button class="download-btn" onclick="downloadCSV()">{{ t.download_csv }}</button>
+
+    <!-- Statistics Box -->
+    <div class="stats-box">
+        <div class="stat-card active">
+            <div class="stat-label">Active Members</div>
+            <div class="stat-value">{{ active_count }}</div>
+        </div>
+        <div class="stat-card expired">
+            <div class="stat-label">Expired Members</div>
+            <div class="stat-value">{{ expired_count }}</div>
+        </div>
+    </div>
+
+    <!-- View Menu Buttons -->
+    <div class="view-menu">
+        <a href="javascript:void(0)" onclick="switchView('active')" 
+           class="view-menu-btn {% if view == 'active' %}active{% else %}inactive{% endif %}">
+            ✅ Active Members
+        </a>
+        <a href="javascript:void(0)" onclick="switchView('expired')" 
+           class="view-menu-btn expired {% if view == 'expired' %}active{% else %}inactive{% endif %}">
+            ❌ Expired Members
+        </a>
+    </div>
 
 <div class="table-container">
 <table id="membersTable">
@@ -561,13 +679,7 @@
         <th><input type="text" id="search_end_date" placeholder="{{ t.search }}" value="{{ search_end_date or '' }}" onkeyup="handleColumnSearch()"></th>
         <th><input type="text" id="search_package" placeholder="{{ t.search }}" value="{{ search_package or '' }}" onkeyup="handleColumnSearch()"></th>
         <th><input type="text" id="search_fees" placeholder="{{ t.search }}" value="{{ search_fees or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th>
-            <select id="search_status" onchange="handleStatusFilter()" style="width: 90%; padding: 12px; border: 1px solid rgba(76, 175, 80, 0.3); border-radius: 6px; background: rgba(20, 20, 30, 0.6); color: white; text-align: center; font-size: 16px;">
-                <option value="" {% if not search_status or search_status == '' %}selected{% endif %}>All</option>
-                <option value="active" {% if search_status|lower == 'active' %}selected{% endif %}>Active</option>
-                <option value="expired" {% if search_status|lower == 'expired' %}selected{% endif %}>Expired</option>
-            </select>
-        </th>
+        <th></th>
         <th><input type="text" id="search_invitations" placeholder="{{ t.search }}" value="{{ search_invitations or '' }}" onkeyup="handleColumnSearch()"></th>
         <th><input type="text" id="search_comment" placeholder="{{ t.search }}" value="{{ search_comment or '' }}" onkeyup="handleColumnSearch()"></th>
         <th></th>
@@ -696,6 +808,14 @@
 
 <script>
 
+    /* VIEW SWITCH */
+    function switchView(newView) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('view', newView);
+        url.searchParams.set('page', '1'); // Reset to first page
+        window.location.href = url.toString();
+    }
+
     /* FILTER */
     // Column search function - searches entire database
     let searchTimeout;
@@ -718,9 +838,12 @@
             const searchEndDate = document.getElementById('search_end_date').value.trim();
             const searchPackage = document.getElementById('search_package').value.trim();
             const searchFees = document.getElementById('search_fees').value.trim();
-            const searchStatus = document.getElementById('search_status').value.trim();
             const searchInvitations = document.getElementById('search_invitations').value.trim();
             const searchComment = document.getElementById('search_comment').value.trim();
+            
+            // Preserve view parameter
+            const currentView = url.searchParams.get('view') || 'all';
+            if (currentView) url.searchParams.set('view', currentView);
             
             // Set or remove search parameters
             if (searchId) url.searchParams.set('search_id', searchId); else url.searchParams.delete('search_id');
@@ -734,7 +857,6 @@
             if (searchEndDate) url.searchParams.set('search_end_date', searchEndDate); else url.searchParams.delete('search_end_date');
             if (searchPackage) url.searchParams.set('search_package', searchPackage); else url.searchParams.delete('search_package');
             if (searchFees) url.searchParams.set('search_fees', searchFees); else url.searchParams.delete('search_fees');
-            if (searchStatus) url.searchParams.set('search_status', searchStatus); else url.searchParams.delete('search_status');
             if (searchInvitations) url.searchParams.set('search_invitations', searchInvitations); else url.searchParams.delete('search_invitations');
             if (searchComment) url.searchParams.set('search_comment', searchComment); else url.searchParams.delete('search_comment');
             
@@ -771,25 +893,6 @@
         sortDirection = !sortDirection;
     }
 
-    /* STATUS FILTER - Immediate action without debounce */
-    function handleStatusFilter() {
-        const url = new URL(window.location.href);
-        const searchStatus = document.getElementById('search_status').value.trim();
-        
-        // Set or remove search_status parameter
-        if (searchStatus) {
-            url.searchParams.set('search_status', searchStatus);
-        } else {
-            url.searchParams.delete('search_status');
-        }
-        
-        // Reset to first page
-        url.searchParams.set('page', '1');
-        
-        // Navigate immediately
-        window.location.href = url.toString();
-    }
-
     /* INFINITE SCROLL */
     let currentPage = {{ page }};
     let totalPages = {{ total_pages }};
@@ -799,9 +902,15 @@
     // Store search parameters for AJAX requests
     function getSearchParams() {
         const params = new URLSearchParams();
+        const url = new URL(window.location.href);
+        
+        // Preserve view parameter
+        const currentView = url.searchParams.get('view') || 'all';
+        if (currentView) params.set('view', currentView);
+        
         const searchFields = ['search_id', 'search_name', 'search_email', 'search_phone', 'search_age', 
                             'search_gender', 'search_actual_start', 'search_start_date', 'search_end_date',
-                            'search_package', 'search_fees', 'search_status', 'search_invitations', 'search_comment'];
+                            'search_package', 'search_fees', 'search_invitations', 'search_comment'];
         
         searchFields.forEach(field => {
             const element = document.getElementById(field);
