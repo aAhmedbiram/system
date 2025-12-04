@@ -503,99 +503,6 @@
             font-size: 13px;
         }
 
-        /* Menu buttons for Active/Expired */
-        .view-menu {
-            display: flex;
-            gap: 15px;
-            margin: 20px 0;
-            justify-content: center;
-        }
-
-        .view-menu-btn {
-            background: rgba(30, 30, 40, 0.7);
-            backdrop-filter: blur(20px);
-            border: 2px solid rgba(76, 175, 80, 0.3);
-            color: white;
-            padding: 15px 30px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-size: 18px;
-            font-weight: 600;
-            transition: all 0.3s;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
-        }
-
-        .view-menu-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
-        }
-
-        .view-menu-btn.active {
-            background: linear-gradient(135deg, #4caf50, #66d66a);
-            border-color: #4caf50;
-            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
-        }
-
-        .view-menu-btn.expired {
-            background: linear-gradient(135deg, #f44336, #e53935);
-            border-color: #f44336;
-        }
-
-        .view-menu-btn.expired:hover {
-            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
-        }
-
-        .view-menu-btn.expired.active {
-            background: linear-gradient(135deg, #f44336, #e53935);
-            border-color: #f44336;
-            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.5);
-        }
-
-        /* Statistics box */
-        .stats-box {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin: 20px 0;
-            flex-wrap: wrap;
-        }
-
-        .stat-card {
-            background: rgba(30, 30, 40, 0.7);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            border-radius: 12px;
-            padding: 20px 40px;
-            text-align: center;
-            min-width: 200px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        .stat-card.active {
-            border-color: rgba(76, 175, 80, 0.5);
-        }
-
-        .stat-card.expired {
-            border-color: rgba(244, 67, 54, 0.5);
-        }
-
-        .stat-label {
-            color: #ccc;
-            font-size: 16px;
-            margin-bottom: 10px;
-            font-weight: 500;
-        }
-
-        .stat-value {
-            font-size: 36px;
-            font-weight: bold;
-            color: #4caf50;
-        }
-
-        .stat-card.expired .stat-value {
-            color: #f44336;
-        }
     </style>
 </head>
 
@@ -617,30 +524,6 @@
 <section>
     <a class="index-btn" href="{{ url_for('index') }}">{{ t.home }}</a>
     <button class="download-btn" onclick="downloadCSV()">{{ t.download_csv }}</button>
-
-    <!-- Statistics Box -->
-    <div class="stats-box">
-        <div class="stat-card active">
-            <div class="stat-label">Active Members</div>
-            <div class="stat-value">{{ active_count }}</div>
-        </div>
-        <div class="stat-card expired">
-            <div class="stat-label">Expired Members</div>
-            <div class="stat-value">{{ expired_count }}</div>
-        </div>
-    </div>
-
-    <!-- View Menu Buttons -->
-    <div class="view-menu">
-        <a href="javascript:void(0)" onclick="switchView('active')" 
-           class="view-menu-btn {% if view == 'active' %}active{% else %}inactive{% endif %}">
-            ✅ Active Members
-        </a>
-        <a href="javascript:void(0)" onclick="switchView('expired')" 
-           class="view-menu-btn expired {% if view == 'expired' %}active{% else %}inactive{% endif %}">
-            ❌ Expired Members
-        </a>
-    </div>
 
 <div class="table-container">
 <table id="membersTable">
@@ -808,14 +691,6 @@
 
 <script>
 
-    /* VIEW SWITCH */
-    function switchView(newView) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('view', newView);
-        url.searchParams.set('page', '1'); // Reset to first page
-        window.location.href = url.toString();
-    }
-
     /* FILTER */
     // Column search function - searches entire database
     let searchTimeout;
@@ -840,10 +715,6 @@
             const searchFees = document.getElementById('search_fees').value.trim();
             const searchInvitations = document.getElementById('search_invitations').value.trim();
             const searchComment = document.getElementById('search_comment').value.trim();
-            
-            // Preserve view parameter
-            const currentView = url.searchParams.get('view') || 'all';
-            if (currentView) url.searchParams.set('view', currentView);
             
             // Set or remove search parameters
             if (searchId) url.searchParams.set('search_id', searchId); else url.searchParams.delete('search_id');
@@ -902,12 +773,6 @@
     // Store search parameters for AJAX requests
     function getSearchParams() {
         const params = new URLSearchParams();
-        const url = new URL(window.location.href);
-        
-        // Preserve view parameter
-        const currentView = url.searchParams.get('view') || 'all';
-        if (currentView) params.set('view', currentView);
-        
         const searchFields = ['search_id', 'search_name', 'search_email', 'search_phone', 'search_age', 
                             'search_gender', 'search_actual_start', 'search_start_date', 'search_end_date',
                             'search_package', 'search_fees', 'search_invitations', 'search_comment'];

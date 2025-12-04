@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filtered Members - Rival Gym System</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        /* Grid pattern overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        header h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 22px;
+            text-align: center;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        section {
+            margin: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .index-btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .index-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .download-btn{
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+            color: white;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-block;
+            margin-bottom: 10px;
+            margin-left: 10px;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+
+        .download-btn:hover{
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.5);
+        }
+
+        /* Menu buttons for Active/Expired */
+        .view-menu {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+
+        .view-menu-btn {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+        }
+
+        .view-menu-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .view-menu-btn.active {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            border-color: #4caf50;
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .view-menu-btn.expired {
+            background: linear-gradient(135deg, #f44336, #e53935);
+            border-color: #f44336;
+        }
+
+        .view-menu-btn.expired:hover {
+            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
+        }
+
+        .view-menu-btn.expired.active {
+            background: linear-gradient(135deg, #f44336, #e53935);
+            border-color: #f44336;
+            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.5);
+        }
+
+        /* Statistics box */
+        .stats-box {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            padding: 20px 40px;
+            text-align: center;
+            min-width: 200px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-card.active {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .stat-card.expired {
+            border-color: rgba(244, 67, 54, 0.5);
+        }
+
+        .stat-label {
+            color: #ccc;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #4caf50;
+        }
+
+        .stat-card.expired .stat-value {
+            color: #f44336;
+        }
+
+        .table-container {
+            max-height: 80vh;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            overflow-y: auto;
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: transparent;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            text-align: center;
+        }
+
+        tr:hover {
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        /* Status light indicators */
+        .status-light {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin: 0 auto;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .status-light.val {
+            background-color: #4caf50;
+            color: #4caf50;
+            animation: pulse-green 2s infinite;
+        }
+
+        .status-light.ex {
+            background-color: #f44336;
+            color: #f44336;
+            animation: pulse-red 2s infinite;
+        }
+
+        .status-light.unknown {
+            background-color: #888;
+            color: #888;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 8px #4caf50;
+            }
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 12px #4caf50;
+            }
+        }
+
+        @keyframes pulse-red {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 8px #f44336;
+            }
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 12px #f44336;
+            }
+        }
+
+        /* Fixed column widths */
+        th:nth-child(1), td:nth-child(1) { width: 80px; } /* Member ID */
+        th:nth-child(2), td:nth-child(2) { width: 120px; } /* Name */
+        th:nth-child(3), td:nth-child(3) { width: 150px; } /* Email */
+        th:nth-child(4), td:nth-child(4) { width: 120px; } /* Phone */
+        th:nth-child(5), td:nth-child(5) { width: 60px; } /* Age */
+        th:nth-child(6), td:nth-child(6) { width: 80px; } /* Gender */
+        th:nth-child(7), td:nth-child(7) { width: 120px; } /* Actual start */
+        th:nth-child(8), td:nth-child(8) { width: 120px; } /* Start date */
+        th:nth-child(9), td:nth-child(9) { width: 120px; } /* End date */
+        th:nth-child(10), td:nth-child(10) { width: 120px; } /* Package */
+        th:nth-child(11), td:nth-child(11) { width: 80px; } /* Fees */
+        th:nth-child(12), td:nth-child(12) { width: 80px; } /* Status */
+        th:nth-child(13), td:nth-child(13) { width: 100px; } /* Invitations */
+        th:nth-child(14), td:nth-child(14) { width: 200px; min-width: 200px; } /* Comment */
+        th:nth-child(15), td:nth-child(15) { width: 120px; } /* Freeze */
+        th:nth-child(16), td:nth-child(16) { width: 100px; } /* Edit */
+        th:nth-child(17), td:nth-child(17) { width: 100px; } /* Delete */
+
+        th {
+            background: rgba(20, 20, 30, 0.9);
+            backdrop-filter: blur(10px);
+            color: #4caf50;
+            cursor: pointer;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .filter-row {
+            position: sticky;
+            top: 42px;
+            background: rgba(20, 20, 30, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 9;
+        }
+
+        .filter-row input {
+            width: 90%;
+            padding: 12px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 6px;
+            background: rgba(20, 20, 30, 0.6);
+            color: white;
+            text-align: center;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .filter-row input:focus {
+            outline: none;
+            border-color: #4caf50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+            background: rgba(20, 20, 30, 0.8);
+        }
+
+        .edit-link {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .edit-link:hover {
+            transform: translateY(-2px);
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
+        }
+
+        .delete-link {
+            background: linear-gradient(135deg, #e53935, #f44336);
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(229, 57, 53, 0.3);
+        }
+
+        .delete-link:hover {
+            transform: translateY(-2px);
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(229, 57, 53, 0.5);
+        }
+
+        .freeze-link {
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+        }
+
+        .freeze-link:hover:not(:disabled) {
+            transform: translateY(-2px);
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.5);
+        }
+
+        .freeze-link:disabled {
+            background-color: #666;
+            color: #999;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .freeze-used {
+            color: #999;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .comment-cell {
+            text-align: left;
+            word-wrap: break-word;
+            max-width: 200px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body {% if is_rtl %}dir="rtl"{% endif %}>
+<div class="content-wrapper">
+<header>
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
+        <h1>{{ t.rival_gym_system }} - Filtered Members</h1>
+        <a href="{{ url_for('toggle_language') }}" class="language-toggle-btn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; font-size: 14px; padding: 8px 16px; border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 6px; transition: all 0.3s; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+            {% if current_lang == 'en' %}
+                🇸🇦 {{ t.arabic }}
+            {% else %}
+                🇬🇧 {{ t.english }}
+            {% endif %}
+        </a>
+    </div>
+</header>
+
+<section>
+    <a class="index-btn" href="{{ url_for('index') }}">{{ t.home }}</a>
+    <button class="download-btn" onclick="downloadCSV()">{{ t.download_csv }}</button>
+
+    <!-- Statistics Box -->
+    <div class="stats-box">
+        <div class="stat-card active">
+            <div class="stat-label">Active Members</div>
+            <div class="stat-value">{{ active_count }}</div>
+        </div>
+        <div class="stat-card expired">
+            <div class="stat-label">Expired Members</div>
+            <div class="stat-value">{{ expired_count }}</div>
+        </div>
+    </div>
+
+    <!-- View Menu Buttons -->
+    <div class="view-menu">
+        <a href="javascript:void(0)" onclick="switchView('active')" 
+           class="view-menu-btn {% if view == 'active' %}active{% endif %}">
+            ✅ Active Members
+        </a>
+        <a href="javascript:void(0)" onclick="switchView('expired')" 
+           class="view-menu-btn expired {% if view == 'expired' %}active{% endif %}">
+            ❌ Expired Members
+        </a>
+    </div>
+
+<div class="table-container">
+<table id="membersTable">
+
+    <thead>
+    <tr>
+        <th onclick="sortTable(0)">{{ t.member_id }} ▲▼</th>
+        <th onclick="sortTable(1)">{{ t.name }} ▲▼</th>
+        <th onclick="sortTable(2)">{{ t.email }} ▲▼</th>
+        <th onclick="sortTable(3)">{{ t.phone }} ▲▼</th>
+        <th onclick="sortTable(4)">{{ t.age }} ▲▼</th>
+        <th onclick="sortTable(5)">{{ t.gender }} ▲▼</th>
+        <th onclick="sortTable(6)">{{ t.actual_starting_date }} ▲▼</th>
+        <th onclick="sortTable(7)">{{ t.starting_date }} ▲▼</th>
+        <th onclick="sortTable(8)">{{ t.end_date }} ▲▼</th>
+        <th onclick="sortTable(9)">{{ t.membership_package }} ▲▼</th>
+        <th onclick="sortTable(10)">{{ t.fees }} ▲▼</th>
+        <th onclick="sortTable(11)">{{ t.status }} ▲▼</th>
+        <th onclick="sortTable(12)">{{ t.invitations }} ▲▼</th>
+        <th onclick="sortTable(13)">{{ t.comment }} ▲▼</th>
+        <th>{{ t.freeze }}</th>
+        <th>Actions</th>
+        <th>{{ t.delete }}</th>
+    </tr>
+
+    <!-- filter row -->
+    <tr class="filter-row">
+        <th><input type="text" id="search_id" placeholder="{{ t.search }}" value="{{ search_id or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_name" placeholder="{{ t.search }}" value="{{ search_name or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_email" placeholder="{{ t.search }}" value="{{ search_email or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_phone" placeholder="{{ t.search }}" value="{{ search_phone or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_age" placeholder="{{ t.search }}" value="{{ search_age or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_gender" placeholder="{{ t.search }}" value="{{ search_gender or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_actual_start" placeholder="{{ t.search }}" value="{{ search_actual_start or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_start_date" placeholder="{{ t.search }}" value="{{ search_start_date or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_end_date" placeholder="{{ t.search }}" value="{{ search_end_date or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_package" placeholder="{{ t.search }}" value="{{ search_package or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_fees" placeholder="{{ t.search }}" value="{{ search_fees or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th></th>
+        <th><input type="text" id="search_invitations" placeholder="{{ t.search }}" value="{{ search_invitations or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_comment" placeholder="{{ t.search }}" value="{{ search_comment or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th></th>
+        <th></th>
+        <th></th>
+    </tr>
+    </thead>
+
+    <tbody>
+    {% for member in members_data %}
+    <tr>
+        <td>{{ member.id }}</td>
+        <td>{{ member.name }}</td>
+        <td>{{ member.email }}</td>
+        <td>{{ member.phone }}</td>
+        <td>{{ member.age }}</td>
+        <td>{{ "Male" if member.gender == "Male" else "Female" }}</td>
+        <td>{{ member.actual_starting_date }}</td>
+        <td>{{ member.starting_date }}</td>
+        <td>{{ member.end_date }}</td>
+        <td>{{ member.membership_packages }}</td>
+        <td>{{ member.membership_fees }}</td>
+        <td>
+            {% set end_date_str = (member.end_date or '')|string %}
+            {% if end_date_str and end_date_str != '-' and end_date_str != 'None' %}
+                {% set end_date_only = end_date_str.split(' ')[0] %}
+                {% if end_date_only|length >= 10 and end_date_only[:4]|int > 1900 %}
+                    {% if end_date_only > today %}
+                        <span class="status-light val" title="Valid - Active Membership (Ends: {{ end_date_str }})"></span>
+                    {% elif end_date_only < today %}
+                        <span class="status-light ex" title="Expired - Membership Ended (Expired: {{ end_date_str }})"></span>
+                    {% else %}
+                        <span class="status-light val" title="Valid - Expires Today"></span>
+                    {% endif %}
+                {% else %}
+                    <span class="status-light unknown" title="Invalid Date Format: {{ end_date_str }}"></span>
+                {% endif %}
+            {% else %}
+                <span class="status-light unknown" title="No End Date"></span>
+            {% endif %}
+        </td>
+        <td>
+            {% if member.is_expired %}
+                <span class="freeze-used">N/A</span>
+            {% else %}
+                <span style="color: #ffd43b; font-weight: bold;">{{ member.invitations or 0 }}</span>
+            {% endif %}
+        </td>
+        <td class="comment-cell">{{ member.comment or '-' }}</td>
+        <td>
+            {% set package = (member.membership_packages or '').strip() %}
+            {% set package_lower = package.lower() %}
+            {% set has_freeze = False %}
+            {% set freeze_days = 0 %}
+            
+            {% if '3 month' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 7 %}
+            {% elif '4 month' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 7 %}
+            {% elif '6 month' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 14 %}
+            {% elif '12 month' in package_lower or '1 year' in package_lower or 'year' in package_lower %}
+                {% set has_freeze = True %}
+                {% set freeze_days = 30 %}
+            {% endif %}
+            
+            {% if member.is_expired %}
+                <span class="freeze-used">N/A</span>
+            {% elif member.freeze_used %}
+                <span class="freeze-used">Used</span>
+            {% elif has_freeze %}
+                <form method="POST" action="{{ url_for('use_freeze', member_id=member.id) }}" 
+                      onsubmit="return confirm('Are you sure you want to use freeze for {{ member.name }}? This will extend the membership by {{ freeze_days }} days and cannot be undone!');" 
+                      style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> 
+                    <button type="submit" class="freeze-link" style="border: none; cursor: pointer;">Use Freeze</button>
+                </form>
+            {% else %}
+                <span class="freeze-used">N/A</span>
+            {% endif %}
+        </td>
+        <td>
+            <div style="display: flex; flex-direction: column; gap: 5px; align-items: center;">
+                <a class="edit-link" href="{{ url_for('edit_member', member_id=member.id) }}" style="font-size: 12px; padding: 6px 12px;">Edit</a>
+                <a href="{{ url_for('member_training_plans', member_id=member.id) }}" 
+                   style="background: linear-gradient(135deg, #ff9800, #ffb74d); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block; transition: all 0.3s; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);">
+                    💪 Plans
+                </a>
+                <a href="{{ url_for('progress_tracking', member_id=member.id) }}" 
+                   style="background: linear-gradient(135deg, #2196F3, #42a5f5); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block; transition: all 0.3s; box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);">
+                    📈 Progress
+                </a>
+            </div>
+        </td>
+        <td>
+            <form method="POST" action="{{ url_for('delete_member_route', member_id=member.id) }}" 
+                  onsubmit="return confirm('Are you sure you want to delete {{ member.name }}? This action cannot be undone!');" 
+                  style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="delete-link" style="border: none; cursor: pointer;">Delete</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+
+    <!-- Loading indicator for infinite scroll -->
+    <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #4caf50; font-size: 16px;">
+        <div>Loading more members...</div>
+    </div>
+    
+    <!-- End of list indicator -->
+    <div id="end-of-list" style="display: none; text-align: center; padding: 20px; color: #888; font-size: 14px;">
+        <div>No more members to load. ({{ total_count }} total members)</div>
+    </div>
+
+</section>
+
+<script>
+
+    /* VIEW SWITCH */
+    function switchView(newView) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('view', newView);
+        url.searchParams.set('page', '1'); // Reset to first page
+        window.location.href = url.toString();
+    }
+
+    /* FILTER */
+    let searchTimeout;
+    function handleColumnSearch() {
+        clearTimeout(searchTimeout);
+        
+        searchTimeout = setTimeout(() => {
+            const url = new URL(window.location.href);
+            
+            const searchId = document.getElementById('search_id').value.trim();
+            const searchName = document.getElementById('search_name').value.trim();
+            const searchEmail = document.getElementById('search_email').value.trim();
+            const searchPhone = document.getElementById('search_phone').value.trim();
+            const searchAge = document.getElementById('search_age').value.trim();
+            const searchGender = document.getElementById('search_gender').value.trim();
+            const searchActualStart = document.getElementById('search_actual_start').value.trim();
+            const searchStartDate = document.getElementById('search_start_date').value.trim();
+            const searchEndDate = document.getElementById('search_end_date').value.trim();
+            const searchPackage = document.getElementById('search_package').value.trim();
+            const searchFees = document.getElementById('search_fees').value.trim();
+            const searchInvitations = document.getElementById('search_invitations').value.trim();
+            const searchComment = document.getElementById('search_comment').value.trim();
+            
+            // Preserve view parameter
+            const currentView = url.searchParams.get('view') || 'all';
+            if (currentView) url.searchParams.set('view', currentView);
+            
+            if (searchId) url.searchParams.set('search_id', searchId); else url.searchParams.delete('search_id');
+            if (searchName) url.searchParams.set('search_name', searchName); else url.searchParams.delete('search_name');
+            if (searchEmail) url.searchParams.set('search_email', searchEmail); else url.searchParams.delete('search_email');
+            if (searchPhone) url.searchParams.set('search_phone', searchPhone); else url.searchParams.delete('search_phone');
+            if (searchAge) url.searchParams.set('search_age', searchAge); else url.searchParams.delete('search_age');
+            if (searchGender) url.searchParams.set('search_gender', searchGender); else url.searchParams.delete('search_gender');
+            if (searchActualStart) url.searchParams.set('search_actual_start', searchActualStart); else url.searchParams.delete('search_actual_start');
+            if (searchStartDate) url.searchParams.set('search_start_date', searchStartDate); else url.searchParams.delete('search_start_date');
+            if (searchEndDate) url.searchParams.set('search_end_date', searchEndDate); else url.searchParams.delete('search_end_date');
+            if (searchPackage) url.searchParams.set('search_package', searchPackage); else url.searchParams.delete('search_package');
+            if (searchFees) url.searchParams.set('search_fees', searchFees); else url.searchParams.delete('search_fees');
+            if (searchInvitations) url.searchParams.set('search_invitations', searchInvitations); else url.searchParams.delete('search_invitations');
+            if (searchComment) url.searchParams.set('search_comment', searchComment); else url.searchParams.delete('search_comment');
+            
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
+        }, 500);
+    }
+
+    /* SORT */
+    let sortDirection = true;
+
+    function sortTable(colIndex) {
+        let table = document.getElementById("membersTable");
+        let switching = true;
+
+        while (switching) {
+            switching = false;
+            let rows = table.rows;
+
+            for (let i = 2; i < rows.length - 1; i++) {
+                let x = rows[i].getElementsByTagName("td")[colIndex];
+                let y = rows[i + 1].getElementsByTagName("td")[colIndex];
+
+                if (
+                    (sortDirection && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) ||
+                    (!sortDirection && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase())
+                ) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    break;
+                }
+            }
+        }
+        sortDirection = !sortDirection;
+    }
+
+    /* INFINITE SCROLL */
+    let currentPage = {{ page }};
+    let totalPages = {{ total_pages }};
+    let isLoading = false;
+    let hasMore = currentPage < totalPages;
+    
+    function getSearchParams() {
+        const params = new URLSearchParams();
+        const url = new URL(window.location.href);
+        
+        // Preserve view parameter
+        const currentView = url.searchParams.get('view') || 'all';
+        if (currentView) params.set('view', currentView);
+        
+        const searchFields = ['search_id', 'search_name', 'search_email', 'search_phone', 'search_age', 
+                            'search_gender', 'search_actual_start', 'search_start_date', 'search_end_date',
+                            'search_package', 'search_fees', 'search_invitations', 'search_comment'];
+        
+        searchFields.forEach(field => {
+            const element = document.getElementById(field);
+            if (element && element.value.trim()) {
+                params.set(field.replace('search_', ''), element.value.trim());
+            }
+        });
+        
+        return params.toString();
+    }
+    
+    function loadMoreMembers() {
+        if (isLoading || !hasMore) return;
+        
+        isLoading = true;
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const endOfList = document.getElementById('end-of-list');
+        
+        loadingIndicator.style.display = 'block';
+        
+        const nextPage = currentPage + 1;
+        const searchParams = getSearchParams();
+        const url = `/filtered_members?page=${nextPage}&format=json${searchParams ? '&' + searchParams : ''}`;
+        
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.members && data.members.length > 0) {
+                const tbody = document.querySelector('#membersTable tbody');
+                
+                data.members.forEach(member => {
+                    const row = createMemberRow(member);
+                    tbody.appendChild(row);
+                });
+                
+                currentPage = data.page;
+                totalPages = data.total_pages;
+                hasMore = data.has_more;
+                
+                if (!hasMore) {
+                    endOfList.style.display = 'block';
+                }
+            } else {
+                hasMore = false;
+                endOfList.style.display = 'block';
+            }
+            
+            loadingIndicator.style.display = 'none';
+            isLoading = false;
+        })
+        .catch(error => {
+            console.error('Error loading more members:', error);
+            loadingIndicator.style.display = 'none';
+            isLoading = false;
+        });
+    }
+    
+    function createMemberRow(member) {
+        const tr = document.createElement('tr');
+        
+        const getValue = (val) => val || '-';
+        const getStatus = (endDate) => {
+            if (!endDate || endDate === '-' || endDate === 'None') {
+                return '<span class="status-light unknown" title="No End Date"></span>';
+            }
+            const endDateOnly = endDate.split(' ')[0];
+            const today = '{{ today }}';
+            
+            if (endDateOnly.length >= 10 && parseInt(endDateOnly.substring(0, 4)) > 1900) {
+                if (endDateOnly > today) {
+                    return `<span class="status-light val" title="Valid - Active Membership (Ends: ${endDate})"></span>`;
+                } else if (endDateOnly < today) {
+                    return `<span class="status-light ex" title="Expired - Membership Ended (Expired: ${endDate})"></span>`;
+                } else {
+                    return `<span class="status-light val" title="Valid - Expires Today"></span>`;
+                }
+            }
+            return `<span class="status-light unknown" title="Invalid Date Format: ${endDate}"></span>`;
+        };
+        
+        const getFreezeButton = (member) => {
+            const package = (member.membership_packages || '').trim().toLowerCase();
+            let hasFreeze = false;
+            let freezeDays = 0;
+            
+            if (package.includes('3 month')) {
+                hasFreeze = true;
+                freezeDays = 7;
+            } else if (package.includes('4 month')) {
+                hasFreeze = true;
+                freezeDays = 7;
+            } else if (package.includes('6 month')) {
+                hasFreeze = true;
+                freezeDays = 14;
+            } else if (package.includes('12 month') || package.includes('1 year') || package.includes('year')) {
+                hasFreeze = true;
+                freezeDays = 30;
+            }
+            
+            if (member.is_expired) {
+                return '<span class="freeze-used">N/A</span>';
+            } else if (member.freeze_used) {
+                return '<span class="freeze-used">Used</span>';
+            } else if (hasFreeze) {
+                const csrfInput = document.querySelector('input[name="csrf_token"]');
+                const csrfToken = csrfInput ? csrfInput.value : '';
+                return `<form method="POST" action="/use_freeze/${member.id}" onsubmit="return confirm('Are you sure you want to use freeze for ${member.name.replace(/'/g, "\\'")}? This will extend the membership by ${freezeDays} days and cannot be undone!');" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+                    <button type="submit" class="freeze-link" style="border: none; cursor: pointer;">Use Freeze</button>
+                </form>`;
+            }
+            return '<span class="freeze-used">N/A</span>';
+        };
+        
+        tr.innerHTML = `
+            <td>${member.id}</td>
+            <td>${getValue(member.name)}</td>
+            <td>${getValue(member.email)}</td>
+            <td>${getValue(member.phone)}</td>
+            <td>${getValue(member.age)}</td>
+            <td>${member.gender === 'Male' ? 'Male' : 'Female'}</td>
+            <td>${getValue(member.actual_starting_date)}</td>
+            <td>${getValue(member.starting_date)}</td>
+            <td>${getValue(member.end_date)}</td>
+            <td>${getValue(member.membership_packages)}</td>
+            <td>${getValue(member.membership_fees)}</td>
+            <td>${getStatus(member.end_date)}</td>
+            <td>${member.is_expired ? '<span class="freeze-used">N/A</span>' : `<span style="color: #ffd43b; font-weight: bold;">${member.invitations || 0}</span>`}</td>
+            <td class="comment-cell">${getValue(member.comment)}</td>
+            <td>${getFreezeButton(member)}</td>
+            <td>
+                <div style="display: flex; flex-direction: column; gap: 5px; align-items: center;">
+                    <a class="edit-link" href="/edit_member/${member.id}" style="font-size: 12px; padding: 6px 12px;">Edit</a>
+                    <a href="/member_training_plans/${member.id}" style="background: linear-gradient(135deg, #ff9800, #ffb74d); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block; transition: all 0.3s; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);">
+                        💪 Plans
+                    </a>
+                    <a href="/progress_tracking/${member.id}" style="background: linear-gradient(135deg, #2196F3, #42a5f5); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block; transition: all 0.3s; box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);">
+                        📈 Progress
+                    </a>
+                </div>
+            </td>
+            <td>
+                <form method="POST" action="/delete_member/${member.id}" onsubmit="return confirm('Are you sure you want to delete ${member.name.replace(/'/g, "\\'")}? This action cannot be undone!');" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="${document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : ''}"/>
+                    <button type="submit" class="delete-link" style="border: none; cursor: pointer;">Delete</button>
+                </form>
+            </td>
+        `;
+        
+        return tr;
+    }
+    
+    let scrollTimeout;
+    window.addEventListener('scroll', function() {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(function() {
+            const scrollPosition = window.innerHeight + window.scrollY;
+            const documentHeight = document.documentElement.scrollHeight;
+            
+            if (documentHeight - scrollPosition < 200 && hasMore && !isLoading) {
+                loadMoreMembers();
+            }
+        }, 100);
+    });
+    
+    window.addEventListener('load', function() {
+        if (!hasMore) {
+            document.getElementById('end-of-list').style.display = 'block';
+        }
+    });
+
+    /* DOWNLOAD CSV */
+    function downloadCSV() {
+        let table = document.getElementById("membersTable");
+        let rows = table.querySelectorAll("tr");
+        let csv = "";
+
+        rows.forEach((row) => {
+            let cols = row.querySelectorAll("th, td");
+            let rowData = [];
+            cols.forEach((col) => {
+                rowData.push(col.innerText.replace(/,/g, " "));
+            });
+            csv += rowData.join(",") + "\n";
+        });
+
+        let blob = new Blob([csv], { type: "text/csv" });
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "filtered_members.csv";
+        link.click();
+    }
+
+</script>
+</div>
+</body>
+</html>
+

@@ -1528,7 +1528,218 @@ def add_member_done():
 @login_required
 def all_members():
     try:
-        # Get view parameter (active/expired/all) - replaces search_status dropdown
+        # Get individual column search queries
+        search_id = request.args.get('search_id', '').strip()
+        search_name = request.args.get('search_name', '').strip()
+        search_email = request.args.get('search_email', '').strip()
+        search_phone = request.args.get('search_phone', '').strip()
+        search_age = request.args.get('search_age', '').strip()
+        search_gender = request.args.get('search_gender', '').strip()
+        search_actual_start = request.args.get('search_actual_start', '').strip()
+        search_start_date = request.args.get('search_start_date', '').strip()
+        search_end_date = request.args.get('search_end_date', '').strip()
+        search_package = request.args.get('search_package', '').strip()
+        search_fees = request.args.get('search_fees', '').strip()
+        search_invitations = request.args.get('search_invitations', '').strip()
+        search_comment = request.args.get('search_comment', '').strip()
+        
+        # Pagination: 50 items per page
+        page = request.args.get('page', 1, type=int)
+        per_page = 50
+        offset = (page - 1) * per_page
+        
+        # Build WHERE conditions for each column
+        where_conditions = []
+        params = []
+        
+        if search_id:
+            where_conditions.append("CAST(id AS TEXT) ILIKE %s")
+            params.append(f'%{search_id}%')
+        
+        if search_name:
+            where_conditions.append("name ILIKE %s")
+            params.append(f'%{search_name}%')
+        
+        if search_email:
+            where_conditions.append("COALESCE(email, '') ILIKE %s")
+            params.append(f'%{search_email}%')
+        
+        if search_phone:
+            where_conditions.append("COALESCE(phone, '') ILIKE %s")
+            params.append(f'%{search_phone}%')
+        
+        if search_age:
+            where_conditions.append("CAST(age AS TEXT) ILIKE %s")
+            params.append(f'%{search_age}%')
+        
+        if search_gender:
+            where_conditions.append("COALESCE(gender, '') ILIKE %s")
+            params.append(f'%{search_gender}%')
+        
+        if search_actual_start:
+            where_conditions.append("COALESCE(actual_starting_date, '') ILIKE %s")
+            params.append(f'%{search_actual_start}%')
+        
+        if search_start_date:
+            where_conditions.append("COALESCE(starting_date, '') ILIKE %s")
+            params.append(f'%{search_start_date}%')
+        
+        if search_end_date:
+            where_conditions.append("COALESCE(end_date, '') ILIKE %s")
+            params.append(f'%{search_end_date}%')
+        
+        if search_package:
+            where_conditions.append("COALESCE(membership_packages, '') ILIKE %s")
+            params.append(f'%{search_package}%')
+        
+        if search_fees:
+            where_conditions.append("CAST(membership_fees AS TEXT) ILIKE %s")
+            params.append(f'%{search_fees}%')
+        
+        if search_invitations:
+            where_conditions.append("CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s")
+            params.append(f'%{search_invitations}%')
+        
+        if search_comment:
+            where_conditions.append("COALESCE(comment, '') ILIKE %s")
+            params.append(f'%{search_comment}%')
+        
+        # Build query
+        if where_conditions:
+            where_clause = " AND ".join(where_conditions)
+            base_query = f'SELECT * FROM members WHERE {where_clause} ORDER BY id ASC'
+            count_query = f'SELECT COUNT(*) as count FROM members WHERE {where_clause}'
+            
+            # Get total count for pagination
+            total_count = query_db(count_query, tuple(params), one=True)
+            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+            
+            # Get paginated data with search
+            members_data = query_db(
+                base_query + ' LIMIT %s OFFSET %s',
+                tuple(params) + (per_page, offset)
+            )
+        else:
+            # No search - get all members
+            total_count = query_db('SELECT COUNT(*) as count FROM members', one=True)
+            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
+            
+            members_data = query_db(
+                'SELECT * FROM members ORDER BY id ASC LIMIT %s OFFSET %s',
+                (per_page, offset)
+            )
+        
+        # Process members to add is_expired flag for freeze button logic
+        # Also calculate dynamic status based on current date (like attendance_table)
+        from datetime import datetime
+        today = datetime.now().date()
+        today_str = today.strftime('%Y-%m-%d')  # Format for template comparison
+        
+        processed_members = []
+        if members_data:
+            for member in members_data:
+                member_dict = dict(member) if hasattr(member, 'keys') else member
+                is_expired = False
+                dynamic_status = 'unknown'  # Will be calculated dynamically
+                end_date_only = ''  # Initialize
+                
+                # Check if end_date is expired and calculate dynamic status
+                end_date_str = member_dict.get('end_date')
+                if end_date_str:
+                    try:
+                        # Extract date part only (first 10 characters)
+                        end_date_only = str(end_date_str).strip()[:10] if end_date_str else ''
+                        
+                        # Validate date format (should be YYYY-MM-DD or similar)
+                        if end_date_only and len(end_date_only) >= 10:
+                            try:
+                                # Try to parse as YYYY-MM-DD
+                                end_date_parsed = datetime.strptime(end_date_only, '%Y-%m-%d').date()
+                                
+                                if end_date_parsed < today:
+                                    is_expired = True
+                                    dynamic_status = 'ex'
+                                elif end_date_parsed > today:
+                                    dynamic_status = 'val'
+                                else:  # end_date == today
+                                    dynamic_status = 'val'
+                            except ValueError:
+                                # Try other date formats
+                                date_formats = [
+                                    '%m/%d/%Y', '%d/%m/%Y', '%m-%d-%Y', 
+                                    '%d-%m-%Y', '%Y/%m/%d'
+                                ]
+                                end_date_parsed = None
+                                for fmt in date_formats:
+                                    try:
+                                        end_date_parsed = datetime.strptime(end_date_only, fmt).date()
+                                        break
+                                    except ValueError:
+                                        continue
+                                
+                                if end_date_parsed:
+                                    if end_date_parsed < today:
+                                        is_expired = True
+                                        dynamic_status = 'ex'
+                                    elif end_date_parsed > today:
+                                        dynamic_status = 'val'
+                                    else:
+                                        dynamic_status = 'val'
+                    except Exception as e:
+                        print(f"Error parsing end_date for member {member_dict.get('id')}: {e}")
+                        dynamic_status = 'unknown'
+                
+                member_dict['is_expired'] = is_expired
+                member_dict['dynamic_status'] = dynamic_status  # For template use
+                member_dict['end_date_only'] = end_date_only
+                # Ensure freeze_used is included (default to False if not present)
+                if 'freeze_used' not in member_dict:
+                    member_dict['freeze_used'] = False
+                processed_members.append(member_dict)
+        
+        # Check if this is an AJAX request for infinite scroll
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
+            # Return JSON for AJAX requests
+            from flask import jsonify
+            return jsonify({
+                'members': processed_members,
+                'page': page,
+                'total_pages': total_pages,
+                'total_count': total_count['count'] if total_count else 0,
+                'has_more': page < total_pages
+            })
+        
+        return render_template("all_members.html", 
+                            members_data=processed_members,
+                            page=page,
+                            total_pages=total_pages,
+                            total_count=total_count['count'] if total_count else 0,
+                            today=today_str,
+                            search_id=search_id,
+                            search_name=search_name,
+                            search_email=search_email,
+                            search_phone=search_phone,
+                            search_age=search_age,
+                            search_gender=search_gender,
+                            search_actual_start=search_actual_start,
+                            search_start_date=search_start_date,
+                            search_end_date=search_end_date,
+                            search_package=search_package,
+                            search_fees=search_fees,
+                            search_invitations=search_invitations,
+                            search_comment=search_comment)
+    except Exception as e:
+        print(f"Error in all_members route: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Error loading members: {str(e)}", "error")
+        return render_template("all_members.html", members_data=[], page=1, total_pages=1, total_count=0)
+
+@app.route("/filtered_members")
+@login_required
+def filtered_members():
+    try:
+        # Get view parameter (active/expired/all) - for filtered members page
         view = request.args.get('view', 'all').strip().lower()
         if view not in ['active', 'expired', 'all']:
             view = 'all'
@@ -1770,7 +1981,7 @@ def all_members():
                 'has_more': page < total_pages
             })
         
-        return render_template("all_members.html", 
+        return render_template("filtered_members.html", 
                             members_data=processed_members,
                             page=page,
                             total_pages=total_pages,
@@ -1793,11 +2004,11 @@ def all_members():
                             search_invitations=search_invitations,
                             search_comment=search_comment)
     except Exception as e:
-        print(f"Error in all_members route: {e}")
+        print(f"Error in filtered_members route: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error loading members: {str(e)}", "error")
-        return render_template("all_members.html", members_data=[], page=1, total_pages=1, total_count=0)
+        return render_template("filtered_members.html", members_data=[], page=1, total_pages=1, total_count=0, view='all', active_count=0, expired_count=0)
 
 # === Edit member ===
 def format_date_for_input(date_str):
