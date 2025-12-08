@@ -825,11 +825,80 @@ def index():
             except:
                 pending_count = 0
         
+        # Calculate statistics for the current month
+        from datetime import datetime
+        today = datetime.now()
+        current_month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_month = today.month
+        current_year = today.year
+        
+        # Count new members in current month (based on actual_starting_date)
+        new_members_count = 0
+        try:
+            # Try to count members where actual_starting_date falls in current month
+            # Since actual_starting_date is stored as TEXT, we need to handle multiple formats
+            # Format 1: YYYY-MM-DD
+            # Format 2: MM/DD/YYYY or DD/MM/YYYY
+            # Format 3: Day name format (e.g., "Monday, January 1, 2025")
+            month_name = today.strftime('%B')  # Full month name like "January"
+            month_name_short = today.strftime('%b')  # Short month name like "Jan"
+            
+            new_members_result = query_db("""
+                SELECT COUNT(*) as count FROM members 
+                WHERE actual_starting_date IS NOT NULL 
+                AND actual_starting_date != ''
+                AND (
+                    -- YYYY-MM-DD format
+                    (LENGTH(TRIM(actual_starting_date)) >= 10 
+                     AND SUBSTRING(TRIM(actual_starting_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                     AND CAST(SUBSTRING(TRIM(actual_starting_date), 1, 10) AS DATE) >= %s
+                     AND CAST(SUBSTRING(TRIM(actual_starting_date), 1, 10) AS DATE) < %s)
+                    OR
+                    -- Contains current year and month name
+                    (actual_starting_date ILIKE %s AND actual_starting_date ILIKE %s)
+                    OR
+                    -- MM/DD/YYYY or DD/MM/YYYY format with current month/year
+                    (actual_starting_date LIKE %s OR actual_starting_date LIKE %s)
+                )
+            """, (
+                current_month_start,
+                datetime(current_year, current_month % 12 + 1, 1) if current_month < 12 else datetime(current_year + 1, 1, 1),
+                f'%{current_year}%',
+                f'%{month_name}%',
+                f'%{current_month:02d}/%/{current_year}%',
+                f'%/{current_month:02d}/{current_year}%'
+            ), one=True)
+            new_members_count = new_members_result['count'] if new_members_result else 0
+        except Exception as e:
+            print(f"Error counting new members: {e}")
+            import traceback
+            traceback.print_exc()
+            new_members_count = 0
+        
+        # Count members who updated starting_date in current month (from member_logs)
+        updated_starting_date_count = 0
+        try:
+            updated_result = query_db("""
+                SELECT COUNT(DISTINCT member_id) as count FROM member_logs 
+                WHERE field_name = 'starting_date' 
+                AND edit_time >= %s
+                AND edit_time < %s
+            """, (
+                current_month_start,
+                datetime(current_year, current_month % 12 + 1, 1) if current_month < 12 else datetime(current_year + 1, 1, 1)
+            ), one=True)
+            updated_starting_date_count = updated_result['count'] if updated_result else 0
+        except Exception as e:
+            print(f"Error counting updated starting dates: {e}")
+            updated_starting_date_count = 0
+        
         return render_template("index.html", 
                                 attendance_data=attendance_data or [], 
                                 members_data=members_data or [],
                                 user_permissions=user_permissions,
-                                pending_approvals_count=pending_count)
+                                pending_approvals_count=pending_count,
+                                new_members_count=new_members_count,
+                                updated_starting_date_count=updated_starting_date_count)
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback

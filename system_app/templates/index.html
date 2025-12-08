@@ -425,6 +425,61 @@
         .nav-btn.red { border-color: rgba(244, 67, 54, 0.3); }
         .nav-btn.red:hover { border-color: rgba(244, 67, 54, 0.5); box-shadow: 0 15px 40px rgba(244, 67, 54, 0.3); }
 
+        /* Statistics box */
+        .monthly-stats-box {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .monthly-stats-box h3 {
+            color: #4caf50;
+            font-size: 24px;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+        }
+
+        .stat-item {
+            background: rgba(20, 20, 30, 0.6);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-5px);
+            border-color: rgba(76, 175, 80, 0.5);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
+        }
+
+        .stat-item-label {
+            color: #ccc;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .stat-item-value {
+            font-size: 42px;
+            font-weight: bold;
+            color: #4caf50;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
         /* Bottom action bar */
         .bottom-bar {
             background: rgba(20, 20, 30, 0.85);
@@ -735,6 +790,21 @@
                         
                         <button type="submit">{{ t.add_member }}</button>
                     </form>
+                </div>
+            </div>
+
+            <!-- Monthly Statistics Box -->
+            <div class="monthly-stats-box">
+                <h3>📊 Monthly Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-item-label">New Members This Month</div>
+                        <div class="stat-item-value">{{ new_members_count or 0 }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-item-label">Members Updated Starting Date</div>
+                        <div class="stat-item-value">{{ updated_starting_date_count or 0 }}</div>
+                    </div>
                 </div>
             </div>
 
