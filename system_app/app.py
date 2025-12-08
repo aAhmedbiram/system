@@ -835,38 +835,50 @@ def index():
         # Count new members in current month (based on actual_starting_date)
         new_members_count = 0
         try:
-            # Try to count members where actual_starting_date falls in current month
-            # Since actual_starting_date is stored as TEXT, we need to handle multiple formats
-            # Format 1: YYYY-MM-DD
-            # Format 2: MM/DD/YYYY or DD/MM/YYYY
-            # Format 3: Day name format (e.g., "Monday, January 1, 2025")
-            month_name = today.strftime('%B')  # Full month name like "January"
-            month_name_short = today.strftime('%b')  # Short month name like "Jan"
+            # Calculate next month start for date range
+            if current_month == 12:
+                next_month_start = datetime(current_year + 1, 1, 1)
+            else:
+                next_month_start = datetime(current_year, current_month + 1, 1)
             
+            # Count members where actual_starting_date falls in current month
+            # New members added through the form will have actual_starting_date in YYYY-MM-DD format
+            month_name = today.strftime('%B')  # Full month name like "January"
+            month_num_str = f'{current_month:02d}'
+            year_str = str(current_year)
+            year_month_pattern = f'{current_year}-{month_num_str}'  # e.g., "2025-12"
+            
+            # Query to count members with actual_starting_date in current month
+            # Try multiple formats to catch all cases
             new_members_result = query_db("""
                 SELECT COUNT(*) as count FROM members 
                 WHERE actual_starting_date IS NOT NULL 
                 AND actual_starting_date != ''
                 AND (
-                    -- YYYY-MM-DD format
+                    -- YYYY-MM-DD format (standard HTML date input - new members from form)
                     (LENGTH(TRIM(actual_starting_date)) >= 10 
+                     AND SUBSTRING(TRIM(actual_starting_date), 1, 7) = %s
                      AND SUBSTRING(TRIM(actual_starting_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
                      AND CAST(SUBSTRING(TRIM(actual_starting_date), 1, 10) AS DATE) >= %s
                      AND CAST(SUBSTRING(TRIM(actual_starting_date), 1, 10) AS DATE) < %s)
                     OR
-                    -- Contains current year and month name
-                    (actual_starting_date ILIKE %s AND actual_starting_date ILIKE %s)
+                    -- Simple pattern match for YYYY-MM-DD format (fallback)
+                    (actual_starting_date LIKE %s)
                     OR
-                    -- MM/DD/YYYY or DD/MM/YYYY format with current month/year
-                    (actual_starting_date LIKE %s OR actual_starting_date LIKE %s)
+                    -- DD,MM,YYYY format (formatted display - e.g., "08,12,2025")
+                    (actual_starting_date LIKE %s)
+                    OR
+                    -- Day name format: "Monday, December 8, 2025" or similar
+                    (actual_starting_date ILIKE %s AND actual_starting_date ILIKE %s)
                 )
             """, (
+                year_month_pattern,  # YYYY-MM pattern
                 current_month_start,
-                datetime(current_year, current_month % 12 + 1, 1) if current_month < 12 else datetime(current_year + 1, 1, 1),
-                f'%{current_year}%',
-                f'%{month_name}%',
-                f'%{current_month:02d}/%/{current_year}%',
-                f'%/{current_month:02d}/{current_year}%'
+                next_month_start,
+                f'{year_month_pattern}-%',  # YYYY-MM-DD pattern
+                f'%,{month_num_str},{year_str}%',  # DD,MM,YYYY format
+                f'%{month_name}%',  # Contains month name
+                f'%{year_str}%'  # Contains current year
             ), one=True)
             new_members_count = new_members_result['count'] if new_members_result else 0
         except Exception as e:
