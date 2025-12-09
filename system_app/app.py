@@ -5877,6 +5877,58 @@ def health_check():
             'timestamp': datetime.now().isoformat()
         }), 503
 
+@app.route('/api/search/members')
+@csrf.exempt
+@login_required
+def api_search_members():
+    """API endpoint for member search autocomplete"""
+    try:
+        query = request.args.get('q', '').strip()
+        limit = int(request.args.get('limit', 10))
+        
+        if len(query) < 2:
+            return jsonify([])
+        
+        # Search by name, phone, or ID
+        results = query_db("""
+            SELECT id, name, phone, email, membership_status
+            FROM members 
+            WHERE name ILIKE %s 
+               OR phone ILIKE %s 
+               OR CAST(id AS TEXT) LIKE %s
+            ORDER BY 
+                CASE 
+                    WHEN name ILIKE %s THEN 1
+                    WHEN phone ILIKE %s THEN 2
+                    ELSE 3
+                END,
+                id DESC
+            LIMIT %s
+        """, (
+            f'%{query}%',
+            f'%{query}%',
+            f'%{query}%',
+            f'{query}%',  # Exact start match gets priority
+            f'{query}%',
+            limit
+        ))
+        
+        suggestions = []
+        for member in results or []:
+            suggestions.append({
+                'id': member.get('id'),
+                'name': member.get('name'),
+                'phone': member.get('phone'),
+                'email': member.get('email'),
+                'status': member.get('membership_status'),
+                'display': f"{member.get('name')} ({member.get('phone') or 'No phone'})"
+            })
+        
+        return jsonify(suggestions)
+    except Exception as e:
+        print(f"Error in api_search_members: {e}")
+        return jsonify([]), 500
+
 @app.route('/metrics')
 @csrf.exempt
 @login_required

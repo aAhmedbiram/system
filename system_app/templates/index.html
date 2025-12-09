@@ -843,7 +843,243 @@
             font-weight: bold;
             color: #4caf50;
         }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+        }
+
+        /* Loading Spinner */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            border-radius: inherit;
+        }
+
+        .loading-spinner {
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(76, 175, 80, 0.3);
+            border-top: 4px solid #4caf50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Form Validation */
+        input.invalid {
+            border-color: #f44336 !important;
+            box-shadow: 0 0 20px rgba(244, 67, 54, 0.3) !important;
+        }
+
+        input.valid {
+            border-color: #4caf50 !important;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3) !important;
+        }
+
+        .field-error {
+            color: #f44336;
+            font-size: 12px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Autocomplete */
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(30, 30, 40, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            margin-top: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(76, 175, 80, 0.1);
+            transition: all 0.2s;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.selected {
+            background: rgba(76, 175, 80, 0.2);
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Scroll to Top Button */
+        #scroll-to-top {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 999;
+        }
+
+        #scroll-to-top:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.6);
+        }
+
+        #scroll-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Theme Toggle */
+        #theme-toggle {
+            background: rgba(30, 30, 40, 0.8);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        #theme-toggle:hover {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        /* Light Theme Styles */
+        [data-theme="light"] body {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 50%, #ffffff 100%);
+            color: #1a1a1a;
+        }
+
+        [data-theme="light"] .action-card,
+        [data-theme="light"] .stat-item,
+        [data-theme="light"] .nav-btn,
+        [data-theme="light"] .monthly-stats-box,
+        [data-theme="light"] .alert-widget,
+        [data-theme="light"] .revenue-package-widget {
+            background: rgba(255, 255, 255, 0.9);
+            color: #1a1a1a;
+            border-color: #e0e0e0;
+        }
+
+        [data-theme="light"] .stat-item-label,
+        [data-theme="light"] .action-card label {
+            color: #666;
+        }
+
+        [data-theme="light"] header {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom-color: #e0e0e0;
+        }
+
+        /* Empty States */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #ccc;
+        }
+
+        .empty-state-message {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: rgba(20, 20, 30, 0.6);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        /* Skeleton Loader */
+        .skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .skeleton-text {
+            height: 16px;
+            margin: 8px 0;
+        }
+
+        .skeleton-title {
+            height: 24px;
+            width: 60%;
+            margin-bottom: 16px;
+        }
     </style>
+    <!-- Chart.js for Data Visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- UI Enhancements -->
+    <script src="{{ url_for('static', filename='js/ui-enhancements.js') }}"></script>
 </head>
 <body {% if is_rtl %}dir="rtl"{% endif %}>
     <div class="content-wrapper">
@@ -1152,6 +1388,314 @@
         
         updateDateTime();
         setInterval(updateDateTime, 1000);
+
+        // ==================== Revenue Chart ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create chart container if revenue data exists
+            const revenueData = {{ revenue_by_package | tojson }};
+            const revenueThisMonth = {{ revenue_this_month | default(0) }};
+            const revenueLastMonth = {{ revenue_last_month | default(0) }};
+
+            if (revenueData && revenueData.length > 0) {
+                // Add chart container after revenue widget
+                const revenueWidget = document.querySelector('.revenue-package-widget');
+                if (revenueWidget) {
+                    const chartContainer = document.createElement('div');
+                    chartContainer.className = 'chart-container';
+                    chartContainer.innerHTML = '<h3 style="color: #4caf50; margin-bottom: 20px; text-align: center;">📊 Revenue by Package (This Month)</h3><canvas id="revenueChart" style="max-height: 300px;"></canvas>';
+                    revenueWidget.parentNode.insertBefore(chartContainer, revenueWidget.nextSibling);
+
+                    // Create pie chart
+                    const ctx = document.getElementById('revenueChart');
+                    if (ctx && typeof Chart !== 'undefined') {
+                        new Chart(ctx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: revenueData.map(p => p.package_name),
+                                datasets: [{
+                                    data: revenueData.map(p => parseFloat(p.total_revenue || 0)),
+                                    backgroundColor: [
+                                        'rgba(76, 175, 80, 0.8)',
+                                        'rgba(33, 150, 243, 0.8)',
+                                        'rgba(156, 39, 176, 0.8)',
+                                        'rgba(255, 152, 0, 0.8)',
+                                        'rgba(244, 67, 54, 0.8)',
+                                        'rgba(0, 188, 212, 0.8)'
+                                    ],
+                                    borderColor: [
+                                        'rgba(76, 175, 80, 1)',
+                                        'rgba(33, 150, 243, 1)',
+                                        'rgba(156, 39, 176, 1)',
+                                        'rgba(255, 152, 0, 1)',
+                                        'rgba(244, 67, 54, 1)',
+                                        'rgba(0, 188, 212, 1)'
+                                    ],
+                                    borderWidth: 2
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'bottom',
+                                        labels: {
+                                            color: '#fff',
+                                            padding: 15,
+                                            font: {
+                                                size: 12
+                                            }
+                                        }
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                const label = context.label || '';
+                                                const value = context.parsed || 0;
+                                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                const percentage = ((value / total) * 100).toFixed(1);
+                                                return `${label}: $${value.toFixed(2)} (${percentage}%)`;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+
+            // ==================== Revenue Trend Line Chart ====================
+            if (revenueThisMonth > 0 || revenueLastMonth > 0) {
+                const statsBox = document.querySelector('.monthly-stats-box');
+                if (statsBox) {
+                    const trendChart = document.createElement('div');
+                    trendChart.className = 'chart-container';
+                    trendChart.style.marginTop = '20px';
+                    trendChart.innerHTML = '<h3 style="color: #4caf50; margin-bottom: 20px; text-align: center;">📈 Revenue Trend</h3><canvas id="revenueTrendChart" style="max-height: 250px;"></canvas>';
+                    statsBox.appendChild(trendChart);
+
+                    const ctx2 = document.getElementById('revenueTrendChart');
+                    if (ctx2 && typeof Chart !== 'undefined') {
+                        const months = ['Last Month', 'This Month'];
+                        new Chart(ctx2, {
+                            type: 'line',
+                            data: {
+                                labels: months,
+                                datasets: [{
+                                    label: 'Revenue ($)',
+                                    data: [revenueLastMonth, revenueThisMonth],
+                                    borderColor: 'rgba(76, 175, 80, 1)',
+                                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                                    borderWidth: 3,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointBackgroundColor: 'rgba(76, 175, 80, 1)',
+                                    pointBorderColor: '#fff',
+                                    pointBorderWidth: 2,
+                                    pointRadius: 6,
+                                    pointHoverRadius: 8
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: true,
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                return `Revenue: $${context.parsed.y.toFixed(2)}`;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            color: '#fff',
+                                            callback: function(value) {
+                                                return '$' + value.toFixed(0);
+                                            }
+                                        },
+                                        grid: {
+                                            color: 'rgba(255, 255, 255, 0.1)'
+                                        }
+                                    },
+                                    x: {
+                                        ticks: {
+                                            color: '#fff'
+                                        },
+                                        grid: {
+                                            color: 'rgba(255, 255, 255, 0.1)'
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+
+            // ==================== Enhanced Search Autocomplete ====================
+            const memberNameInput = document.getElementById('member_name');
+            const memberIdInput = document.getElementById('member_id');
+            
+            function setupAutocomplete(input, searchType) {
+                if (!input) return;
+                
+                let autocompleteList = null;
+                let selectedIndex = -1;
+
+                input.addEventListener('input', async function(e) {
+                    const query = this.value.trim();
+                    
+                    if (query.length < 2) {
+                        if (autocompleteList) {
+                            autocompleteList.remove();
+                            autocompleteList = null;
+                        }
+                        return;
+                    }
+
+                    // Create autocomplete list
+                    if (!autocompleteList) {
+                        autocompleteList = document.createElement('div');
+                        autocompleteList.className = 'autocomplete-list';
+                        this.parentElement.style.position = 'relative';
+                        this.parentElement.appendChild(autocompleteList);
+                    }
+
+                    // Fetch suggestions
+                    try {
+                        autocompleteList.innerHTML = '<div style="padding: 15px; color: #888; text-align: center;">Searching...</div>';
+                        
+                        const response = await fetch(`/api/search/members?q=${encodeURIComponent(query)}&limit=5`);
+                        const suggestions = await response.json();
+                        
+                        if (suggestions.length === 0) {
+                            autocompleteList.innerHTML = '<div style="padding: 15px; color: #888; text-align: center;">No members found</div>';
+                            return;
+                        }
+
+                        autocompleteList.innerHTML = suggestions.map((member, index) => `
+                            <div class="autocomplete-item" data-index="${index}" data-id="${member.id}" data-name="${member.name}">
+                                <div style="font-weight: 600; color: #fff; margin-bottom: 4px;">${member.name}</div>
+                                <div style="font-size: 12px; color: #888;">
+                                    ${member.phone ? '📱 ' + member.phone : ''} 
+                                    ${member.status ? ' | Status: ' + member.status : ''}
+                                </div>
+                            </div>
+                        `).join('');
+
+                        // Add click handlers
+                        autocompleteList.querySelectorAll('.autocomplete-item').forEach(item => {
+                            item.addEventListener('click', function() {
+                                const memberId = this.dataset.id;
+                                const memberName = this.dataset.name;
+                                
+                                if (searchType === 'id') {
+                                    input.value = memberId;
+                                } else {
+                                    input.value = memberName;
+                                }
+                                
+                                autocompleteList.remove();
+                                autocompleteList = null;
+                                selectedIndex = -1;
+                                
+                                // Auto-submit if form exists
+                                const form = input.closest('form');
+                                if (form && suggestions.length === 1) {
+                                    setTimeout(() => form.submit(), 300);
+                                }
+                            });
+                        });
+                    } catch (error) {
+                        console.error('Autocomplete error:', error);
+                        autocompleteList.innerHTML = '<div style="padding: 15px; color: #f44336; text-align: center;">Error loading suggestions</div>';
+                    }
+                });
+
+                // Keyboard navigation
+                input.addEventListener('keydown', function(e) {
+                    if (!autocompleteList) return;
+
+                    const items = autocompleteList.querySelectorAll('.autocomplete-item');
+                    if (items.length === 0) return;
+                    
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                        updateSelection(items);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelection(items);
+                    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                        e.preventDefault();
+                        items[selectedIndex].click();
+                    } else if (e.key === 'Escape') {
+                        if (autocompleteList) {
+                            autocompleteList.remove();
+                            autocompleteList = null;
+                        }
+                    }
+                });
+
+                function updateSelection(items) {
+                    items.forEach((item, index) => {
+                        if (index === selectedIndex) {
+                            item.style.background = 'rgba(76, 175, 80, 0.2)';
+                            item.classList.add('selected');
+                        } else {
+                            item.style.background = 'transparent';
+                            item.classList.remove('selected');
+                        }
+                    });
+                }
+
+                // Close on outside click
+                document.addEventListener('click', function(e) {
+                    if (!input.contains(e.target) && autocompleteList && !autocompleteList.contains(e.target)) {
+                        autocompleteList.remove();
+                        autocompleteList = null;
+                    }
+                });
+            }
+
+            setupAutocomplete(memberNameInput, 'name');
+            setupAutocomplete(memberIdInput, 'id');
+
+            // ==================== Form Submission with Loading ====================
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn && !submitBtn.disabled) {
+                        loading.showButton(submitBtn, 'Processing...');
+                    }
+                });
+            });
+
+            // ==================== Scroll to Top Button ====================
+            const scrollBtn = document.getElementById('scroll-to-top');
+            if (scrollBtn) {
+                window.addEventListener('scroll', function() {
+                    if (window.pageYOffset > 300) {
+                        scrollBtn.classList.add('visible');
+                    } else {
+                        scrollBtn.classList.remove('visible');
+                    }
+                });
+
+                scrollBtn.addEventListener('click', function() {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+        });
     </script>
 </body>
 </html>
