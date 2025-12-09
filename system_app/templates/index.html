@@ -670,6 +670,179 @@
                 text-align: center;
             }
         }
+
+        /* Enhanced Statistics Styles */
+        .revenue-stat {
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1));
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .revenue-value {
+            font-size: 36px;
+            color: #4caf50;
+        }
+
+        .revenue-growth {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .revenue-growth.positive {
+            color: #4caf50;
+        }
+
+        .revenue-growth.negative {
+            color: #f44336;
+        }
+
+        /* Alert Widget Styles */
+        .alert-widget {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 152, 0, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(255, 152, 0, 0.2);
+        }
+
+        .alert-widget h3 {
+            color: #ff9800;
+            font-size: 24px;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .alert-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .alert-item {
+            background: rgba(20, 20, 30, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .alert-item.urgent {
+            border: 2px solid rgba(244, 67, 54, 0.5);
+            background: rgba(244, 67, 54, 0.1);
+        }
+
+        .alert-item.warning {
+            border: 2px solid rgba(255, 152, 0, 0.5);
+            background: rgba(255, 152, 0, 0.1);
+        }
+
+        .alert-item.info {
+            border: 2px solid rgba(33, 150, 243, 0.5);
+            background: rgba(33, 150, 243, 0.1);
+        }
+
+        .alert-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .alert-icon {
+            font-size: 40px;
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-title {
+            color: #ccc;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .alert-count {
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .alert-subtitle {
+            color: #888;
+            font-size: 12px;
+        }
+
+        /* Revenue by Package Widget */
+        .revenue-package-widget {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .revenue-package-widget h3 {
+            color: #4caf50;
+            font-size: 24px;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .package-revenue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .package-revenue-item {
+            background: rgba(20, 20, 30, 0.6);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .package-revenue-item:hover {
+            transform: translateX(5px);
+            border-color: rgba(76, 175, 80, 0.5);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+        }
+
+        .package-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .package-stats {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
+        }
+
+        .package-count {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .package-revenue {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4caf50;
+        }
     </style>
 </head>
 <body {% if is_rtl %}dir="rtl"{% endif %}>
@@ -802,11 +975,81 @@
                         <div class="stat-item-value">{{ new_members_count or 0 }}</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-item-label">Renew Membew</div>
+                        <div class="stat-item-label">Renewed Members</div>
                         <div class="stat-item-value">{{ updated_starting_date_count or 0 }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-item-label">Total Active Members</div>
+                        <div class="stat-item-value">{{ total_active_members or 0 }}</div>
+                    </div>
+                    <div class="stat-item revenue-stat">
+                        <div class="stat-item-label">Revenue This Month</div>
+                        <div class="stat-item-value revenue-value">${{ "%.2f"|format(revenue_this_month or 0) }}</div>
+                        {% if revenue_growth %}
+                        <div class="revenue-growth {% if revenue_growth >= 0 %}positive{% else %}negative{% endif %}">
+                            {% if revenue_growth >= 0 %}↑{% else %}↓{% endif %} {{ "%.1f"|format(revenue_growth|abs) }}%
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
+
+            <!-- Expiring Memberships Alert Widget -->
+            {% if expiring_7_days > 0 or expiring_14_days > 0 or expiring_30_days > 0 %}
+            <div class="alert-widget">
+                <h3>⚠️ Expiring Memberships Alert</h3>
+                <div class="alert-grid">
+                    {% if expiring_7_days > 0 %}
+                    <div class="alert-item urgent">
+                        <div class="alert-icon">🔴</div>
+                        <div class="alert-content">
+                            <div class="alert-title">Urgent</div>
+                            <div class="alert-count">{{ expiring_7_days }}</div>
+                            <div class="alert-subtitle">Expiring in 7 days</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if expiring_14_days > 0 %}
+                    <div class="alert-item warning">
+                        <div class="alert-icon">🟡</div>
+                        <div class="alert-content">
+                            <div class="alert-title">Warning</div>
+                            <div class="alert-count">{{ expiring_14_days }}</div>
+                            <div class="alert-subtitle">Expiring in 14 days</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if expiring_30_days > 0 %}
+                    <div class="alert-item info">
+                        <div class="alert-icon">🔵</div>
+                        <div class="alert-content">
+                            <div class="alert-title">Upcoming</div>
+                            <div class="alert-count">{{ expiring_30_days }}</div>
+                            <div class="alert-subtitle">Expiring in 30 days</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Revenue by Package Widget -->
+            {% if revenue_by_package %}
+            <div class="revenue-package-widget">
+                <h3>💰 Top Packages by Revenue (This Month)</h3>
+                <div class="package-revenue-list">
+                    {% for package in revenue_by_package %}
+                    <div class="package-revenue-item">
+                        <div class="package-name">{{ package.package_name or 'Unknown' }}</div>
+                        <div class="package-stats">
+                            <span class="package-count">{{ package.count }} sales</span>
+                            <span class="package-revenue">${{ "%.2f"|format(package.total_revenue or 0) }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Navigation Grid -->
             <div class="nav-grid">

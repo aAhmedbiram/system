@@ -12,6 +12,9 @@ from functools import wraps
 from email_validator import validate_email, EmailNotValidError
 import re
 import secrets
+import uuid
+import logging
+from logging.handlers import RotatingFileHandler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -33,6 +36,34 @@ app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # 24 hour session timeout
 
+# === Enhanced Logging Configuration ===
+if not app.debug:
+    # Create logs directory if it doesn't exist
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # Set up rotating file handler
+    file_handler = RotatingFileHandler(
+        os.path.join(log_dir, 'rival_gym.log'),
+        maxBytes=10240000,  # 10MB
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('Rival Gym System startup')
+
+# === Request ID Tracking ===
+@app.before_request
+def add_request_id():
+    """Add unique request ID for tracking"""
+    g.request_id = str(uuid.uuid4())[:8]
+    g.start_time = datetime.now()
+
 # Security headers
 @app.after_request
 def set_security_headers(response):
@@ -41,6 +72,15 @@ def set_security_headers(response):
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    # Content Security Policy
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+    # Add request ID to response headers
+    if hasattr(g, 'request_id'):
+        response.headers['X-Request-ID'] = g.request_id
+    # Add response time tracking
+    if hasattr(g, 'start_time'):
+        duration = (datetime.now() - g.start_time).total_seconds()
+        response.headers['X-Response-Time'] = f"{duration:.3f}s"
     return response
 
 # === Global Error Handlers for Debugging ===
@@ -48,13 +88,16 @@ def set_security_headers(response):
 def log_request_info():
     """Log request information for debugging"""
     try:
+        request_id = getattr(g, 'request_id', 'N/A')
+        log_msg = f"[{request_id}] {request.method} {request.path} from {request.remote_addr}"
         print(f"\n{'='*80}")
-        print(f"REQUEST: {request.method} {request.path}")
+        print(f"REQUEST: {request.method} {request.path} [ID: {request_id}]")
         print(f"Remote Addr: {request.remote_addr}")
         print(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
         if request.method == 'POST':
             print(f"Form Data Keys: {list(request.form.keys())}")
         print(f"{'='*80}\n")
+        app.logger.info(log_msg)
     except Exception as e:
         print(f"Error in log_request_info: {e}")
 
@@ -791,15 +834,46 @@ def toggle_language():
     else:
         return redirect(url_for('login'))
 
+# Simple in-memory cache for expensive queries
+_cache = {}
+_cache_timeout = {}
+
+def get_cached(key, timeout=300):
+    """Get cached value if not expired"""
+    if key in _cache:
+        if key in _cache_timeout:
+            if datetime.now() < _cache_timeout[key]:
+                return _cache[key]
+            else:
+                # Expired, remove it
+                del _cache[key]
+                del _cache_timeout[key]
+    return None
+
+def set_cached(key, value, timeout=300):
+    """Set cached value with timeout"""
+    _cache[key] = value
+    _cache_timeout[key] = datetime.now() + timedelta(seconds=timeout)
+
 @app.route('/')
 @app.route('/home')
 @permission_required('index')
 def index():
     # Don't do any flash here ever
     try:
-        # Limit to recent 50 records for performance
-        attendance_data = query_db('SELECT * FROM attendance ORDER BY num DESC LIMIT 50')
-        members_data = query_db('SELECT * FROM members ORDER BY id DESC LIMIT 50')
+        # Use cache for expensive queries
+        cache_key_attendance = 'index_attendance_data'
+        cache_key_members = 'index_members_data'
+        
+        attendance_data = get_cached(cache_key_attendance, timeout=60)  # Cache for 1 minute
+        if attendance_data is None:
+            attendance_data = query_db('SELECT * FROM attendance ORDER BY num DESC LIMIT 50')
+            set_cached(cache_key_attendance, attendance_data, timeout=60)
+        
+        members_data = get_cached(cache_key_members, timeout=60)  # Cache for 1 minute
+        if members_data is None:
+            members_data = query_db('SELECT * FROM members ORDER BY id DESC LIMIT 50')
+            set_cached(cache_key_members, members_data, timeout=60)
         
         # Get current user permissions for template
         user = get_current_user()
@@ -904,13 +978,142 @@ def index():
             print(f"Error counting updated starting dates: {e}")
             updated_starting_date_count = 0
         
+        # === Enhanced Analytics ===
+        # Get revenue analytics
+        revenue_this_month = get_cached('revenue_this_month', timeout=300)
+        if revenue_this_month is None:
+            try:
+                from .queries import get_monthly_total
+                revenue_this_month = get_monthly_total(current_year, current_month)
+                set_cached('revenue_this_month', revenue_this_month, timeout=300)
+            except:
+                revenue_this_month = 0.0
+        
+        # Get revenue last month for comparison
+        revenue_last_month = get_cached('revenue_last_month', timeout=300)
+        if revenue_last_month is None:
+            try:
+                from .queries import get_monthly_total
+                last_month = current_month - 1 if current_month > 1 else 12
+                last_year = current_year if current_month > 1 else current_year - 1
+                revenue_last_month = get_monthly_total(last_year, last_month)
+                set_cached('revenue_last_month', revenue_last_month, timeout=300)
+            except:
+                revenue_last_month = 0.0
+        
+        # Get expiring memberships (7, 14, 30 days)
+        expiring_7_days = get_cached('expiring_7_days', timeout=60)
+        if expiring_7_days is None:
+            try:
+                from datetime import timedelta
+                seven_days_from_now = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+                expiring_7_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE membership_status = 'VAL' 
+                    AND end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                """, (seven_days_from_now, today.strftime('%Y-%m-%d')), one=True)
+                expiring_7_days = expiring_7_result['count'] if expiring_7_result else 0
+                set_cached('expiring_7_days', expiring_7_days, timeout=60)
+            except Exception as e:
+                print(f"Error getting expiring members: {e}")
+                expiring_7_days = 0
+        
+        expiring_14_days = get_cached('expiring_14_days', timeout=60)
+        if expiring_14_days is None:
+            try:
+                from datetime import timedelta
+                fourteen_days_from_now = (today + timedelta(days=14)).strftime('%Y-%m-%d')
+                expiring_14_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE membership_status = 'VAL' 
+                    AND end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                """, (fourteen_days_from_now, (today + timedelta(days=7)).strftime('%Y-%m-%d')), one=True)
+                expiring_14_days = expiring_14_result['count'] if expiring_14_result else 0
+                set_cached('expiring_14_days', expiring_14_days, timeout=60)
+            except:
+                expiring_14_days = 0
+        
+        expiring_30_days = get_cached('expiring_30_days', timeout=60)
+        if expiring_30_days is None:
+            try:
+                from datetime import timedelta
+                thirty_days_from_now = (today + timedelta(days=30)).strftime('%Y-%m-%d')
+                expiring_30_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE membership_status = 'VAL' 
+                    AND end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                """, (thirty_days_from_now, (today + timedelta(days=14)).strftime('%Y-%m-%d')), one=True)
+                expiring_30_days = expiring_30_result['count'] if expiring_30_result else 0
+                set_cached('expiring_30_days', expiring_30_days, timeout=60)
+            except:
+                expiring_30_days = 0
+        
+        # Get total active members
+        total_active_members = get_cached('total_active_members', timeout=300)
+        if total_active_members is None:
+            try:
+                active_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE membership_status = 'VAL'
+                """, one=True)
+                total_active_members = active_result['count'] if active_result else 0
+                set_cached('total_active_members', total_active_members, timeout=300)
+            except:
+                total_active_members = 0
+        
+        # Get revenue by package type (this month)
+        revenue_by_package = get_cached('revenue_by_package', timeout=300)
+        if revenue_by_package is None:
+            try:
+                package_revenue = query_db("""
+                    SELECT 
+                        package_name,
+                        COUNT(*) as count,
+                        SUM(fees) as total_revenue
+                    FROM renewal_logs
+                    WHERE EXTRACT(YEAR FROM renewal_date) = %s
+                    AND EXTRACT(MONTH FROM renewal_date) = %s
+                    GROUP BY package_name
+                    ORDER BY total_revenue DESC
+                    LIMIT 5
+                """, (current_year, current_month))
+                revenue_by_package = package_revenue or []
+                set_cached('revenue_by_package', revenue_by_package, timeout=300)
+            except Exception as e:
+                print(f"Error getting revenue by package: {e}")
+                revenue_by_package = []
+        
+        # Calculate revenue growth percentage
+        revenue_growth = 0.0
+        if revenue_last_month > 0:
+            revenue_growth = ((revenue_this_month - revenue_last_month) / revenue_last_month) * 100
+        elif revenue_this_month > 0:
+            revenue_growth = 100.0  # 100% growth if last month was 0
+        
         return render_template("index.html", 
                                 attendance_data=attendance_data or [], 
                                 members_data=members_data or [],
                                 user_permissions=user_permissions,
                                 pending_approvals_count=pending_count,
                                 new_members_count=new_members_count,
-                                updated_starting_date_count=updated_starting_date_count)
+                                updated_starting_date_count=updated_starting_date_count,
+                                revenue_this_month=revenue_this_month,
+                                revenue_last_month=revenue_last_month,
+                                revenue_growth=revenue_growth,
+                                expiring_7_days=expiring_7_days,
+                                expiring_14_days=expiring_14_days,
+                                expiring_30_days=expiring_30_days,
+                                total_active_members=total_active_members,
+                                revenue_by_package=revenue_by_package)
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback
@@ -5615,6 +5818,122 @@ def reject_edit(edit_id):
     return redirect(url_for('pending_approvals'))
 
 # === Debug Route (for testing) ===
+@app.route('/health')
+@csrf.exempt
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Test database connection
+        db_status = 'connected'
+        db_error = None
+        try:
+            test_query = query_db('SELECT 1 as test', one=True)
+            if not test_query:
+                db_status = 'error'
+                db_error = 'Query returned no result'
+        except Exception as e:
+            db_status = 'error'
+            db_error = str(e)
+        
+        # Get active users count
+        active_users_count = len(_active_users)
+        
+        # Get cache stats
+        cache_size = len(_cache)
+        cache_keys = list(_cache.keys())[:10]  # First 10 keys
+        
+        # Calculate database response time
+        db_response_time = None
+        if db_status == 'connected':
+            try:
+                start_time = datetime.now()
+                query_db('SELECT 1 as test', one=True)
+                db_response_time = (datetime.now() - start_time).total_seconds()
+            except:
+                pass
+        
+        health_data = {
+            'status': 'healthy' if db_status == 'connected' else 'unhealthy',
+            'timestamp': datetime.now().isoformat(),
+            'database': {
+                'status': db_status,
+                'error': db_error,
+                'response_time_ms': round(db_response_time * 1000, 2) if db_response_time else None
+            },
+            'active_users': active_users_count,
+            'cache': {
+                'size': cache_size,
+                'keys': cache_keys
+            },
+            'version': '1.0.0'
+        }
+        
+        status_code = 200 if db_status == 'connected' else 503
+        return jsonify(health_data), status_code
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 503
+
+@app.route('/metrics')
+@csrf.exempt
+@login_required
+def metrics():
+    """Metrics endpoint for monitoring and analytics"""
+    try:
+        # Get database stats
+        try:
+            total_members = query_db('SELECT COUNT(*) as count FROM members', one=True)
+            total_attendance = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
+            total_users = query_db('SELECT COUNT(*) as count FROM users', one=True)
+            active_members = query_db(
+                "SELECT COUNT(*) as count FROM members WHERE membership_status = 'VAL'",
+                one=True
+            )
+        except Exception as e:
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
+        
+        # Get cache stats
+        cache_stats = {
+            'total_keys': len(_cache),
+            'keys': list(_cache.keys())
+        }
+        
+        # Get active users
+        active_users_list = [
+            {
+                'username': data['username'],
+                'last_activity': data['last_activity'].isoformat() if isinstance(data['last_activity'], datetime) else str(data['last_activity']),
+                'ip_address': data.get('ip_address', 'Unknown')
+            }
+            for data in _active_users.values()
+        ]
+        
+        metrics_data = {
+            'timestamp': datetime.now().isoformat(),
+            'database': {
+                'total_members': total_members['count'] if total_members else 0,
+                'total_attendance_records': total_attendance['count'] if total_attendance else 0,
+                'total_users': total_users['count'] if total_users else 0,
+                'active_members': active_members['count'] if active_members else 0
+            },
+            'application': {
+                'active_users': len(_active_users),
+                'active_users_list': active_users_list,
+                'cache': cache_stats
+            },
+            'version': '1.0.0'
+        }
+        
+        return jsonify(metrics_data), 200
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 @app.route('/debug/test')
 def debug_test():
     """Test route to verify the app is working"""
