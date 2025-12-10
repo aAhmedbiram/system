@@ -251,6 +251,8 @@
                     <p>{{ attendance_count }}</p>
                 </div>
             </div>
+            <button type="button" class="btn btn-secondary" onclick="clearCache()" style="margin-top: 10px;">Clear Cache</button>
+            <div id="cacheStatus" style="margin-top: 10px; color: #ccc; font-size: 14px;"></div>
         </div>
 
         <!-- Delete All Data Section -->
@@ -346,6 +348,32 @@
     </div>
 
     <script>
+        async function clearCache() {
+            const statusEl = document.getElementById('cacheStatus');
+            if (statusEl) statusEl.textContent = 'Clearing cache...';
+
+            if (!confirm('Clear in-memory cache?')) {
+                if (statusEl) statusEl.textContent = 'Cancelled.';
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/clear_cache', { method: 'POST' });
+                const data = await response.json();
+                if (response.ok) {
+                    if (statusEl) statusEl.textContent = `Cache cleared. Keys removed: ${data.cleared_count}`;
+                    alert('Cache cleared successfully.');
+                } else {
+                    const msg = data.error || 'Failed to clear cache';
+                    if (statusEl) statusEl.textContent = msg;
+                    alert(msg);
+                }
+            } catch (err) {
+                if (statusEl) statusEl.textContent = 'Error clearing cache';
+                alert('Error clearing cache: ' + err.message);
+            }
+        }
+
         function showLoading() {
             const overlay = document.getElementById('loadingOverlay');
             const btn = document.getElementById('importBtn');

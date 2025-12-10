@@ -5929,6 +5929,23 @@ def api_search_members():
         print(f"Error in api_search_members: {e}")
         return jsonify([]), 500
 
+@app.route('/admin/clear_cache', methods=['POST'])
+@csrf.exempt
+@login_required
+def clear_cache():
+    """Clear the in-memory cache (admin only)"""
+    perms = session.get('user_permissions', {})
+    if not (perms.get('super_admin') or session.get('username') == 'rino'):
+        return jsonify({'error': 'forbidden'}), 403
+    
+    cleared_keys = list(_cache.keys())
+    _cache.clear()
+    return jsonify({
+        'status': 'ok',
+        'cleared_count': len(cleared_keys),
+        'cleared_keys': cleared_keys
+    })
+
 @app.route('/metrics')
 @csrf.exempt
 @login_required
