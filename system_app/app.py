@@ -1009,9 +1009,11 @@ def index():
                 seven_days_from_now = (today + timedelta(days=7)).strftime('%Y-%m-%d')
                 expiring_7_result = query_db("""
                     SELECT COUNT(*) as count FROM members 
-                    WHERE membership_status = 'VAL' 
-                    AND end_date IS NOT NULL 
+                    WHERE end_date IS NOT NULL 
                     AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (seven_days_from_now, today.strftime('%Y-%m-%d')), one=True)
@@ -1028,9 +1030,11 @@ def index():
                 fourteen_days_from_now = (today + timedelta(days=14)).strftime('%Y-%m-%d')
                 expiring_14_result = query_db("""
                     SELECT COUNT(*) as count FROM members 
-                    WHERE membership_status = 'VAL' 
-                    AND end_date IS NOT NULL 
+                    WHERE end_date IS NOT NULL 
                     AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (fourteen_days_from_now, (today + timedelta(days=7)).strftime('%Y-%m-%d')), one=True)
@@ -1046,9 +1050,11 @@ def index():
                 thirty_days_from_now = (today + timedelta(days=30)).strftime('%Y-%m-%d')
                 expiring_30_result = query_db("""
                     SELECT COUNT(*) as count FROM members 
-                    WHERE membership_status = 'VAL' 
-                    AND end_date IS NOT NULL 
+                    WHERE end_date IS NOT NULL 
                     AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (thirty_days_from_now, (today + timedelta(days=14)).strftime('%Y-%m-%d')), one=True)
@@ -1057,17 +1063,22 @@ def index():
             except:
                 expiring_30_days = 0
         
-        # Get total active members
+        # Get total active members - based on end_date >= today
         total_active_members = get_cached('total_active_members', timeout=300)
         if total_active_members is None:
             try:
                 active_result = query_db("""
                     SELECT COUNT(*) as count FROM members 
-                    WHERE membership_status = 'VAL'
+                    WHERE end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
                 """, one=True)
                 total_active_members = active_result['count'] if active_result else 0
                 set_cached('total_active_members', total_active_members, timeout=300)
-            except:
+            except Exception as e:
+                print(f"Error counting total active members: {e}")
                 total_active_members = 0
         
         # Get revenue by package type (this month)
@@ -1839,29 +1850,35 @@ def all_members():
         today = datetime.now().date()
         today_str = today.strftime('%Y-%m-%d')
         
-        # Get active count
+        # Get active count - based on end_date >= today
         active_count_result = query_db("""
             SELECT COUNT(*) as count FROM members 
-            WHERE end_date IS NOT NULL AND end_date != '' AND 
-                  LENGTH(TRIM(end_date)) >= 10 AND
-                  CASE 
-                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
-                      ELSE FALSE
-                  END
+            WHERE end_date IS NOT NULL 
+            AND end_date != ''
+            AND LENGTH(TRIM(end_date)) >= 10
+            AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
         """, one=True)
         active_count = active_count_result['count'] if active_count_result else 0
         
-        # Get expired count
+        # Get expired count - based on end_date < today OR end_date is NULL/empty/invalid
         expired_count_result = query_db("""
             SELECT COUNT(*) as count FROM members 
-            WHERE end_date IS NOT NULL AND end_date != '' AND 
-                  LENGTH(TRIM(end_date)) >= 10 AND
-                  CASE 
-                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
-                      ELSE FALSE
-                  END
+            WHERE (
+                -- end_date is NULL or empty
+                (end_date IS NULL OR end_date = '')
+                OR
+                -- end_date format is invalid (less than 10 characters)
+                (LENGTH(TRIM(end_date)) < 10)
+                OR
+                -- end_date format is invalid (doesn't match YYYY-MM-DD pattern)
+                (LENGTH(TRIM(end_date)) >= 10 AND SUBSTRING(TRIM(end_date), 1, 10) !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}')
+                OR
+                -- end_date is valid but < today (expired)
+                (LENGTH(TRIM(end_date)) >= 10 
+                 AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE)
+            )
         """, one=True)
         expired_count = expired_count_result['count'] if expired_count_result else 0
         
@@ -2009,29 +2026,35 @@ def filtered_members():
         today = datetime.now().date()
         today_str = today.strftime('%Y-%m-%d')
         
-        # Get active count
+        # Get active count - based on end_date >= today
         active_count_result = query_db("""
             SELECT COUNT(*) as count FROM members 
-            WHERE end_date IS NOT NULL AND end_date != '' AND 
-                  LENGTH(TRIM(end_date)) >= 10 AND
-                  CASE 
-                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
-                      ELSE FALSE
-                  END
+            WHERE end_date IS NOT NULL 
+            AND end_date != ''
+            AND LENGTH(TRIM(end_date)) >= 10
+            AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
         """, one=True)
         active_count = active_count_result['count'] if active_count_result else 0
         
-        # Get expired count
+        # Get expired count - based on end_date < today OR end_date is NULL/empty/invalid
         expired_count_result = query_db("""
             SELECT COUNT(*) as count FROM members 
-            WHERE end_date IS NOT NULL AND end_date != '' AND 
-                  LENGTH(TRIM(end_date)) >= 10 AND
-                  CASE 
-                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                          CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
-                      ELSE FALSE
-                  END
+            WHERE (
+                -- end_date is NULL or empty
+                (end_date IS NULL OR end_date = '')
+                OR
+                -- end_date format is invalid (less than 10 characters)
+                (LENGTH(TRIM(end_date)) < 10)
+                OR
+                -- end_date format is invalid (doesn't match YYYY-MM-DD pattern)
+                (LENGTH(TRIM(end_date)) >= 10 AND SUBSTRING(TRIM(end_date), 1, 10) !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}')
+                OR
+                -- end_date is valid but < today (expired)
+                (LENGTH(TRIM(end_date)) >= 10 
+                 AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE)
+            )
         """, one=True)
         expired_count = expired_count_result['count'] if expired_count_result else 0
         
