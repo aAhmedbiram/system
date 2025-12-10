@@ -352,31 +352,28 @@
             border: 1px solid rgba(76, 175, 80, 0.3);
         }
 
-        .filter-row {
-            position: sticky;
-            top: 42px;
-            background: rgba(20, 20, 30, 0.9);
-            backdrop-filter: blur(10px);
-            z-index: 9;
-        }
-
-        .filter-row input {
-            width: 90%;
-            padding: 12px;
+        .sort-btn {
+            background: rgba(76, 175, 80, 0.2);
             border: 1px solid rgba(76, 175, 80, 0.3);
-            border-radius: 6px;
-            background: rgba(20, 20, 30, 0.6);
-            color: white;
-            text-align: center;
-            font-size: 16px;
-            transition: all 0.3s;
+            color: #4caf50;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 0 2px;
+            transition: all 0.2s;
         }
 
-        .filter-row input:focus {
-            outline: none;
+        .sort-btn:hover {
+            background: rgba(76, 175, 80, 0.4);
             border-color: #4caf50;
-            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
-            background: rgba(20, 20, 30, 0.8);
+            transform: scale(1.1);
+        }
+
+        .sort-btn.active {
+            background: rgba(76, 175, 80, 0.6);
+            border-color: #4caf50;
+            color: white;
         }
 
         .edit-link {
@@ -588,44 +585,95 @@
 
     <thead>
     <tr>
-        <th onclick="sortTable(0)">{{ t.member_id }} ▲▼</th>
-        <th onclick="sortTable(1)">{{ t.name }} ▲▼</th>
-        <th onclick="sortTable(2)">{{ t.email }} ▲▼</th>
-        <th onclick="sortTable(3)">{{ t.phone }} ▲▼</th>
-        <th onclick="sortTable(4)">{{ t.age }} ▲▼</th>
-        <th onclick="sortTable(5)">{{ t.gender }} ▲▼</th>
-        <th onclick="sortTable(6)">{{ t.actual_starting_date }} ▲▼</th>
-        <th onclick="sortTable(7)">{{ t.starting_date }} ▲▼</th>
-        <th onclick="sortTable(8)">{{ t.end_date }} ▲▼</th>
-        <th onclick="sortTable(9)">{{ t.membership_package }} ▲▼</th>
-        <th onclick="sortTable(10)">{{ t.fees }} ▲▼</th>
-        <th onclick="sortTable(11)">{{ t.status }} ▲▼</th>
-        <th onclick="sortTable(12)">{{ t.invitations }} ▲▼</th>
-        <th onclick="sortTable(13)">{{ t.comment }} ▲▼</th>
+        <th>
+            {{ t.member_id }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('id', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('id', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.name }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('name', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('name', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.email }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('email', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('email', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.phone }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('phone', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('phone', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.age }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('age', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('age', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.gender }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('gender', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('gender', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.actual_starting_date }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('actual_starting_date', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('actual_starting_date', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.starting_date }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('starting_date', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('starting_date', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.end_date }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('end_date', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('end_date', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.membership_package }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('membership_packages', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('membership_packages', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.fees }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('membership_fees', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('membership_fees', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>
+            {{ t.status }}
+            <div style="display: inline-block; margin-left: 5px;">
+                <button onclick="sortByColumn('membership_status', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('membership_status', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+            </div>
+        </th>
+        <th>{{ t.invitations }}</th>
+        <th>{{ t.comment }}</th>
         <th>{{ t.freeze }}</th>
-                        <th>Actions</th>
-                        <th>{{ t.delete }}</th>
-    </tr>
-
-    <!-- filter row -->
-    <tr class="filter-row">
-        <th><input type="text" id="search_id" placeholder="{{ t.search }}" value="{{ search_id or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_name" placeholder="{{ t.search }}" value="{{ search_name or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_email" placeholder="{{ t.search }}" value="{{ search_email or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_phone" placeholder="{{ t.search }}" value="{{ search_phone or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_age" placeholder="{{ t.search }}" value="{{ search_age or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_gender" placeholder="{{ t.search }}" value="{{ search_gender or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_actual_start" placeholder="{{ t.search }}" value="{{ search_actual_start or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_start_date" placeholder="{{ t.search }}" value="{{ search_start_date or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_end_date" placeholder="{{ t.search }}" value="{{ search_end_date or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_package" placeholder="{{ t.search }}" value="{{ search_package or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_fees" placeholder="{{ t.search }}" value="{{ search_fees or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th></th>
-        <th><input type="text" id="search_invitations" placeholder="{{ t.search }}" value="{{ search_invitations or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_comment" placeholder="{{ t.search }}" value="{{ search_comment or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th></th>
-        <th></th>
-        <th></th>
+        <th>Actions</th>
+        <th>{{ t.delete }}</th>
     </tr>
     </thead>
 
@@ -748,55 +796,33 @@
 </section>
 
 <script>
+    // Current sort state
+    let currentSortBy = '{{ sort_by or "id" }}';
+    let currentSortDir = '{{ sort_dir or "asc" }}';
 
-    /* FILTER */
-    // Column search function - searches entire database
-    let searchTimeout;
-    function handleColumnSearch() {
-        clearTimeout(searchTimeout);
+    /* SORT FROM DATABASE */
+    function sortByColumn(column, direction) {
+        // Update current sort state
+        currentSortBy = column;
+        currentSortDir = direction;
         
-        // Debounce: wait 500ms after user stops typing
-        searchTimeout = setTimeout(() => {
-            const url = new URL(window.location.href);
-            
-            // Get all search values
-            const searchId = document.getElementById('search_id').value.trim();
-            const searchName = document.getElementById('search_name').value.trim();
-            const searchEmail = document.getElementById('search_email').value.trim();
-            const searchPhone = document.getElementById('search_phone').value.trim();
-            const searchAge = document.getElementById('search_age').value.trim();
-            const searchGender = document.getElementById('search_gender').value.trim();
-            const searchActualStart = document.getElementById('search_actual_start').value.trim();
-            const searchStartDate = document.getElementById('search_start_date').value.trim();
-            const searchEndDate = document.getElementById('search_end_date').value.trim();
-            const searchPackage = document.getElementById('search_package').value.trim();
-            const searchFees = document.getElementById('search_fees').value.trim();
-            const searchInvitations = document.getElementById('search_invitations').value.trim();
-            const searchComment = document.getElementById('search_comment').value.trim();
-            
-            // Set or remove search parameters
-            if (searchId) url.searchParams.set('search_id', searchId); else url.searchParams.delete('search_id');
-            if (searchName) url.searchParams.set('search_name', searchName); else url.searchParams.delete('search_name');
-            if (searchEmail) url.searchParams.set('search_email', searchEmail); else url.searchParams.delete('search_email');
-            if (searchPhone) url.searchParams.set('search_phone', searchPhone); else url.searchParams.delete('search_phone');
-            if (searchAge) url.searchParams.set('search_age', searchAge); else url.searchParams.delete('search_age');
-            if (searchGender) url.searchParams.set('search_gender', searchGender); else url.searchParams.delete('search_gender');
-            if (searchActualStart) url.searchParams.set('search_actual_start', searchActualStart); else url.searchParams.delete('search_actual_start');
-            if (searchStartDate) url.searchParams.set('search_start_date', searchStartDate); else url.searchParams.delete('search_start_date');
-            if (searchEndDate) url.searchParams.set('search_end_date', searchEndDate); else url.searchParams.delete('search_end_date');
-            if (searchPackage) url.searchParams.set('search_package', searchPackage); else url.searchParams.delete('search_package');
-            if (searchFees) url.searchParams.set('search_fees', searchFees); else url.searchParams.delete('search_fees');
-            if (searchInvitations) url.searchParams.set('search_invitations', searchInvitations); else url.searchParams.delete('search_invitations');
-            if (searchComment) url.searchParams.set('search_comment', searchComment); else url.searchParams.delete('search_comment');
-            
-            url.searchParams.set('page', '1'); // Reset to first page on search
-            window.location.href = url.toString();
-        }, 500);
+        // Reload page with new sort parameters
+        const url = new URL(window.location.href);
+        url.searchParams.set('sort_by', column);
+        url.searchParams.set('sort_dir', direction);
+        url.searchParams.set('page', '1'); // Reset to first page on sort
+        
+        // Highlight active sort button
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Reload page
+        window.location.href = url.toString();
     }
 
-    /* SORT */
-    let sortDirection = true;
-
+    // Old sortTable function - kept for compatibility but not used
     function sortTable(colIndex, direction) {
         let table = document.getElementById("membersTable");
         let switching = true;
@@ -837,24 +863,7 @@
     let isLoading = false;
     let hasMore = currentPage < totalPages;
     
-    // Store search parameters for AJAX requests
-    function getSearchParams() {
-        const params = new URLSearchParams();
-        const searchFields = ['search_id', 'search_name', 'search_email', 'search_phone', 'search_age', 
-                            'search_gender', 'search_actual_start', 'search_start_date', 'search_end_date',
-                            'search_package', 'search_fees', 'search_invitations', 'search_comment'];
-        
-        searchFields.forEach(field => {
-            const element = document.getElementById(field);
-            if (element && element.value.trim()) {
-                params.set(field.replace('search_', ''), element.value.trim());
-            }
-        });
-        
-        return params.toString();
-    }
-    
-    // Load more members via AJAX
+    // Load more members via AJAX with sorting from database
     function loadMoreMembers() {
         if (isLoading || !hasMore) return;
         
@@ -865,8 +874,7 @@
         loadingIndicator.style.display = 'block';
         
         const nextPage = currentPage + 1;
-        const searchParams = getSearchParams();
-        const url = `/all_members?page=${nextPage}&format=json${searchParams ? '&' + searchParams : ''}`;
+        const url = `/all_members?page=${nextPage}&format=json&sort_by=${currentSortBy}&sort_dir=${currentSortDir}`;
         
         fetch(url, {
             headers: {

@@ -1812,25 +1812,25 @@ def add_member_done():
 @login_required
 def all_members():
     try:
-        # Get individual column search queries
-        search_id = request.args.get('search_id', '').strip()
-        search_name = request.args.get('search_name', '').strip()
-        search_email = request.args.get('search_email', '').strip()
-        search_phone = request.args.get('search_phone', '').strip()
-        search_age = request.args.get('search_age', '').strip()
-        search_gender = request.args.get('search_gender', '').strip()
-        search_actual_start = request.args.get('search_actual_start', '').strip()
-        search_start_date = request.args.get('search_start_date', '').strip()
-        search_end_date = request.args.get('search_end_date', '').strip()
-        search_package = request.args.get('search_package', '').strip()
-        search_fees = request.args.get('search_fees', '').strip()
-        search_invitations = request.args.get('search_invitations', '').strip()
-        search_comment = request.args.get('search_comment', '').strip()
-        
-        # Pagination: 50 items per page
+        # Pagination
         page = request.args.get('page', 1, type=int)
         per_page = 50
         offset = (page - 1) * per_page
+        
+        # Sorting from database
+        sort_by = request.args.get('sort_by', 'id').strip()
+        sort_dir = request.args.get('sort_dir', 'asc').strip().lower()
+        
+        # Whitelist allowed sort columns for security
+        allowed_sort_columns = ['id', 'name', 'email', 'phone', 'age', 'gender', 
+                              'actual_starting_date', 'starting_date', 'end_date', 
+                              'membership_packages', 'membership_fees', 'membership_status']
+        
+        if sort_by not in allowed_sort_columns:
+            sort_by = 'id'
+        
+        if sort_dir not in ['asc', 'desc']:
+            sort_dir = 'asc'
         
         # Calculate counts for active and expired members (for statistics box)
         from datetime import datetime
@@ -1863,86 +1863,18 @@ def all_members():
         """, one=True)
         expired_count = expired_count_result['count'] if expired_count_result else 0
         
-        # Build WHERE conditions for each column
-        where_conditions = []
-        params = []
+        # Build query with sorting from database
+        order_clause = f'ORDER BY {sort_by} {sort_dir.upper()}'
         
-        if search_id:
-            where_conditions.append("CAST(id AS TEXT) ILIKE %s")
-            params.append(f'%{search_id}%')
+        # Get total count
+        total_count = query_db('SELECT COUNT(*) as count FROM members', one=True)
+        total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
         
-        if search_name:
-            where_conditions.append("name ILIKE %s")
-            params.append(f'%{search_name}%')
-        
-        if search_email:
-            where_conditions.append("COALESCE(email, '') ILIKE %s")
-            params.append(f'%{search_email}%')
-        
-        if search_phone:
-            where_conditions.append("COALESCE(phone, '') ILIKE %s")
-            params.append(f'%{search_phone}%')
-        
-        if search_age:
-            where_conditions.append("CAST(age AS TEXT) ILIKE %s")
-            params.append(f'%{search_age}%')
-        
-        if search_gender:
-            where_conditions.append("COALESCE(gender, '') ILIKE %s")
-            params.append(f'%{search_gender}%')
-        
-        if search_actual_start:
-            where_conditions.append("COALESCE(actual_starting_date, '') ILIKE %s")
-            params.append(f'%{search_actual_start}%')
-        
-        if search_start_date:
-            where_conditions.append("COALESCE(starting_date, '') ILIKE %s")
-            params.append(f'%{search_start_date}%')
-        
-        if search_end_date:
-            where_conditions.append("COALESCE(end_date, '') ILIKE %s")
-            params.append(f'%{search_end_date}%')
-        
-        if search_package:
-            where_conditions.append("COALESCE(membership_packages, '') ILIKE %s")
-            params.append(f'%{search_package}%')
-        
-        if search_fees:
-            where_conditions.append("CAST(membership_fees AS TEXT) ILIKE %s")
-            params.append(f'%{search_fees}%')
-        
-        if search_invitations:
-            where_conditions.append("CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s")
-            params.append(f'%{search_invitations}%')
-        
-        if search_comment:
-            where_conditions.append("COALESCE(comment, '') ILIKE %s")
-            params.append(f'%{search_comment}%')
-        
-        # Build query
-        if where_conditions:
-            where_clause = " AND ".join(where_conditions)
-            base_query = f'SELECT * FROM members WHERE {where_clause} ORDER BY id ASC'
-            count_query = f'SELECT COUNT(*) as count FROM members WHERE {where_clause}'
-            
-            # Get total count for pagination
-            total_count = query_db(count_query, tuple(params), one=True)
-            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
-            
-            # Get paginated data with search
-            members_data = query_db(
-                base_query + ' LIMIT %s OFFSET %s',
-                tuple(params) + (per_page, offset)
-            )
-        else:
-            # No search - get all members
-            total_count = query_db('SELECT COUNT(*) as count FROM members', one=True)
-            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
-            
-            members_data = query_db(
-                'SELECT * FROM members ORDER BY id ASC LIMIT %s OFFSET %s',
-                (per_page, offset)
-            )
+        # Get paginated data with sorting from database
+        members_data = query_db(
+            f'SELECT * FROM members {order_clause} LIMIT %s OFFSET %s',
+            (per_page, offset)
+        )
         
         # Process members to add is_expired flag for freeze button logic
         # Also calculate dynamic status based on current date (like attendance_table)
@@ -2032,19 +1964,8 @@ def all_members():
                             today=today_str,
                             active_count=active_count,
                             expired_count=expired_count,
-                            search_id=search_id,
-                            search_name=search_name,
-                            search_email=search_email,
-                            search_phone=search_phone,
-                            search_age=search_age,
-                            search_gender=search_gender,
-                            search_actual_start=search_actual_start,
-                            search_start_date=search_start_date,
-                            search_end_date=search_end_date,
-                            search_package=search_package,
-                            search_fees=search_fees,
-                            search_invitations=search_invitations,
-                            search_comment=search_comment)
+                            sort_by=sort_by,
+                            sort_dir=sort_dir)
     except Exception as e:
         print(f"Error in all_members route: {e}")
         import traceback
