@@ -568,6 +568,8 @@
 <section>
     <a class="index-btn" href="{{ url_for('index') }}">{{ t.home }}</a>
     <button class="download-btn" onclick="downloadCSV()">{{ t.download_csv }}</button>
+    <button class="download-btn" onclick="sortTable(0, 'asc')">Sort ID ↑</button>
+    <button class="download-btn" onclick="sortTable(0, 'desc')">Sort ID ↓</button>
 
     <!-- Statistics Box -->
     <div class="stats-box">
@@ -795,9 +797,18 @@
     /* SORT */
     let sortDirection = true;
 
-    function sortTable(colIndex) {
+    function sortTable(colIndex, direction) {
         let table = document.getElementById("membersTable");
         let switching = true;
+
+        let asc;
+        if (direction === 'asc') {
+            asc = true;
+        } else if (direction === 'desc') {
+            asc = false;
+        } else {
+            asc = sortDirection;
+        }
 
         while (switching) {
             switching = false;
@@ -808,8 +819,8 @@
                 let y = rows[i + 1].getElementsByTagName("td")[colIndex];
 
                 if (
-                    (sortDirection && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) ||
-                    (!sortDirection && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase())
+                    (asc && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) ||
+                    (!asc && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase())
                 ) {
                     rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
                     switching = true;
@@ -817,7 +828,7 @@
                 }
             }
         }
-        sortDirection = !sortDirection;
+        sortDirection = (direction === undefined) ? !sortDirection : asc;
     }
 
     /* INFINITE SCROLL */
