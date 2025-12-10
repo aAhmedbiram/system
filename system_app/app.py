@@ -1812,9 +1812,11 @@ def add_member_done():
 @login_required
 def all_members():
     try:
-        # Pagination
+        # Pagination - Server-Side Pagination with 100 items per page
         page = request.args.get('page', 1, type=int)
-        per_page = 50
+        if page < 1:
+            page = 1
+        per_page = 100
         offset = (page - 1) * per_page
         
         # Sorting from database

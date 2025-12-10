@@ -371,9 +371,10 @@
         }
 
         .sort-btn.active {
-            background: rgba(76, 175, 80, 0.6);
+            background: rgba(76, 175, 80, 0.8);
             border-color: #4caf50;
             color: white;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
         }
 
         .edit-link {
@@ -452,25 +453,35 @@
             font-style: italic;
         }
 
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
+        .pagination-container {
             margin: 30px 0;
             padding: 20px;
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            text-align: center;
         }
 
         .pagination-info {
             color: #fff;
-            margin: 0 15px;
-            font-size: 14px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .pagination-btn {
             background: linear-gradient(135deg, #4caf50, #66d66a);
             color: white;
-            padding: 10px 20px;
+            padding: 10px 16px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
@@ -479,11 +490,15 @@
             font-weight: 600;
             transition: all 0.3s;
             box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+            min-width: 40px;
+            display: inline-block;
+            text-align: center;
         }
 
-        .pagination-btn:hover:not(.disabled) {
+        .pagination-btn:hover:not(.disabled):not(.active) {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
+            background: linear-gradient(135deg, #66d66a, #4caf50);
         }
 
         .pagination-btn.disabled {
@@ -491,6 +506,18 @@
             color: #888;
             cursor: not-allowed;
             opacity: 0.5;
+        }
+
+        .pagination-btn.active {
+            background: linear-gradient(135deg, #2196F3, #42a5f5);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.5);
+            cursor: default;
+        }
+
+        .pagination-ellipsis {
+            color: #888;
+            padding: 0 8px;
+            font-size: 16px;
         }
 
         .comment-cell {
@@ -783,15 +810,56 @@
 </table>
 </div>
 
-    <!-- Loading indicator for infinite scroll -->
-    <div id="loading-indicator" style="display: none; text-align: center; padding: 20px; color: #4caf50; font-size: 16px;">
-        <div>Loading more members...</div>
+    <!-- Server-Side Pagination -->
+    {% if total_pages > 1 %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            <span>Page {{ page }} of {{ total_pages }} ({{ total_count }} total members)</span>
+        </div>
+        <div class="pagination-controls">
+            {% if page > 1 %}
+                <a href="?page=1&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}" class="pagination-btn">First</a>
+                <a href="?page={{ page - 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}" class="pagination-btn">Previous</a>
+            {% else %}
+                <span class="pagination-btn disabled">First</span>
+                <span class="pagination-btn disabled">Previous</span>
+            {% endif %}
+            
+            {% set start_page = [1, page - 2]|max %}
+            {% set end_page = [total_pages, page + 2]|min %}
+            
+            {% if start_page > 1 %}
+                <a href="?page=1&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}" class="pagination-btn">1</a>
+                {% if start_page > 2 %}
+                    <span class="pagination-ellipsis">...</span>
+                {% endif %}
+            {% endif %}
+            
+            {% for p in range(start_page, end_page + 1) %}
+                {% if p == page %}
+                    <span class="pagination-btn active">{{ p }}</span>
+                {% else %}
+                    <a href="?page={{ p }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}" class="pagination-btn">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+            
+            {% if end_page < total_pages %}
+                {% if end_page < total_pages - 1 %}
+                    <span class="pagination-ellipsis">...</span>
+                {% endif %}
+                <a href="?page={{ total_pages }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}" class="pagination-btn">{{ total_pages }}</a>
+            {% endif %}
+            
+            {% if page < total_pages %}
+                <a href="?page={{ page + 1 }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}" class="pagination-btn">Next</a>
+                <a href="?page={{ total_pages }}&sort_by={{ sort_by }}&sort_dir={{ sort_dir }}" class="pagination-btn">Last</a>
+            {% else %}
+                <span class="pagination-btn disabled">Next</span>
+                <span class="pagination-btn disabled">Last</span>
+            {% endif %}
+        </div>
     </div>
-    
-    <!-- End of list indicator -->
-    <div id="end-of-list" style="display: none; text-align: center; padding: 20px; color: #888; font-size: 14px;">
-        <div>No more members to load. ({{ total_count }} total members)</div>
-    </div>
+    {% endif %}
 
 </section>
 
@@ -857,180 +925,17 @@
         sortDirection = (direction === undefined) ? !sortDirection : asc;
     }
 
-    /* INFINITE SCROLL */
-    let currentPage = {{ page }};
-    let totalPages = {{ total_pages }};
-    let isLoading = false;
-    let hasMore = currentPage < totalPages;
-    
-    // Load more members via AJAX with sorting from database
-    function loadMoreMembers() {
-        if (isLoading || !hasMore) return;
+    // Highlight active sort buttons on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const activeSortBy = '{{ sort_by or "id" }}';
+        const activeSortDir = '{{ sort_dir or "asc" }}';
         
-        isLoading = true;
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const endOfList = document.getElementById('end-of-list');
-        
-        loadingIndicator.style.display = 'block';
-        
-        const nextPage = currentPage + 1;
-        const url = `/all_members?page=${nextPage}&format=json&sort_by=${currentSortBy}&sort_dir=${currentSortDir}`;
-        
-        fetch(url, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            const onclick = btn.getAttribute('onclick');
+            if (onclick && onclick.includes(`'${activeSortBy}'`) && onclick.includes(`'${activeSortDir}'`)) {
+                btn.classList.add('active');
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.members && data.members.length > 0) {
-                const tbody = document.querySelector('#membersTable tbody');
-                
-                data.members.forEach(member => {
-                    const row = createMemberRow(member);
-                    tbody.appendChild(row);
-                });
-                
-                currentPage = data.page;
-                totalPages = data.total_pages;
-                hasMore = data.has_more;
-                
-                if (!hasMore) {
-                    endOfList.style.display = 'block';
-                }
-            } else {
-                hasMore = false;
-                endOfList.style.display = 'block';
-            }
-            
-            loadingIndicator.style.display = 'none';
-            isLoading = false;
-        })
-        .catch(error => {
-            console.error('Error loading more members:', error);
-            loadingIndicator.style.display = 'none';
-            isLoading = false;
         });
-    }
-    
-    // Create a table row from member data
-    function createMemberRow(member) {
-        const tr = document.createElement('tr');
-        
-        // Helper function to safely get value
-        const getValue = (val) => val || '-';
-        const getStatus = (endDate) => {
-            if (!endDate || endDate === '-' || endDate === 'None') {
-                return '<span class="status-light unknown" title="No End Date"></span>';
-            }
-            const endDateOnly = endDate.split(' ')[0];
-            const today = '{{ today }}';
-            
-            if (endDateOnly.length >= 10 && parseInt(endDateOnly.substring(0, 4)) > 1900) {
-                if (endDateOnly > today) {
-                    return `<span class="status-light val" title="Valid - Active Membership (Ends: ${endDate})"></span>`;
-                } else if (endDateOnly < today) {
-                    return `<span class="status-light ex" title="Expired - Membership Ended (Expired: ${endDate})"></span>`;
-                } else {
-                    return `<span class="status-light val" title="Valid - Expires Today"></span>`;
-                }
-            }
-            return `<span class="status-light unknown" title="Invalid Date Format: ${endDate}"></span>`;
-        };
-        
-        const getFreezeButton = (member) => {
-            const package = (member.membership_packages || '').trim().toLowerCase();
-            let hasFreeze = false;
-            let freezeDays = 0;
-            
-            if (package.includes('3 month')) {
-                hasFreeze = true;
-                freezeDays = 7;
-            } else if (package.includes('4 month')) {
-                hasFreeze = true;
-                freezeDays = 7;
-            } else if (package.includes('6 month')) {
-                hasFreeze = true;
-                freezeDays = 14;
-            } else if (package.includes('12 month') || package.includes('1 year') || package.includes('year')) {
-                hasFreeze = true;
-                freezeDays = 30;
-            }
-            
-            if (member.is_expired) {
-                return '<span class="freeze-used">N/A</span>';
-            } else if (member.freeze_used) {
-                return '<span class="freeze-used">Used</span>';
-            } else if (hasFreeze) {
-                // Get CSRF token from existing form on page
-                const csrfInput = document.querySelector('input[name="csrf_token"]');
-                const csrfToken = csrfInput ? csrfInput.value : '';
-                return `<form method="POST" action="/use_freeze/${member.id}" onsubmit="return confirm('Are you sure you want to use freeze for ${member.name.replace(/'/g, "\\'")}? This will extend the membership by ${freezeDays} days and cannot be undone!');" style="display: inline;">
-                    <input type="hidden" name="csrf_token" value="${csrfToken}"/>
-                    <button type="submit" class="freeze-link" style="border: none; cursor: pointer;">Use Freeze</button>
-                </form>`;
-            }
-            return '<span class="freeze-used">N/A</span>';
-        };
-        
-        tr.innerHTML = `
-            <td>${member.id}</td>
-            <td>${getValue(member.name)}</td>
-            <td>${getValue(member.email)}</td>
-            <td>${getValue(member.phone)}</td>
-            <td>${getValue(member.age)}</td>
-            <td>${member.gender === 'Male' ? 'Male' : 'Female'}</td>
-            <td>${getValue(member.actual_starting_date)}</td>
-            <td>${getValue(member.starting_date)}</td>
-            <td>${getValue(member.end_date)}</td>
-            <td>${getValue(member.membership_packages)}</td>
-            <td>${getValue(member.membership_fees)}</td>
-            <td>${getStatus(member.end_date)}</td>
-            <td>${member.is_expired ? '<span class="freeze-used">N/A</span>' : `<span style="color: #ffd43b; font-weight: bold;">${member.invitations || 0}</span>`}</td>
-            <td class="comment-cell">${getValue(member.comment)}</td>
-            <td>${getFreezeButton(member)}</td>
-            <td>
-                <div style="display: flex; flex-direction: column; gap: 5px; align-items: center;">
-                    <a class="edit-link" href="/edit_member/${member.id}" style="font-size: 12px; padding: 6px 12px;">Edit</a>
-                    <a href="/member_training_plans/${member.id}" style="background: linear-gradient(135deg, #ff9800, #ffb74d); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block; transition: all 0.3s; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);">
-                        💪 Plans
-                    </a>
-                    <a href="/progress_tracking/${member.id}" style="background: linear-gradient(135deg, #2196F3, #42a5f5); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block; transition: all 0.3s; box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);">
-                        📈 Progress
-                    </a>
-                </div>
-            </td>
-            <td>
-                <form method="POST" action="/delete_member/${member.id}" onsubmit="return confirm('Are you sure you want to delete ${member.name.replace(/'/g, "\\'")}? This action cannot be undone!');" style="display: inline;">
-                    <input type="hidden" name="csrf_token" value="${document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : ''}"/>
-                    <button type="submit" class="delete-link" style="border: none; cursor: pointer;">Delete</button>
-                </form>
-            </td>
-        `;
-        
-        return tr;
-    }
-    
-    // Scroll event listener for infinite scroll
-    let scrollTimeout;
-    window.addEventListener('scroll', function() {
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(function() {
-            // Check if user scrolled near bottom (within 200px)
-            const scrollPosition = window.innerHeight + window.scrollY;
-            const documentHeight = document.documentElement.scrollHeight;
-            
-            if (documentHeight - scrollPosition < 200 && hasMore && !isLoading) {
-                loadMoreMembers();
-            }
-        }, 100);
-    });
-    
-    // Initial check on page load
-    window.addEventListener('load', function() {
-        if (!hasMore) {
-            document.getElementById('end-of-list').style.display = 'block';
-        }
     });
 
     /* DOWNLOAD CSV */
