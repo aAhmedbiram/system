@@ -31,4 +31,5 @@ node_modules
 *.sqlite
 *.db
 *.sqbpro
-
+fly.toml
+.envrc
