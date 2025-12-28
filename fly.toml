@@ -1,15 +1,17 @@
 # fly.toml app configuration file generated for system-rival
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
 
 app = "system-rival"
 primary_region = "iad"
 
 [build]
+  # بنعرف الـ Flask app بشكل صريح كمتغير بيئة أثناء البناء
+  [build.args]
+    FLASK_APP = "app.py"
 
 [env]
   PORT = "5000"
+  FLASK_APP = "app.py"
+  FLASK_ENV = "production"
 
 [http_service]
   internal_port = 5000
@@ -20,7 +22,7 @@ primary_region = "iad"
   processes = ["app"]
 
 [[http_service.checks]]
-  grace_period = "10s"
+  grace_period = "15s"
   interval = "30s"
   method = "GET"
   timeout = "5s"
