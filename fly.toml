@@ -1,17 +1,11 @@
-# fly.toml app configuration file generated for system-rival
-
 app = "system-rival"
 primary_region = "iad"
 
 [build]
-  # بنعرف الـ Flask app بشكل صريح كمتغير بيئة أثناء البناء
-  [build.args]
-    FLASK_APP = "app.py"
+  # لا تقم بتغيير هذا الجزء، سيقوم Fly.io بالتعرف على Python تلقائياً
 
 [env]
   PORT = "5000"
-  FLASK_APP = "app.py"
-  FLASK_ENV = "production"
 
 [http_service]
   internal_port = 5000
@@ -32,3 +26,7 @@ primary_region = "iad"
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 512
+
+# هذا الجزء هو الأهم لإخبار Fly.io كيف يشغل تطبيقك
+[processes]
+  app = "gunicorn --bind 0.0.0.0:5000 app:app"
