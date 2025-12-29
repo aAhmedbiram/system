@@ -33,6 +33,5 @@ RUN mkdir -p logs && chmod 755 logs
 # Expose port
 EXPOSE 5000
 
-# Run gunicorn pointing to the main app.py in root
-# إضافة المجلد الحالي للمسار لضمان رؤية ملف app.py
+# تأكد أن هذا هو السطر الأخير بدقة
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app", "--workers", "1", "--threads", "2", "--timeout", "120"]
