@@ -6,8 +6,7 @@ primary_region = "iad"
 
 [env]
   PORT = "5000"
-  # Removed FLASK_APP to prevent Fly.io from auto-detecting and using flask run
-  # Fly.io will use the [processes] command instead
+  # FLASK_APP is not needed when using Gunicorn
 
 [http_service]
   internal_port = 5000
@@ -18,10 +17,10 @@ primary_region = "iad"
   processes = ["app"]
 
 [[http_service.checks]]
-  grace_period = "30s" # زودنا الوقت لـ 30 ثانية
+  grace_period = "30s"
   interval = "15s"
   method = "GET"
-  timeout = "5s"
+  timeout = "10s"
   path = "/"
 
 [[vm]]
@@ -29,6 +28,6 @@ primary_region = "iad"
   cpus = 1
   memory_mb = 512
 
-# هذا الجزء هو الأهم لإخبار Fly.io كيف يشغل تطبيقك
 [processes]
-  app = "gunicorn --bind 0.0.0.0:5000 system_app.app:app --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -"
+  # تم تعديل المسار ليكون app:app مباشرة لأن الملف في المجلد الرئيسي
+  app = "gunicorn --bind 0.0.0.0:5000 app:app --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -"

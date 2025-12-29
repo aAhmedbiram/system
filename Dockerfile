@@ -37,11 +37,7 @@ RUN mkdir -p logs && \
 # Expose port
 EXPOSE 5000
 
-# Health check endpoint (optional, can be removed if causing issues)
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-#     CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', ${PORT:-5000})); s.close()" || exit 1
-
-# Run gunicorn - Fly.io will use [processes] from fly.toml to override this
-# Using 1 worker with 2 threads for better memory efficiency on 512MB RAM
-# تأكد إن app:app بتشير لملف app.py اللي في الرووت عندك
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120"]
+# Run gunicorn
+# ملاحظة: تم تعديل المسار من system_app.app:app إلى app:app
+# لأن ملف app.py موجود في المجلد الرئيسي مباشرة
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
