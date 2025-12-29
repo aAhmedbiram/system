@@ -10,33 +10,28 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=5000 \
     PYTHONPATH=/app
 
-# Install system dependencies including build essentials for psycopg2
-# تم إضافة build-essential و musl-dev لضمان استقرار البناء
+# Install ONLY necessary system dependencies for PostgreSQL and building tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    g++ \
-    build-essential \
-    musl-dev \
-    postgresql-client \
     libpq-dev \
-    python3-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Upgrade pip and install dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
-# Create logs directory
+# Create logs directory with proper permissions
 RUN mkdir -p logs && chmod 755 logs
 
 # Expose port
 EXPOSE 5000
 
-# Run gunicorn - Direct path to app:app
+# Run gunicorn pointing to the main app.py in root
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
