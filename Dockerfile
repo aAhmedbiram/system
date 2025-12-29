@@ -43,4 +43,5 @@ EXPOSE 5000
 
 # Run gunicorn - Fly.io will use [processes] from fly.toml to override this
 # Using 1 worker with 2 threads for better memory efficiency on 512MB RAM
-CMD ["gunicorn", "system_app.app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
+# تأكد إن app:app بتشير لملف app.py اللي في الرووت عندك
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120"]

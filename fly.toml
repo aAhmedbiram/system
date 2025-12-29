@@ -18,8 +18,8 @@ primary_region = "iad"
   processes = ["app"]
 
 [[http_service.checks]]
-  grace_period = "15s"
-  interval = "30s"
+  grace_period = "30s" # زودنا الوقت لـ 30 ثانية
+  interval = "15s"
   method = "GET"
   timeout = "5s"
   path = "/"
