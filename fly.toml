@@ -45,4 +45,4 @@ primary_region = "iad"
   memory_mb = 512
 
 [processes]
-  app = "gunicorn --bind 0.0.0.0:5000 system_app.app:app --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -"
+  app = "gunicorn --bind 0.0.0.0:5000 system_app.app:app --workers 1 --threads 2 --timeout 120"
