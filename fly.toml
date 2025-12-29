@@ -6,7 +6,6 @@ primary_region = "iad"
 
 [env]
   PORT = "5000"
-  # FLASK_APP is not needed when using Gunicorn
 
 [http_service]
   internal_port = 5000
@@ -17,7 +16,7 @@ primary_region = "iad"
   processes = ["app"]
 
 [[http_service.checks]]
-  grace_period = "30s"
+  grace_period = "40s" # زيادة وقت السماح لبدء التشغيل
   interval = "15s"
   method = "GET"
   timeout = "10s"
@@ -29,5 +28,5 @@ primary_region = "iad"
   memory_mb = 512
 
 [processes]
-  # تم تعديل المسار ليكون app:app مباشرة لأن الملف في المجلد الرئيسي
+  # التشغيل المباشر عبر gunicorn لتجنب أخطاء flask locate
   app = "gunicorn --bind 0.0.0.0:5000 app:app --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -"

@@ -11,9 +11,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app
 
 # Install system dependencies including build essentials for psycopg2
+# تم إضافة build-essential و musl-dev لضمان استقرار البناء
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
+    build-essential \
+    musl-dev \
     postgresql-client \
     libpq-dev \
     python3-dev \
@@ -22,22 +25,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies with better error handling
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt || \
-    (echo "Failed to install requirements" && cat requirements.txt && exit 1)
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
-# Create logs directory with proper permissions
-RUN mkdir -p logs && \
-    chmod 755 logs
+# Create logs directory
+RUN mkdir -p logs && chmod 755 logs
 
 # Expose port
 EXPOSE 5000
 
-# Run gunicorn
-# ملاحظة: تم تعديل المسار من system_app.app:app إلى app:app
-# لأن ملف app.py موجود في المجلد الرئيسي مباشرة
+# Run gunicorn - Direct path to app:app
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
