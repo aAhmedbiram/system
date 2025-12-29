@@ -9,8 +9,12 @@ import threading
 
 # === Read DATABASE_URL ===
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGURL")
-if not DATABASE_URL:
-    raise Exception("DATABASE_URL not found. Make sure it's set in Railway Variables.")
+
+def get_database_url():
+    """Get DATABASE_URL and raise error if not found"""
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL not found. Make sure it's set in environment variables.")
+    return DATABASE_URL
 
 # === Connection Pool for Performance ===
 # Create a connection pool to reuse connections instead of creating new ones
@@ -24,10 +28,11 @@ def get_connection_pool():
         with _pool_lock:
             if _connection_pool is None:
                 try:
+                    db_url = get_database_url()
                     _connection_pool = psycopg2.pool.ThreadedConnectionPool(
                         minconn=1,
                         maxconn=20,  # Maximum 20 connections in pool
-                        dsn=DATABASE_URL,
+                        dsn=db_url,
                         sslmode='require'
                     )
                     print("Database connection pool created successfully")
@@ -38,7 +43,8 @@ def get_connection_pool():
 
 # === Create tables (once on startup) ===
 def create_table():
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url, sslmode='require')
     cr = conn.cursor()
     try:
         cr.execute('''
@@ -434,7 +440,8 @@ def query_db(query, args=(), one=False, commit=False):
     # Fallback to direct connection if pool fails
     if pool is None:
         try:
-            conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+            db_url = get_database_url()
+            conn = psycopg2.connect(db_url, sslmode='require')
         except Exception as e:
             print(f"Error creating direct connection: {e}")
             raise e
@@ -445,7 +452,8 @@ def query_db(query, args=(), one=False, commit=False):
             print(f"Error getting connection from pool: {e}")
             # Fallback to direct connection
             try:
-                conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+                db_url = get_database_url()
+                conn = psycopg2.connect(db_url, sslmode='require')
             except Exception as fallback_error:
                 print(f"Fallback connection also failed: {fallback_error}")
                 raise fallback_error
@@ -545,7 +553,8 @@ def bulk_add_members(members_list):
     inserted = 0
     
     try:
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        db_url = get_database_url()
+        conn = psycopg2.connect(db_url, sslmode='require')
         cur = conn.cursor()
         
         # Check if first member has custom_id
@@ -676,7 +685,8 @@ def delete_member(member_id):
 
 def delete_all_data():
     """Delete all data from all tables (except users table)"""
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url, sslmode='require')
     cur = conn.cursor()
     try:
         # Use CASCADE to truncate members table and all child tables that reference it
