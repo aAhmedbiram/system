@@ -26,6 +26,6 @@ primary_region = "iad"
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 512
-
 [processes]
-  app = "gunicorn --bind 0.0.0.0:5000 system_app.app:app --workers 1 --threads 2"
+  # سنطلب من gunicorn الدخول لمجلد system_app أولاً ثم تشغيل التطبيق
+  app = "gunicorn --bind 0.0.0.0:5000 --chdir /app/system_app app:app --workers 1 --threads 2"

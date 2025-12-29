@@ -33,5 +33,4 @@ RUN mkdir -p logs && chmod 755 logs
 # Expose port
 EXPOSE 5000
 
-# تأكد أن هذا هو السطر الأخير بدقة
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "system_app.app:app", "--workers", "1", "--threads", "2", "--timeout", "120"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--chdir", "/app/system_app", "app:app"]
