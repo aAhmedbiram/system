@@ -7,25 +7,43 @@ primary_region = "iad"
 [env]
   PORT = "5000"
 
-[http_service]
+# تم تحويل الإعدادات إلى صيغة [[services]] لضمان استقرار الربط بالمنفذ 5000
+[[services]]
   internal_port = 5000
-  force_https = true
-  auto_stop_machines = true
-  auto_start_machines = true
-  min_machines_running = 0
+  protocol = "tcp"
   processes = ["app"]
 
-[[http_service.checks]]
-  grace_period = "40s" # زيادة وقت السماح لبدء التشغيل
+  [[services.ports]]
+    force_https = true
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.concurrency]]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
+
+  [[services.tcp_checks]]
+    grace_period = "60s"
+    interval = "15s"
+    restart_limit = 0
+    timeout = "10s"
+
+[[services.http_checks]]
+  grace_period = "60s" # زيادة وقت السماح للتطبيق ليقوم ببدء Gunicorn بالكامل
   interval = "15s"
   method = "GET"
-  timeout = "10s"
   path = "/"
+  timeout = "10s"
 
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 512
+
 [processes]
-  # استخدام system_app.app:app لضمان أن Python يعرف system_app كحزمة
   app = "gunicorn --bind 0.0.0.0:5000 system_app.app:app --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -"
