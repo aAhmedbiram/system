@@ -10,14 +10,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=5000 \
     PYTHONPATH=/app
 
-# Install ONLY necessary system dependencies for PostgreSQL and building tools
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Copy requirements first
 COPY requirements.txt .
 
 # Upgrade pip and install dependencies
@@ -27,10 +27,14 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copy application code
 COPY . .
 
-# Create logs directory with proper permissions
+# لضمان أن بايثون يتعامل مع المجلد كمجموعة حزم
+RUN touch system_app/__init__.py
+
+# Create logs directory
 RUN mkdir -p logs && chmod 755 logs
 
 # Expose port
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--chdir", "/app/system_app", "app:app"]
+# الأمر النهائي (صحيح تماماً بناءً على هيكل مشروعك الحالي)
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--chdir", "/app/system_app", "app:app", "--workers", "1", "--threads", "2", "--timeout", "120"]
