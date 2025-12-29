@@ -7,6 +7,7 @@ app = "system-rival"
 primary_region = "iad"
 
 [build]
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = "5000"
