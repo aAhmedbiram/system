@@ -34,4 +34,4 @@ RUN mkdir -p logs && chmod 755 logs
 EXPOSE 5000
 
 # تأكد أن هذا هو السطر الأخير بدقة
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "system_app.app:app", "--workers", "1", "--threads", "2", "--timeout", "120"]
