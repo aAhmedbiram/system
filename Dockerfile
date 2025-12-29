@@ -41,6 +41,6 @@ EXPOSE 5000
 # HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 #     CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', ${PORT:-5000})); s.close()" || exit 1
 
-# Run gunicorn using shell form to handle environment variable
+# Run gunicorn - Fly.io will use [processes] from fly.toml to override this
 # Using 1 worker with 2 threads for better memory efficiency on 512MB RAM
-CMD gunicorn system_app.app:app --bind 0.0.0.0:5000 --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -
+CMD ["gunicorn", "system_app.app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]

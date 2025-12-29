@@ -6,7 +6,8 @@ primary_region = "iad"
 
 [env]
   PORT = "5000"
-  FLASK_APP = "system_app.app:app"
+  # Removed FLASK_APP to prevent Fly.io from auto-detecting and using flask run
+  # Fly.io will use the [processes] command instead
 
 [http_service]
   internal_port = 5000
