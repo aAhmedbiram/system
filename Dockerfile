@@ -34,4 +34,5 @@ RUN mkdir -p logs && chmod 755 logs
 EXPOSE 5000
 
 # Run gunicorn pointing to the main app.py in root
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120"]
+# إضافة المجلد الحالي للمسار لضمان رؤية ملف app.py
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app", "--workers", "1", "--threads", "2", "--timeout", "120"]

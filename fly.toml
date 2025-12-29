@@ -26,7 +26,6 @@ primary_region = "iad"
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 512
-
+  
 [processes]
-  # التشغيل المباشر عبر gunicorn لتجنب أخطاء flask locate
-  app = "gunicorn --bind 0.0.0.0:5000 app:app --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -"
+  app = "gunicorn --bind 0.0.0.0:5000 app:app --workers 1 --threads 2"
