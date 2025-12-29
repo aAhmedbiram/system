@@ -42,4 +42,4 @@ EXPOSE 5000
 #     CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', ${PORT:-5000})); s.close()" || exit 1
 
 # Run gunicorn using shell form to handle environment variable
-CMD gunicorn system_app.app:app --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 --access-logfile - --error-logfile -
+CMD gunicorn system_app.app:app --bind 0.0.0.0:5000 --workers 2 --timeout 120 --access-logfile - --error-logfile -

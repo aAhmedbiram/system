@@ -18,7 +18,7 @@ psycopg2-binary==2.9.9
 SQLAlchemy==2.0.36
 PyMySQL==1.1.1
 mysql-connector-python==9.0.0
-mysqlclient==2.2.4
+# mysqlclient==2.2.4  # Removed for Fly.io compatibility - use PyMySQL or mysql-connector-python instead
 
 # Security & Authentication
 bcrypt==4.1.1

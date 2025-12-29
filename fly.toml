@@ -1,13 +1,12 @@
-# fly.toml app configuration file generated for system-rival
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
 app = "system-rival"
 primary_region = "iad"
 
 [build]
+<<<<<<< HEAD
   dockerfile = "Dockerfile"
+=======
+  # لا تقم بتغيير هذا الجزء، سيقوم Fly.io بالتعرف على Python تلقائياً
+>>>>>>> 8668f4f59c71995fd055ee346020fdb4722513e8
 
 [env]
   PORT = "5000"
@@ -22,7 +21,7 @@ primary_region = "iad"
   processes = ["app"]
 
 [[http_service.checks]]
-  grace_period = "10s"
+  grace_period = "15s"
   interval = "30s"
   method = "GET"
   timeout = "5s"
@@ -32,3 +31,7 @@ primary_region = "iad"
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 512
+
+# هذا الجزء هو الأهم لإخبار Fly.io كيف يشغل تطبيقك
+[processes]
+  app = "gunicorn --bind 0.0.0.0:5000 app:app"
