@@ -27,5 +27,5 @@ RUN mkdir -p logs && chmod 755 logs
 
 EXPOSE 5000
 
-# تشغيل gunicorn من داخل مجلد system_app لضمان إيجاد app.py
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--chdir", "/app/system_app", "app:app", "--workers", "1", "--threads", "2", "--timeout", "120"]
+# تشغيل gunicorn من /app مع استخدام system_app.app:app لضمان أن Python يعرف system_app كحزمة
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "system_app.app:app", "--workers", "1", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
