@@ -30,4 +30,4 @@ primary_region = "iad"
 
 # هذا الجزء هو الأهم لإخبار Fly.io كيف يشغل تطبيقك
 [processes]
-  app = "gunicorn --bind 0.0.0.0:5000 app:app"
+  app = "gunicorn --bind 0.0.0.0:5000 system_app.app:app --workers 2 --timeout 120"
