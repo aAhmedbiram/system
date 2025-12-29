@@ -2,11 +2,7 @@ app = "system-rival"
 primary_region = "iad"
 
 [build]
-<<<<<<< HEAD
   dockerfile = "Dockerfile"
-=======
-  # لا تقم بتغيير هذا الجزء، سيقوم Fly.io بالتعرف على Python تلقائياً
->>>>>>> 8668f4f59c71995fd055ee346020fdb4722513e8
 
 [env]
   PORT = "5000"
