@@ -10,6 +10,7 @@ primary_region = "iad"
 
 [env]
   PORT = "5000"
+  FLASK_APP = "system_app.app:app"
 
 [http_service]
   internal_port = 5000

@@ -86,7 +86,6 @@ def set_security_headers(response):
 # === Global Error Handlers for Debugging ===
 @app.before_request
 def log_request_info():
-    """Log request information for debugging"""
     try:
         request_id = getattr(g, 'request_id', 'N/A')
         log_msg = f"[{request_id}] {request.method} {request.path} from {request.remote_addr}"
