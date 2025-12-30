@@ -875,6 +875,15 @@ def toggle_language():
     else:
         return redirect(url_for('login'))
 
+# Health endpoints for platform health checks
+@app.route('/health', methods=['GET', 'HEAD'])
+def health():
+    return jsonify(status='ok'), 200
+
+@app.route('/healthz', methods=['GET', 'HEAD'])
+def healthz():
+    return jsonify(status='ok'), 200
+
 # Simple in-memory cache for expensive queries
 _cache = {}
 _cache_timeout = {}
