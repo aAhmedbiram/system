@@ -253,8 +253,8 @@ def handle_csrf_error(e):
     flash('CSRF token missing or invalid. Please try again.', 'error')
     return redirect(request.url or url_for('index'))
 
-from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
-from .queries import (
+from func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
+from queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
     add_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
