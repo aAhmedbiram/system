@@ -266,7 +266,7 @@ from queries import (
     log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total,
     create_invoice, get_invoice, get_invoice_by_number, get_all_invoices
 )
-from .queries import delete_all_data as delete_all_data_from_db
+from queries import delete_all_data as delete_all_data_from_db
 
 # Initialize database tables on startup
 with app.app_context():
@@ -982,7 +982,7 @@ def index():
         revenue_this_month = get_cached('revenue_this_month', timeout=300)
         if revenue_this_month is None:
             try:
-                from .queries import get_monthly_total
+                from queries import get_monthly_total
                 revenue_this_month = get_monthly_total(current_year, current_month)
                 set_cached('revenue_this_month', revenue_this_month, timeout=300)
             except:
@@ -992,7 +992,7 @@ def index():
         revenue_last_month = get_cached('revenue_last_month', timeout=300)
         if revenue_last_month is None:
             try:
-                from .queries import get_monthly_total
+                from queries import get_monthly_total
                 last_month = current_month - 1 if current_month > 1 else 12
                 last_year = current_year if current_month > 1 else current_year - 1
                 revenue_last_month = get_monthly_total(last_year, last_month)
