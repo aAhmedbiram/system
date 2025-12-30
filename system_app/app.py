@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify, has_request_context
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from datetime import datetime, timedelta
 import os
@@ -20,11 +20,16 @@ from apscheduler.triggers.cron import CronTrigger
 
 app = Flask(__name__)
 
+# Environment flags
+is_production = (os.environ.get('APP_ENV', '').lower() == 'production') or (os.environ.get('FLASK_ENV') == 'production')
+
 # Security: Use strong secret key from environment (required in production)
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
+    if is_production:
+        raise RuntimeError("SECRET_KEY must be set in production")
     secret_key = secrets.token_hex(32)
-    print("WARNING: SECRET_KEY not set in environment. Using generated key (not secure for production!)")
+    print("WARNING: SECRET_KEY not set. Generated a temporary key for non-production.")
 app.secret_key = secret_key
 
 # Enable CSRF protection
@@ -32,29 +37,57 @@ csrf = CSRFProtect(app)
 
 # Secure session configuration
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # HTTPS only in production
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = is_production or os.environ.get('SESSION_COOKIE_SECURE', '').lower() == 'true'
+app.config['SESSION_COOKIE_SAMESITE'] = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # 24 hour session timeout
 
 # === Enhanced Logging Configuration ===
-if not app.debug:
-    # Create logs directory if it doesn't exist
-    log_dir = 'logs'
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
-    # Set up rotating file handler
-    file_handler = RotatingFileHandler(
-        os.path.join(log_dir, 'rival_gym.log'),
-        maxBytes=10240000,  # 10MB
-        backupCount=10
-    )
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
+class RequestContextFilter(logging.Filter):
+    def filter(self, record):
+        try:
+            record.request_id = getattr(g, 'request_id', '-')
+            if has_request_context():
+                ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+                if isinstance(ip, str) and ',' in ip:
+                    ip = ip.split(',')[0].strip()
+                record.client = anonymize_ip(ip)
+            else:
+                record.client = '-'
+        except Exception:
+            record.request_id = '-'
+            record.client = '-'
+        return True
+
+def anonymize_ip(ip):
+    try:
+        if not ip:
+            return '-'
+        parts = str(ip).split('.')
+        if len(parts) == 4:
+            parts[-1] = '0'
+            return '.'.join(parts)
+        return str(ip)
+    except Exception:
+        return '-'
+
+if not app.debug or is_production:
+    log_to_stdout = os.environ.get('LOG_TO_STDOUT', '').lower() == 'true' or is_production
+    log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s [req=%(request_id)s client=%(client)s in %(module)s:%(lineno)d]')
+    handler = None
+    if log_to_stdout:
+        handler = logging.StreamHandler()
+    else:
+        log_dir = 'logs'
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        handler = RotatingFileHandler(os.path.join(log_dir, 'rival_gym.log'), maxBytes=10240000, backupCount=10)
+    handler.setFormatter(formatter)
+    handler.setLevel(getattr(logging, log_level, logging.INFO))
+    handler.addFilter(RequestContextFilter())
+    app.logger.handlers = []
+    app.logger.addHandler(handler)
+    app.logger.setLevel(getattr(logging, log_level, logging.INFO))
     app.logger.info('Rival Gym System startup')
 
 # === Request ID Tracking ===
@@ -71,7 +104,8 @@ def set_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    if is_production or os.environ.get('ENABLE_HSTS', '').lower() == 'true':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     # Content Security Policy
     response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
     # Add request ID to response headers
@@ -88,17 +122,23 @@ def set_security_headers(response):
 def log_request_info():
     try:
         request_id = getattr(g, 'request_id', 'N/A')
-        log_msg = f"[{request_id}] {request.method} {request.path} from {request.remote_addr}"
-        print(f"\n{'='*80}")
-        print(f"REQUEST: {request.method} {request.path} [ID: {request_id}]")
-        print(f"Remote Addr: {request.remote_addr}")
-        print(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
-        if request.method == 'POST':
-            print(f"Form Data Keys: {list(request.form.keys())}")
-        print(f"{'='*80}\n")
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        if isinstance(ip_address, str) and ',' in ip_address:
+            ip_address = ip_address.split(',')[0].strip()
+        client = anonymize_ip(ip_address)
+        log_msg = f"{request.method} {request.path}"
+        if not is_production and app.debug:
+            print(f"\n{'='*80}")
+            print(f"REQUEST: {request.method} {request.path} [ID: {request_id}]")
+            print(f"Client: {client}")
+            print(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
+            if request.method == 'POST':
+                print(f"Form Data Keys: {list(request.form.keys())}")
+            print(f"{'='*80}\n")
         app.logger.info(log_msg)
     except Exception as e:
-        print(f"Error in log_request_info: {e}")
+        if not is_production:
+            print(f"Error in log_request_info: {e}")
 
 @app.before_request
 def track_user_activity():
@@ -109,10 +149,11 @@ def track_user_activity():
             username = session.get('username', 'Unknown')
             now = datetime.now()
             
-            # Get IP address
+            # Get IP address (anonymized)
             ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
             if isinstance(ip_address, str) and ',' in ip_address:
                 ip_address = ip_address.split(',')[0].strip()
+            ip_address = anonymize_ip(ip_address)
             
             # Update or create user activity record
             if user_id not in _active_users:
@@ -268,29 +309,30 @@ from queries import (
 )
 from queries import delete_all_data as delete_all_data_from_db
 
-# Initialize database tables on startup
-with app.app_context():
-    try:
-        create_table()
-    except Exception as e:
-        print(f"Warning: Could not create tables on startup: {e}")
-        print("Tables may already exist or database connection failed.")
+# Initialize database tables on startup (disabled in production unless explicitly enabled)
+if not is_production or os.environ.get('RUN_DB_MIGRATIONS', '').lower() == 'true':
+    with app.app_context():
+        try:
+            create_table()
+        except Exception as e:
+            print(f"Warning: Could not create tables on startup: {e}")
+            print("Tables may already exist or database connection failed.")
 
-# Initialize scheduler for daily status updates at midnight
-scheduler = BackgroundScheduler(daemon=True)
-scheduler.add_job(
-    func=scheduled_daily_status_update,
-    trigger=CronTrigger(hour=0, minute=0),  # Run at midnight (00:00) every day
-    id='daily_status_update',
-    name='Daily Membership Status Update',
-    replace_existing=True
-)
-scheduler.start()
-print("Scheduler started: Daily membership status update scheduled for 12:00 AM every day")
-
-# Ensure scheduler shuts down when app stops
-import atexit
-atexit.register(lambda: scheduler.shutdown())
+# Initialize scheduler for daily status updates at midnight (optional)
+if os.environ.get('RUN_SCHEDULER', '').lower() == 'true':
+    scheduler = BackgroundScheduler(daemon=True, timezone=os.environ.get('APSCHEDULER_TIMEZONE', 'UTC'))
+    scheduler.add_job(
+        func=scheduled_daily_status_update,
+        trigger=CronTrigger(hour=0, minute=0),  # Run at midnight (00:00) every day
+        id='daily_status_update',
+        name='Daily Membership Status Update',
+        replace_existing=True
+    )
+    scheduler.start()
+    print("Scheduler started: Daily membership status update scheduled for 12:00 AM every day (UTC)")
+    # Ensure scheduler shuts down when app stops
+    import atexit
+    atexit.register(lambda: scheduler.shutdown(wait=False))
 
 
 # === Authorization Helpers & Decorators ===
@@ -1193,11 +1235,18 @@ def reset_login_lockout():
 @csrf.exempt
 def reset_lockout_public():
     """Public route to reset login lockout (requires secret token)"""
-    # Check for secret token in query parameter or environment variable
-    secret_token = os.environ.get('RESET_LOCKOUT_TOKEN', 'reset_lockout_12345')
+    # Token must be set via environment
+    secret_token = os.environ.get('RESET_LOCKOUT_TOKEN')
+    if not secret_token:
+        return jsonify({'success': False, 'message': 'RESET_LOCKOUT_TOKEN not configured.'}), 403
     provided_token = request.args.get('token', '')
     
-    if provided_token == secret_token:
+    try:
+        valid = secrets.compare_digest(provided_token, secret_token)
+    except Exception:
+        valid = False
+    
+    if valid:
         reset_all_login_attempts()
         return jsonify({'success': True, 'message': 'All login attempt lockouts have been reset.'}), 200
     else:
