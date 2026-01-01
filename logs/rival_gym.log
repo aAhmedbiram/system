@@ -12,3 +12,4 @@
 2025-12-30 19:43:06,688 INFO: [4f97db3f] POST /signup from 192.168.1.16 [in d:\system\system_app\app.py:99]
 2025-12-30 19:43:12,462 INFO: [654d7595] GET /home from 192.168.1.16 [in d:\system\system_app\app.py:99]
 2025-12-30 19:43:12,471 INFO: [96e98445] GET /login from 192.168.1.16 [in d:\system\system_app\app.py:99]
+2026-01-01 21:07:59,584 INFO: Rival Gym System startup [req=- client=- in app:91]
