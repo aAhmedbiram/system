@@ -294,8 +294,8 @@ def handle_csrf_error(e):
     flash('CSRF token missing or invalid. Please try again.', 'error')
     return redirect(request.url or url_for('index'))
 
-from system_app.func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
-from system_app.queries import (
+from func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
+from queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
     add_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
@@ -307,7 +307,7 @@ from system_app.queries import (
     log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total,
     create_invoice, get_invoice, get_invoice_by_number, get_all_invoices
 )
-from system_app.queries import delete_all_data as delete_all_data_from_db
+from queries import delete_all_data as delete_all_data_from_db
 
 # Initialize database tables on startup (disabled in production unless explicitly enabled)
 if not is_production or os.environ.get('RUN_DB_MIGRATIONS', '').lower() == 'true':
@@ -1033,7 +1033,7 @@ def index():
         revenue_this_month = get_cached('revenue_this_month', timeout=300)
         if revenue_this_month is None:
             try:
-                from system_app.queries import get_monthly_total
+                from queries import get_monthly_total
                 revenue_this_month = get_monthly_total(current_year, current_month)
                 set_cached('revenue_this_month', revenue_this_month, timeout=300)
             except:
@@ -1043,7 +1043,7 @@ def index():
         revenue_last_month = get_cached('revenue_last_month', timeout=300)
         if revenue_last_month is None:
             try:
-                from system_app.queries import get_monthly_total
+                from queries import get_monthly_total
                 last_month = current_month - 1 if current_month > 1 else 12
                 last_year = current_year if current_month > 1 else current_year - 1
                 revenue_last_month = get_monthly_total(last_year, last_month)
@@ -4073,7 +4073,7 @@ def data_management():
                 flash(f'Starting import of {total_rows} rows. This may take 10-15 minutes. Please wait and do not close this page...', 'success')
                 
                 # Import bulk_add_members function
-                from system_app.queries import bulk_add_members
+                from queries import bulk_add_members
                 
                 # Process in batches to avoid memory/timeout issues
                 for batch_start in range(0, total_rows, batch_size):
