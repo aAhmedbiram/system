@@ -291,6 +291,9 @@ def handle_exception(e):
 def handle_csrf_error(e):
     """Handle CSRF token errors"""
     print(f"CSRF Error: {e.description}")
+    if 'user_id' not in session:
+        flash('Your session expired. Please log in again.', 'error')
+        return redirect(url_for('login'))
     flash('CSRF token missing or invalid. Please try again.', 'error')
     return redirect(request.url or url_for('index'))
 
@@ -1262,7 +1265,6 @@ def reset_lockout_public():
         return jsonify({'success': False, 'message': 'Invalid token.'}), 403
 
 @app.route('/login', methods=['GET', 'POST'])
-@csrf.exempt  # Exempt login from CSRF (public endpoint, no authenticated session yet)
 def login():
     # If already logged in, redirect based on permissions
     if 'user_id' in session:

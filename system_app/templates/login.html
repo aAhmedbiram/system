@@ -374,6 +374,7 @@
 
     <div class="login-container">
         <form action="/login" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <h2>{{ t.login }}</h2>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
