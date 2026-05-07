@@ -1,0 +1,18 @@
+# Rival Gym System - Ignore Rules
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.pytest_cache/
+dist/
+build/
+
+# Application Logs
+logs/
+
+# Environment and Data
+.env
+*.sqlite3
