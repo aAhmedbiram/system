@@ -5,6 +5,7 @@ from psycopg2.extras import RealDictCursor
 from psycopg2 import IntegrityError
 from psycopg2 import pool
 from datetime import date
+from .func import get_cairo_date
 import threading
 
 # === Read DATABASE_URL ===
@@ -914,9 +915,9 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
                         except ValueError:
                             continue
                     
-                    # If parsing succeeded, check if expired
+                    # If parsing succeeded, check if expired using Cairo date
                     if end_date:
-                        today = datetime.now().date()
+                        today = get_cairo_date()
                         if end_date < today:
                             raise ValueError(f"Member {member['name']} (ID: {member_id}) cannot use invitations because their membership has expired. End date: {end_date_str}")
                     else:

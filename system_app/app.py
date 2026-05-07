@@ -179,14 +179,16 @@ def track_user_activity():
         print(f"Error tracking user activity: {e}")
 
 def scheduled_daily_status_update():
-    """Scheduled task to update membership statuses daily at midnight"""
+    """Scheduled task to update membership statuses daily at midnight Cairo time"""
     with app.app_context():
         try:
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running scheduled daily membership status update...")
+            cairo_now = get_cairo_now()
+            print(f"[{cairo_now.strftime('%Y-%m-%d %H:%M:%S')}] Running scheduled daily membership status update (Cairo Time)...")
             updated_count = update_all_membership_statuses()
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Daily status update completed. Updated {updated_count} member(s).")
+            print(f"[{cairo_now.strftime('%Y-%m-%d %H:%M:%S')}] Daily status update completed. Updated {updated_count} member(s).")
         except Exception as e:
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error in scheduled status update: {e}")
+            cairo_now = get_cairo_now()
+            print(f"[{cairo_now.strftime('%Y-%m-%d %H:%M:%S')}] Error in scheduled status update: {e}")
             import traceback
             traceback.print_exc()
 
@@ -297,7 +299,7 @@ def handle_csrf_error(e):
     flash('CSRF token missing or invalid. Please try again.', 'error')
     return redirect(request.url or url_for('index'))
 
-from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
+from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations, get_cairo_date, get_cairo_now
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
@@ -1066,7 +1068,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (seven_days_from_now, today.strftime('%Y-%m-%d')), one=True)
@@ -1087,7 +1089,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (fourteen_days_from_now, (today + timedelta(days=7)).strftime('%Y-%m-%d')), one=True)
@@ -1107,7 +1109,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (thirty_days_from_now, (today + timedelta(days=14)).strftime('%Y-%m-%d')), one=True)
@@ -1126,7 +1128,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                 """, one=True)
                 total_active_members = active_result['count'] if active_result else 0
                 set_cached('total_active_members', total_active_members, timeout=300)
@@ -1436,9 +1438,9 @@ def online_users():
         return redirect(url_for('index'))
 
 def update_all_membership_statuses():
-    """Update all membership statuses in the database based on current end dates"""
+    """Update all membership statuses in the database based on current end dates using Cairo time"""
     try:
-        today = datetime.now().date()
+        today = get_cairo_date()
         all_members = query_db('SELECT id, end_date, membership_status FROM members WHERE end_date IS NOT NULL AND end_date != %s', ('',))
         
         updated_count = 0
@@ -1905,8 +1907,7 @@ def all_members():
             sort_dir = 'asc'
         
         # Calculate counts for active and expired members (for statistics box)
-        from datetime import datetime
-        today = datetime.now().date()
+        today = get_cairo_date()
         today_str = today.strftime('%Y-%m-%d')
         
         # Get active count - based on end_date >= today
@@ -1916,7 +1917,7 @@ def all_members():
             AND end_date != ''
             AND LENGTH(TRIM(end_date)) >= 10
             AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
         """, one=True)
         active_count = active_count_result['count'] if active_count_result else 0
         
@@ -1936,7 +1937,7 @@ def all_members():
                 -- end_date is valid but < today (expired)
                 (LENGTH(TRIM(end_date)) >= 10 
                  AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE)
+                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE)
             )
         """, one=True)
         expired_count = expired_count_result['count'] if expired_count_result else 0
@@ -1956,8 +1957,7 @@ def all_members():
         
         # Process members to add is_expired flag for freeze button logic
         # Also calculate dynamic status based on current date (like attendance_table)
-        from datetime import datetime
-        today = datetime.now().date()
+        today = get_cairo_date()
         today_str = today.strftime('%Y-%m-%d')  # Format for template comparison
         
         processed_members = []
@@ -2081,8 +2081,7 @@ def filtered_members():
         offset = (page - 1) * per_page
         
         # Calculate counts for active and expired members (for statistics box)
-        from datetime import datetime
-        today = datetime.now().date()
+        today = get_cairo_date()
         today_str = today.strftime('%Y-%m-%d')
         
         # Get active count - based on end_date >= today
@@ -2092,7 +2091,7 @@ def filtered_members():
             AND end_date != ''
             AND LENGTH(TRIM(end_date)) >= 10
             AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
         """, one=True)
         active_count = active_count_result['count'] if active_count_result else 0
         
@@ -2112,7 +2111,7 @@ def filtered_members():
                 -- end_date is valid but < today (expired)
                 (LENGTH(TRIM(end_date)) >= 10 
                  AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE)
+                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE)
             )
         """, one=True)
         expired_count = expired_count_result['count'] if expired_count_result else 0
@@ -2173,7 +2172,7 @@ def filtered_members():
                  LENGTH(TRIM(end_date)) >= 10 AND
                  CASE 
                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= CURRENT_DATE
+                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                      ELSE FALSE
                  END)
             """)
@@ -2184,7 +2183,7 @@ def filtered_members():
                  LENGTH(TRIM(end_date)) >= 10 AND
                  CASE 
                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < CURRENT_DATE
+                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                      ELSE FALSE
                  END)
             """)
@@ -2225,8 +2224,7 @@ def filtered_members():
         
         # Process members to add is_expired flag for freeze button logic
         # Also calculate dynamic status based on current date (like attendance_table)
-        from datetime import datetime
-        today = datetime.now().date()
+        today = get_cairo_date()
         today_str = today.strftime('%Y-%m-%d')  # Format for template comparison
         
         processed_members = []
@@ -2956,8 +2954,7 @@ def attendance_table():
                 print(f"Error getting user in attendance_table: {perm_error}")
                 user_permissions = {}
             
-            from datetime import date
-            today = date.today().strftime('%Y-%m-%d')
+            today = get_cairo_date().strftime('%Y-%m-%d')
             
             return render_template("attendance_table.html", 
                                 members_data=data or [],
@@ -3009,8 +3006,7 @@ def attendance_table():
             print(f"Error getting user in attendance_table: {perm_error}")
             user_permissions = {}
         
-        from datetime import date
-        today = date.today().strftime('%Y-%m-%d')
+        today = get_cairo_date().strftime('%Y-%m-%d')
         
         return render_template("attendance_table.html", 
                             members_data=data or [], 
@@ -3133,8 +3129,7 @@ def invitations():
                 return redirect(url_for('invitations'))
             
             # Check if member's membership is expired
-            from datetime import datetime
-            today = datetime.now().date()
+            today = get_cairo_date()
             end_date_str = member.get('end_date')
             is_expired = False
             
@@ -3223,8 +3218,7 @@ def invitations():
         )
         
         # Get all members with is_expired flag for JavaScript
-        from datetime import datetime
-        today = datetime.now().date()
+        today = get_cairo_date()
         all_members = query_db('SELECT id, name, invitations, end_date FROM members ORDER BY id ASC') or []
         
         # Process members to add is_expired flag

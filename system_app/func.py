@@ -1,5 +1,15 @@
-# func.py
 from datetime import datetime, timedelta
+import pytz
+
+def get_cairo_date():
+    """Returns the current date in Africa/Cairo timezone"""
+    cairo_tz = pytz.timezone('Africa/Cairo')
+    return datetime.now(cairo_tz).date()
+
+def get_cairo_now():
+    """Returns the current datetime in Africa/Cairo timezone"""
+    cairo_tz = pytz.timezone('Africa/Cairo')
+    return datetime.now(cairo_tz)
 
 def calculate_age(birthdate_str):
     """Returns age as int always, even if date is empty or wrong"""
@@ -87,12 +97,12 @@ def membership_fees(package_name):
 
 
 def compare_dates(end_date_str):
-    """VAL or EX or 'Unknown'"""
+    """VAL or EX or 'Unknown' using Cairo timezone"""
     if not end_date_str:
         return "Unknown"
     try:
         end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-        today = datetime.now().date()
+        today = get_cairo_date()
         return "VAL" if end_date >= today else "EX"
     except ValueError:
         return "Unknown"
