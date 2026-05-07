@@ -592,7 +592,8 @@ def bulk_add_members(members_list):
         print("Falling back to individual inserts...")
         for member_data in members_list:
             try:
-                if has_custom_id:
+                # Check length of each individual tuple to handle mixed batches correctly
+                if len(member_data) == 15:
                     add_member(
                         name=member_data[1],
                         email=member_data[2],

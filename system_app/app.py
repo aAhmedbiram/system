@@ -297,8 +297,8 @@ def handle_csrf_error(e):
     flash('CSRF token missing or invalid. Please try again.', 'error')
     return redirect(request.url or url_for('index'))
 
-from func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
-from queries import (
+from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations
+from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
     add_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
@@ -310,7 +310,7 @@ from queries import (
     log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total,
     create_invoice, get_invoice, get_invoice_by_number, get_all_invoices
 )
-from queries import delete_all_data as delete_all_data_from_db
+from .queries import delete_all_data as delete_all_data_from_db
 
 # Initialize database tables on startup (disabled in production unless explicitly enabled)
 if not is_production or os.environ.get('RUN_DB_MIGRATIONS', '').lower() == 'true':
@@ -1036,7 +1036,7 @@ def index():
         revenue_this_month = get_cached('revenue_this_month', timeout=300)
         if revenue_this_month is None:
             try:
-                from queries import get_monthly_total
+                from .queries import get_monthly_total
                 revenue_this_month = get_monthly_total(current_year, current_month)
                 set_cached('revenue_this_month', revenue_this_month, timeout=300)
             except:
@@ -1046,7 +1046,7 @@ def index():
         revenue_last_month = get_cached('revenue_last_month', timeout=300)
         if revenue_last_month is None:
             try:
-                from queries import get_monthly_total
+                from .queries import get_monthly_total
                 last_month = current_month - 1 if current_month > 1 else 12
                 last_year = current_year if current_month > 1 else current_year - 1
                 revenue_last_month = get_monthly_total(last_year, last_month)
@@ -4075,7 +4075,7 @@ def data_management():
                 flash(f'Starting import of {total_rows} rows. This may take 10-15 minutes. Please wait and do not close this page...', 'success')
                 
                 # Import bulk_add_members function
-                from queries import bulk_add_members
+                from .queries import bulk_add_members
                 
                 # Process in batches to avoid memory/timeout issues
                 for batch_start in range(0, total_rows, batch_size):
@@ -4231,15 +4231,20 @@ def data_management():
                                             membership_packages = None
                                 
                                 # Membership Fees → membership_fees
-                                membership_fees = None
+                                membership_fees = 0.0
                                 fees_col = mapped_columns.get('membership fees') or mapped_columns.get('Membership Fees')
                                 if fees_col and fees_col in row.index:
                                     try:
                                         fees_val = row.get(fees_col)
                                         if pd.notna(fees_val):
-                                            membership_fees = float(fees_val)
+                                            if isinstance(fees_val, str):
+                                                fees_val = fees_val.strip()
+                                                membership_fees = float(fees_val) if fees_val else 0.0
+                                            else:
+                                                membership_fees = float(fees_val)
                                     except Exception as e:
-                                        print(f"Error processing membership_fees: {e}")
+                                        # Default to 0.0 for invalid numbers as requested
+                                        membership_fees = 0.0
                                 
                                 # Status → membership_status
                                 membership_status = None
@@ -4262,84 +4267,71 @@ def data_management():
                                 if membership_packages:
                                     invitations = calculate_invitations(membership_packages)
                                 
-                                # Add to batch list for bulk insert
+                                # Add to batch list for bulk insert - store row index for detailed logging
                                 if custom_id is not None:
                                     batch_members.append((
                                         custom_id, name, email, phone, age, gender, birthdate,
                                         actual_starting_date, starting_date, end_date,
                                         membership_packages, membership_fees, membership_status,
-                                        invitations, comment
+                                        invitations, comment, idx + 2 # Add row number for logging
                                     ))
                                 else:
                                     batch_members.append((
                                         name, email, phone, age, gender, birthdate,
                                         actual_starting_date, starting_date, end_date,
                                         membership_packages, membership_fees, membership_status,
-                                        invitations, comment
+                                        invitations, comment, idx + 2 # Add row number for logging
                                     ))
                                 
                             except Exception as e:
-                                error_msg = str(e)
-                                # Truncate long error messages
-                                if len(error_msg) > 100:
-                                    error_msg = error_msg[:100] + "..."
-                                errors.append(f"Row {idx + 2}: {error_msg}")  # +2 because Excel rows start at 1 and we have header
+                                errors.append(f"Row {idx + 2}: {str(e)[:100]}")
                                 print(f"Error processing row {idx + 2}: {e}")
-                                # Continue processing next row even if this one fails
                                 continue
 
-                        # Bulk insert the entire batch at once
+                        # Process the batch by separating members with and without custom IDs
                         if batch_members:
-                            try:
-                                batch_imported = bulk_add_members(batch_members)
-                                imported += batch_imported
-                                print(f"Batch {batch_num}: Successfully imported {batch_imported} members")
-                            except Exception as bulk_error:
-                                print(f"Bulk insert failed for batch {batch_num}: {bulk_error}")
-                                errors.append(f"Batch {batch_num} bulk insert failed: {str(bulk_error)[:100]}")
-                                # Fall back to individual inserts for this batch
-                                print(f"Falling back to individual inserts for batch {batch_num}...")
-                                for member_data in batch_members:
-                                    try:
-                                        if len(member_data) == 15:  # Has custom_id
-                                            add_member(
-                                                name=member_data[1],
-                                                email=member_data[2],
-                                                phone=member_data[3],
-                                                age=member_data[4],
-                                                gender=member_data[5],
-                                                birthdate=member_data[6],
-                                                actual_starting_date=member_data[7],
-                                                starting_date=member_data[8],
-                                                end_date=member_data[9],
-                                                membership_packages=member_data[10],
-                                                membership_fees=member_data[11],
-                                                membership_status=member_data[12],
-                                                invitations=member_data[13],
-                                                comment=member_data[14],
-                                                custom_id=member_data[0]
-                                            )
-                                        else:  # No custom_id
-                                            add_member(
-                                                name=member_data[0],
-                                                email=member_data[1],
-                                                phone=member_data[2],
-                                                age=member_data[3],
-                                                gender=member_data[4],
-                                                birthdate=member_data[5],
-                                                actual_starting_date=member_data[6],
-                                                starting_date=member_data[7],
-                                                end_date=member_data[8],
-                                                membership_packages=member_data[9],
-                                                membership_fees=member_data[10],
-                                                membership_status=member_data[11],
-                                                invitations=member_data[12],
-                                                comment=member_data[13]
-                                            )
-                                        imported += 1
-                                    except Exception as individual_error:
-                                        errors.append(f"Row in batch {batch_num}: {str(individual_error)[:100]}")
-                                continue
+                            # Separate sub-batches to ensure consistent tuple lengths for execute_batch
+                            batch_with_id = [m[:-1] for m in batch_members if len(m) == 16] # 15 + index
+                            batch_no_id = [m[:-1] for m in batch_members if len(m) == 15]   # 14 + index
+                            
+                            for sub_batch, has_id in [(batch_with_id, True), (batch_no_id, False)]:
+                                if not sub_batch:
+                                    continue
+                                    
+                                try:
+                                    # Attempt bulk insert
+                                    batch_imported = bulk_add_members(sub_batch)
+                                    imported += batch_imported
+                                except Exception as bulk_error:
+                                    print(f"Bulk insert failed for sub-batch: {bulk_error}")
+                                    # Fall back to individual inserts with detailed logging
+                                    for member_data in sub_batch:
+                                        # Find original row index (passed in original tuple)
+                                        orig_row = next((m[-1] for m in batch_members if m[:-1] == member_data), "Unknown")
+                                        m_name = member_data[1] if has_id else member_data[0]
+                                        
+                                        try:
+                                            if has_id:
+                                                add_member(
+                                                    name=member_data[1], email=member_data[2], phone=member_data[3],
+                                                    age=member_data[4], gender=member_data[5], birthdate=member_data[6],
+                                                    actual_starting_date=member_data[7], starting_date=member_data[8],
+                                                    end_date=member_data[9], membership_packages=member_data[10],
+                                                    membership_fees=member_data[11], membership_status=member_data[12],
+                                                    invitations=member_data[13], comment=member_data[14], custom_id=member_data[0]
+                                                )
+                                            else:
+                                                add_member(
+                                                    name=member_data[0], email=member_data[1], phone=member_data[2],
+                                                    age=member_data[3], gender=member_data[4], birthdate=member_data[5],
+                                                    actual_starting_date=member_data[6], starting_date=member_data[7],
+                                                    end_date=member_data[8], membership_packages=member_data[9],
+                                                    membership_fees=member_data[10], membership_status=member_data[11],
+                                                    invitations=member_data[12], comment=member_data[13]
+                                                )
+                                            imported += 1
+                                        except Exception as individual_error:
+                                            errors.append(f"Row {orig_row} ({m_name}): {str(individual_error)}")
                                 
                         # Log batch completion
                         if batch_num % 3 == 0:  # Log every 3 batches

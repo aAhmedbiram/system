@@ -22,3 +22,6 @@
 2026-05-04 17:53:13,864 INFO: GET /login [req=b7763fdb client=192.168.1.0 in app:138]
 2026-05-04 17:53:14,269 INFO: GET /static/logo.png [req=78ae7558 client=192.168.1.0 in app:138]
 2026-05-04 17:53:24,343 INFO: POST /login [req=d532c9bf client=192.168.1.0 in app:138]
+2026-05-07 19:59:04,609 INFO: Rival Gym System startup [req=- client=- in app:91]
+2026-05-07 19:59:16,761 INFO: Rival Gym System startup [req=- client=- in app:91]
+2026-05-07 19:59:18,362 INFO: Rival Gym System startup [req=- client=- in app:91]
