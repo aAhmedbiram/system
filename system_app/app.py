@@ -375,6 +375,7 @@ def get_default_permissions_for_username(username):
     base = {
         'index': True,
         'attendance': True,
+        'delete_attendance': True,
         'members_view': True,
         'members_edit': True,
         'delete_member': True,
@@ -400,6 +401,7 @@ def get_default_permissions_for_username(username):
             'training_templates': False,
             'offers': False,
             'renewal_log': False,
+            'delete_attendance': False,
         })
         return perms
 
@@ -415,6 +417,7 @@ def get_default_permissions_for_username(username):
             'renewal_log': False,
             'supplements_water': False,
             'attendance_backup': False,
+            'delete_attendance': False,
         })
         return perms
 
@@ -507,7 +510,8 @@ def permission_required(permission_key):
                 return redirect(url_for('attendance_table'))
 
             perms = user.get('permissions') or {}
-            if not perms.get(permission_key):
+            # Allow if they have the specific permission OR if they are a super_admin
+            if not perms.get(permission_key) and not perms.get('super_admin'):
                 flash('You do not have permission to access this page!', 'error')
                 # Stay on current page (redirect back to referrer) or go to attendance_table if no referrer
                 referrer = request.referrer
@@ -544,6 +548,7 @@ def user_permissions():
     all_permissions = [
         ('index', 'Dashboard / Home'),
         ('attendance', 'Attendance Table'),
+        ('delete_attendance', 'Delete Attendance Records'),
         ('members_view', 'Members - View'),
         ('members_edit', 'Members - Edit'),
         ('delete_member', 'Delete Member'),
@@ -3072,21 +3077,20 @@ def delete_attendance_data():
 
 
 @app.route('/delete_attendance/<int:attendance_num>', methods=['POST'])
-@login_required
+@permission_required('delete_attendance')
 def delete_attendance_route(attendance_num):
     try:
-        # Check permissions - only rino or admin can delete
+        # Check permissions - rino and super_admin are also allowed via decorator or explicit check
         user = get_current_user()
-        is_admin = False
-        if user:
-            if user.get('username') == 'rino':
-                is_admin = True
-            else:
-                permissions = user.get('permissions') or {}
-                if permissions.get('super_admin'):
-                    is_admin = True
+        perms = user.get('permissions') or {}
         
-        if not is_admin:
+        # Additional safety check (permission_required already handles rino and specific perms)
+        # but the user requested explicit inclusion of super_admin role if not already covered
+        is_allowed = (user.get('username') == 'rino' or 
+                     perms.get('super_admin') or 
+                     perms.get('delete_attendance'))
+        
+        if not is_allowed:
             flash("You do not have permission to delete attendance records!", "error")
             return redirect(url_for('attendance_table'))
             
