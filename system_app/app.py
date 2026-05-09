@@ -2877,7 +2877,7 @@ def attendance_table():
                     # Try to record attendance within try-except
                     try:
                         # Make sure the member hasn't already been recorded today
-                        today = datetime.now().strftime("%Y-%m-%d")
+                        today = get_cairo_date().strftime("%Y-%m-%d")
                         already = query_db(
                             "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", 
                             (member_id, today), one=True
@@ -3029,7 +3029,6 @@ def attendance_table():
 @login_required
 def delete_attendance_data():
     try:
-        print("\n--- DEBUG: Starting transfer and clear process ---")
 
         # Use one connection for all operations so TRUNCATE works
         conn = psycopg2.connect(DATABASE_URL, sslmode='require')
@@ -3037,7 +3036,6 @@ def delete_attendance_data():
         
         try:
             # 1) Copy data to backup
-            print("DEBUG: Copying data to attendance_backup...")
             cur.execute("""
                 INSERT INTO attendance_backup 
                 (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
@@ -3046,12 +3044,10 @@ def delete_attendance_data():
             """)
             
             # 2) Clear table and reset numbering
-            print("DEBUG: Clearing attendance table and resetting numbering...")
             cur.execute("TRUNCATE TABLE attendance RESTART IDENTITY")
             
             # Confirm operations
             conn.commit()
-            print("--- Transfer and clear completed successfully! ---")
             
             flash("All attendance data moved to backup and table cleared successfully!", "success")
 

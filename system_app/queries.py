@@ -735,9 +735,9 @@ def search_members(name=None, phone=None, email=None):
 
 # === Attendance functions ===
 def add_attendance(member_id, name, end_date, membership_status):
-    from datetime import datetime
+    from .func import get_cairo_now
     try:
-        now = datetime.now()
+        now = get_cairo_now()
         attendance_time = now.strftime("%H:%M:%S")
         attendance_date = now.strftime("%Y-%m-%d")
         day = now.strftime("%A")
@@ -756,7 +756,7 @@ def add_attendance(member_id, name, end_date, membership_status):
 
 
 def get_today_attendance():
-    today = date.today().isoformat()
+    today = get_cairo_date().isoformat()
     return query_db('SELECT * FROM attendance WHERE attendance_date = %s ORDER BY num DESC', (today,))
 
 
