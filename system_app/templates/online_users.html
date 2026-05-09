@@ -264,15 +264,15 @@
             location.reload();
         }, 10000);
 
+        let currentServerTime = new Date("{{ server_now_iso }}");
+
         // Update last update time
         function updateLastUpdateTime() {
-            const localNow = new Date();
-            const utcMs = localNow.getTime() + (localNow.getTimezoneOffset() * 60000);
-            const cairoNow = new Date(utcMs + (2 * 3600000));
+            currentServerTime = new Date(currentServerTime.getTime() + 1000);
             
-            let hours = cairoNow.getUTCHours();
-            const minutes = String(cairoNow.getUTCMinutes()).padStart(2, '0');
-            const seconds = String(cairoNow.getUTCSeconds()).padStart(2, '0');
+            let hours = currentServerTime.getUTCHours();
+            const minutes = String(currentServerTime.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(currentServerTime.getUTCSeconds()).padStart(2, '0');
             const ampm = hours >= 12 ? ' PM' : ' AM';
             
             hours = hours % 12;

@@ -1184,7 +1184,8 @@ def index():
                                 expiring_14_days=expiring_14_days,
                                 expiring_30_days=expiring_30_days,
                                 total_active_members=total_active_members,
-                                revenue_by_package=revenue_by_package)
+                                revenue_by_package=revenue_by_package,
+                                server_now_iso=get_cairo_now().strftime('%Y-%m-%dT%H:%M:%SZ'))
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback
@@ -1193,7 +1194,8 @@ def index():
         return render_template("index.html", 
                             attendance_data=[], 
                             members_data=[],
-                            user_permissions={})
+                            user_permissions={},
+                            server_now_iso=get_cairo_now().strftime('%Y-%m-%dT%H:%M:%SZ'))
 
 
 # Rate limiting for login (simple in-memory implementation)
@@ -1434,7 +1436,8 @@ def online_users():
         current_time = datetime.now()
         return render_template('online_users.html', 
                              online_users=online_users_list,
-                             current_time=current_time)
+                             current_time=current_time,
+                             server_now_iso=get_cairo_now().strftime('%Y-%m-%dT%H:%M:%SZ'))
     except Exception as e:
         print(f"Error getting online users: {e}")
         import traceback

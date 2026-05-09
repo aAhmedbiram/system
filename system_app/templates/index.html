@@ -1360,28 +1360,24 @@
     </div>
 
     <script>
+        let currentServerTime = new Date("{{ server_now_iso }}");
+
         function updateDateTime() {
-            // Get current local time
-            const localNow = new Date();
-            
-            // Get UTC time by removing the browser's local timezone offset
-            const utcMs = localNow.getTime() + (localNow.getTimezoneOffset() * 60000);
-            
-            // Create a new Date object mathematically shifted to exact UTC+2 (no DST)
-            const cairoNow = new Date(utcMs + (2 * 3600000));
+            // Increment the server time by 1000ms (1 second) each tick
+            currentServerTime = new Date(currentServerTime.getTime() + 1000);
             
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             
-            // Extract components using getUTC* methods to ignore local browser rules entirely
-            const dayName = days[cairoNow.getUTCDay()];
-            const monthName = months[cairoNow.getUTCMonth()];
-            const day = cairoNow.getUTCDate();
-            const year = cairoNow.getUTCFullYear();
+            // Extract components using getUTC* methods because we formatted the ISO string as 'Z' (UTC) on the backend
+            const dayName = days[currentServerTime.getUTCDay()];
+            const monthName = months[currentServerTime.getUTCMonth()];
+            const day = currentServerTime.getUTCDate();
+            const year = currentServerTime.getUTCFullYear();
             
-            let hours = cairoNow.getUTCHours();
-            const minutes = String(cairoNow.getUTCMinutes()).padStart(2, '0');
-            const seconds = String(cairoNow.getUTCSeconds()).padStart(2, '0');
+            let hours = currentServerTime.getUTCHours();
+            const minutes = String(currentServerTime.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(currentServerTime.getUTCSeconds()).padStart(2, '0');
             const ampm = hours >= 12 ? 'PM' : 'AM';
             
             hours = hours % 12;
@@ -1397,7 +1393,7 @@
             }
         }
         
-        updateDateTime();
+        // Don't call immediately to prevent double-tick on load, let interval handle it
         setInterval(updateDateTime, 1000);
 
         // ==================== Revenue Chart ====================
