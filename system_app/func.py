@@ -2,15 +2,13 @@ from datetime import datetime, timedelta
 import pytz
 
 def get_cairo_date():
-    """Returns the current date in UTC+2 (Fixed Egypt Time, no DST)"""
-    from datetime import timezone
-    tz = timezone(timedelta(hours=2))
+    """Returns the current date in Africa/Cairo (with DST)"""
+    tz = pytz.timezone("Africa/Cairo")
     return datetime.now(tz).date()
 
 def get_cairo_now():
-    """Returns the current datetime in UTC+2 (Fixed Egypt Time, no DST)"""
-    from datetime import timezone
-    tz = timezone(timedelta(hours=2))
+    """Returns the current datetime in Africa/Cairo (with DST)"""
+    tz = pytz.timezone("Africa/Cairo")
     return datetime.now(tz)
 
 def calculate_age(birthdate_str):

@@ -1369,15 +1369,14 @@
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             
-            // Extract components using getUTC* methods because we formatted the ISO string as 'Z' (UTC) on the backend
-            const dayName = days[currentServerTime.getUTCDay()];
-            const monthName = months[currentServerTime.getUTCMonth()];
-            const day = currentServerTime.getUTCDate();
-            const year = currentServerTime.getUTCFullYear();
+            const dayName = days[currentServerTime.getDay()];
+            const monthName = months[currentServerTime.getMonth()];
+            const day = currentServerTime.getDate();
+            const year = currentServerTime.getFullYear();
             
-            let hours = currentServerTime.getUTCHours();
-            const minutes = String(currentServerTime.getUTCMinutes()).padStart(2, '0');
-            const seconds = String(currentServerTime.getUTCSeconds()).padStart(2, '0');
+            let hours = currentServerTime.getHours();
+            const minutes = String(currentServerTime.getMinutes()).padStart(2, '0');
+            const seconds = String(currentServerTime.getSeconds()).padStart(2, '0');
             const ampm = hours >= 12 ? 'PM' : 'AM';
             
             hours = hours % 12;

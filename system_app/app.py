@@ -1073,7 +1073,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (seven_days_from_now, today.strftime('%Y-%m-%d')), one=True)
@@ -1094,7 +1094,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (fourteen_days_from_now, (today + timedelta(days=7)).strftime('%Y-%m-%d')), one=True)
@@ -1114,7 +1114,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
                     AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                 """, (thirty_days_from_now, (today + timedelta(days=14)).strftime('%Y-%m-%d')), one=True)
@@ -1133,7 +1133,7 @@ def index():
                     AND end_date != ''
                     AND LENGTH(TRIM(end_date)) >= 10
                     AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                 """, one=True)
                 total_active_members = active_result['count'] if active_result else 0
                 set_cached('total_active_members', total_active_members, timeout=300)
@@ -1185,7 +1185,7 @@ def index():
                                 expiring_30_days=expiring_30_days,
                                 total_active_members=total_active_members,
                                 revenue_by_package=revenue_by_package,
-                                server_now_iso=get_cairo_now().strftime('%Y-%m-%dT%H:%M:%SZ'))
+                                server_now_iso=get_cairo_now().isoformat())
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback
@@ -1195,7 +1195,7 @@ def index():
                             attendance_data=[], 
                             members_data=[],
                             user_permissions={},
-                            server_now_iso=get_cairo_now().strftime('%Y-%m-%dT%H:%M:%SZ'))
+                            server_now_iso=get_cairo_now().isoformat())
 
 
 # Rate limiting for login (simple in-memory implementation)
@@ -1437,7 +1437,7 @@ def online_users():
         return render_template('online_users.html', 
                              online_users=online_users_list,
                              current_time=current_time,
-                             server_now_iso=get_cairo_now().strftime('%Y-%m-%dT%H:%M:%SZ'))
+                             server_now_iso=get_cairo_now().isoformat())
     except Exception as e:
         print(f"Error getting online users: {e}")
         import traceback
@@ -1925,7 +1925,7 @@ def all_members():
             AND end_date != ''
             AND LENGTH(TRIM(end_date)) >= 10
             AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
         """, one=True)
         active_count = active_count_result['count'] if active_count_result else 0
         
@@ -1945,7 +1945,7 @@ def all_members():
                 -- end_date is valid but < today (expired)
                 (LENGTH(TRIM(end_date)) >= 10 
                  AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE)
+                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE)
             )
         """, one=True)
         expired_count = expired_count_result['count'] if expired_count_result else 0
@@ -2099,7 +2099,7 @@ def filtered_members():
             AND end_date != ''
             AND LENGTH(TRIM(end_date)) >= 10
             AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
         """, one=True)
         active_count = active_count_result['count'] if active_count_result else 0
         
@@ -2119,7 +2119,7 @@ def filtered_members():
                 -- end_date is valid but < today (expired)
                 (LENGTH(TRIM(end_date)) >= 10 
                  AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE)
+                 AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE)
             )
         """, one=True)
         expired_count = expired_count_result['count'] if expired_count_result else 0
@@ -2180,7 +2180,7 @@ def filtered_members():
                  LENGTH(TRIM(end_date)) >= 10 AND
                  CASE 
                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                      ELSE FALSE
                  END)
             """)
@@ -2191,7 +2191,7 @@ def filtered_members():
                  LENGTH(TRIM(end_date)) >= 10 AND
                  CASE 
                      WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
-                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' + INTERVAL '2 hours')::DATE
+                         CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                      ELSE FALSE
                  END)
             """)
