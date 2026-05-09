@@ -266,9 +266,20 @@
 
         // Update last update time
         function updateLastUpdateTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString();
-            document.getElementById('last-update').textContent = timeString;
+            const localNow = new Date();
+            const utcMs = localNow.getTime() + (localNow.getTimezoneOffset() * 60000);
+            const cairoNow = new Date(utcMs + (2 * 3600000));
+            
+            let hours = cairoNow.getUTCHours();
+            const minutes = String(cairoNow.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(cairoNow.getUTCSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? ' PM' : ' AM';
+            
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const formattedHours = String(hours).padStart(2, '0');
+            
+            document.getElementById('last-update').textContent = `${formattedHours}:${minutes}:${seconds}${ampm}`;
         }
         
         // Update time every second
