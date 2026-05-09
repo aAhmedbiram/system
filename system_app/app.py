@@ -303,7 +303,7 @@ from .func import calculate_age, calculate_end_date, membership_fees, compare_da
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
-    add_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
+    add_attendance, delete_attendance, get_all_logs, get_member_logs, log_action, get_undoable_actions, mark_action_undone, get_action_by_id,
     use_invitation, get_all_invitations, get_member_invitations,
     add_supplement, get_supplement, get_all_supplements, update_supplement, delete_supplement,
     add_supplement_sale, get_supplement_sales, get_supplement_statistics,
@@ -3068,6 +3068,49 @@ def delete_attendance_data():
         print(e)
         flash("Failed to connect to database!", "error")
 
+    return redirect(url_for('attendance_table'))
+
+
+@app.route('/delete_attendance/<int:attendance_num>', methods=['POST'])
+@login_required
+def delete_attendance_route(attendance_num):
+    try:
+        # Check permissions - only rino or admin can delete
+        user = get_current_user()
+        is_admin = False
+        if user:
+            if user.get('username') == 'rino':
+                is_admin = True
+            else:
+                permissions = user.get('permissions') or {}
+                if permissions.get('super_admin'):
+                    is_admin = True
+        
+        if not is_admin:
+            flash("You do not have permission to delete attendance records!", "error")
+            return redirect(url_for('attendance_table'))
+            
+        # Log the action before deleting for traceability
+        record = query_db('SELECT * FROM attendance WHERE num = %s', (attendance_num,), one=True)
+        if record:
+            username = session.get('username', 'Unknown')
+            log_action('delete_attendance', member_id=record.get('member_id'), 
+                      member_name=record.get('name'),
+                      action_data={'attendance_num': attendance_num, 
+                                  'attendance_date': record.get('attendance_date'),
+                                  'attendance_time': record.get('attendance_time')},
+                      performed_by=username)
+            
+            # Delete the record
+            delete_attendance(attendance_num)
+            flash("Attendance record deleted successfully!", "success")
+        else:
+            flash("Attendance record not found!", "error")
+            
+    except Exception as e:
+        print(f"Error deleting attendance: {e}")
+        flash(f"Error deleting attendance: {str(e)}", "error")
+        
     return redirect(url_for('attendance_table'))
 
 

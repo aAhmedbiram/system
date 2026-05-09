@@ -760,6 +760,11 @@ def get_today_attendance():
     return query_db('SELECT * FROM attendance WHERE attendance_date = %s ORDER BY num DESC', (today,))
 
 
+def delete_attendance(num):
+    """Delete a specific attendance record by its primary key 'num'"""
+    query_db('DELETE FROM attendance WHERE num = %s', (num,), commit=True)
+
+
 # === User functions ===
 def add_user(username, email, password_hash):
     try:
