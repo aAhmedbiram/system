@@ -286,6 +286,7 @@
         <a href="{{ url_for('index') }}" class="index-btn">← Back to Home</a>
 
         <h2>Use Invitation</h2>
+        {% if user_permissions.get('super_admin') or user_permissions.get('invitations_use') %}
         <div class="form-section">
             <form method="POST" action="{{ url_for('invitations') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -327,6 +328,11 @@
                 <button type="submit">Use Invitation</button>
             </form>
         </div>
+        {% else %}
+        <div class="form-section" style="text-align: center; color: #888; border-style: dashed;">
+            <p>You do not have permission to use invitations. You are in <strong>View-Only</strong> mode.</p>
+        </div>
+        {% endif %}
 
         <h2>Invitation Usage History</h2>
         {% if invitations_data %}

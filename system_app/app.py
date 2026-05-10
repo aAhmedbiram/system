@@ -345,13 +345,23 @@ if os.environ.get('RUN_SCHEDULER', '').lower() == 'true':
 def _load_permissions(raw_permissions):
     """Safely load permissions from DB (JSONB or TEXT) into a dict."""
     if not raw_permissions:
-        return {}
-    if isinstance(raw_permissions, dict):
-        return raw_permissions
-    try:
-        return json.loads(raw_permissions)
-    except Exception:
-        return {}
+        perms = {}
+    elif isinstance(raw_permissions, dict):
+        perms = raw_permissions
+    else:
+        try:
+            perms = json.loads(raw_permissions)
+        except Exception:
+            perms = {}
+    
+    # Backward compatibility for invitations
+    if perms.get('invitations'):
+        if 'invitations_view' not in perms:
+            perms['invitations_view'] = True
+        if 'invitations_use' not in perms:
+            perms['invitations_use'] = True
+            
+    return perms
 
 
 def get_default_permissions_for_username(username):
@@ -389,6 +399,8 @@ def get_default_permissions_for_username(username):
         'online_users': True,
         'invoices': True,
         'invitations': True,
+        'invitations_view': True,
+        'invitations_use': True,
     }
 
     if username == 'ahmed_adel':
@@ -560,6 +572,8 @@ def user_permissions():
         ('undo_action', 'Undo Actions'),
         ('data_management', 'Data Management / Import'),
         ('online_users', 'Online Users'),
+        ('invitations_view', 'Invitations - View History'),
+        ('invitations_use', 'Invitations - Use Invitation'),
     ]
 
     if request.method == 'POST':
@@ -3148,10 +3162,20 @@ def success():
     return render_template('success.html')
 
 @app.route('/invitations', methods=['GET', 'POST'])
-@login_required
+@permission_required('invitations_view')
 def invitations():
     """Handle invitation usage"""
+    user = get_current_user()
+    user_permissions = user.get('permissions') or {}
+    
+    # Check if super admin or has invitations_use for POST
+    is_super = user.get('username') == 'rino' or user_permissions.get('super_admin')
+    has_use_permission = is_super or user_permissions.get('invitations_use')
+
     if request.method == 'POST':
+        if not has_use_permission:
+            flash('You do not have permission to use invitations!', 'error')
+            return redirect(url_for('invitations'))
         try:
             member_id_str = request.form.get('member_id', '').strip()
             friend_name = request.form.get('friend_name', '').strip().capitalize()
@@ -3304,13 +3328,14 @@ def invitations():
                              members_data=processed_members,
                              page=page,
                              total_pages=total_pages,
-                             total_count=total_count['count'] if total_count else 0)
+                             total_count=total_count['count'] if total_count else 0,
+                             user_permissions=user_permissions)
     except Exception as e:
         print(f"Error in invitations GET route: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error loading invitations: {str(e)}", "error")
-        return render_template('invitations.html', invitations_data=[], members_data=[], page=1, total_pages=1, total_count=0)
+        return render_template('invitations.html', invitations_data=[], members_data=[], page=1, total_pages=1, total_count=0, user_permissions=user_permissions)
 
 @app.route('/invoices')
 @login_required

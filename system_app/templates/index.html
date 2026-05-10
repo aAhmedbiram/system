@@ -1343,7 +1343,7 @@
                 {% if user_permissions.get('super_admin') or user_permissions.get('attendance_backup') %}
                 <a href="/attendance_backup" class="bottom-btn">{{ t.attendance_backup }}</a>
                 {% endif %}
-                {% if user_permissions.get('super_admin') or user_permissions.get('invitations') %}
+                {% if user_permissions.get('super_admin') or user_permissions.get('invitations_view') %}
                 <a href="{{ url_for('invitations') }}" class="bottom-btn">{{ t.invitations }}</a>
                 {% endif %}
                 {% if user_permissions.get('super_admin') or user_permissions.get('offers') %}
