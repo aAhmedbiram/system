@@ -192,6 +192,82 @@ def scheduled_daily_status_update():
             import traceback
             traceback.print_exc()
 
+def perform_attendance_backup_and_clear(performed_by='System'):
+    """
+    Moves all attendance data to backup and clears the active table.
+    Returns: (success, rows_moved, error_message)
+    """
+    try:
+        # 1) Get current row count
+        count_result = query_db("SELECT COUNT(*) as count FROM attendance", one=True)
+        rows_to_move = count_result['count'] if count_result else 0
+        
+        if rows_to_move == 0:
+            return True, 0, "No attendance data to move"
+
+        # Use one connection for transaction safety
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        cur = conn.cursor()
+        
+        try:
+            # 1) Copy data to backup
+            cur.execute("""
+                INSERT INTO attendance_backup 
+                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
+                SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
+                FROM attendance
+            """)
+            
+            # 2) Clear table and reset numbering
+            cur.execute("TRUNCATE TABLE attendance RESTART IDENTITY")
+            
+            conn.commit()
+            return True, rows_to_move, None
+
+        except Exception as e:
+            conn.rollback()
+            return False, 0, str(e)
+        finally:
+            cur.close()
+            conn.close()
+    except Exception as e:
+        return False, 0, str(e)
+
+def scheduled_attendance_backup():
+    """Daily scheduled task to backup and clear attendance"""
+    with app.app_context():
+        today = get_cairo_date()
+        cairo_now = get_cairo_now()
+        
+        print(f"[{cairo_now.strftime('%Y-%m-%d %H:%M:%S')}] Starting scheduled attendance backup for date: {today} (Cairo Time)")
+        
+        # 1) Check if already run for today
+        already_run = query_db("SELECT 1 FROM attendance_backup_runs WHERE run_date = %s AND status = 'success'", (today,), one=True)
+        if already_run:
+            print(f"[{cairo_now.strftime('%Y-%m-%d %H:%M:%S')}] Attendance backup already executed successfully for {today}. Skipping.")
+            return
+
+        # 2) Execute backup
+        success, rows_moved, error = perform_attendance_backup_and_clear(performed_by='Scheduled Job')
+        
+        # 3) Record run
+        status = 'success' if success else 'failure'
+        query_db("""
+            INSERT INTO attendance_backup_runs (run_date, executed_at, status, rows_moved, rows_deleted, error_message)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (run_date) DO UPDATE SET
+                executed_at = EXCLUDED.executed_at,
+                status = EXCLUDED.status,
+                rows_moved = EXCLUDED.rows_moved,
+                rows_deleted = EXCLUDED.rows_moved,
+                error_message = EXCLUDED.error_message
+        """, (today, cairo_now, status, rows_moved, rows_moved, error), commit=True)
+        
+        if success:
+            print(f"[{cairo_now.strftime('%Y-%m-%d %H:%M:%S')}] Scheduled attendance backup completed successfully. Moved {rows_moved} rows.")
+        else:
+            print(f"[{cairo_now.strftime('%Y-%m-%d %H:%M:%S')}] Scheduled attendance backup failed: {error}")
+
 def get_online_users():
     """Get list of currently online users"""
     now = datetime.now()
@@ -323,18 +399,49 @@ if not is_production or os.environ.get('RUN_DB_MIGRATIONS', '').lower() == 'true
             print(f"Warning: Could not create tables on startup: {e}")
             print("Tables may already exist or database connection failed.")
 
-# Initialize scheduler for daily status updates at midnight (optional)
+# Initialize scheduler for daily updates at midnight
 if os.environ.get('RUN_SCHEDULER', '').lower() == 'true':
-    scheduler = BackgroundScheduler(daemon=True, timezone=os.environ.get('APSCHEDULER_TIMEZONE', 'UTC'))
+    # Use Cairo timezone for the scheduler as requested
+    scheduler = BackgroundScheduler(daemon=True, timezone='Africa/Cairo')
+    
+    # Job 1: Daily Status Update
     scheduler.add_job(
         func=scheduled_daily_status_update,
-        trigger=CronTrigger(hour=0, minute=0),  # Run at midnight (00:00) every day
+        trigger=CronTrigger(hour=0, minute=0),
         id='daily_status_update',
         name='Daily Membership Status Update',
         replace_existing=True
     )
+    
+    # Job 2: Daily Attendance Backup & Clear
+    scheduler.add_job(
+        func=scheduled_attendance_backup,
+        trigger=CronTrigger(hour=0, minute=0),
+        id='daily_attendance_backup',
+        name='Daily Attendance Backup and Clear',
+        replace_existing=True
+    )
+    
     scheduler.start()
-    print("Scheduler started: Daily membership status update scheduled for 12:00 AM every day (UTC)")
+    print("Scheduler started: Daily status updates and attendance backup scheduled for 12:00 AM (Cairo Time)")
+    
+    # Check if we missed today's backup on startup
+    with app.app_context():
+        try:
+            # Check for today's backup
+            today = get_cairo_date()
+            already_run = query_db("SELECT 1 FROM attendance_backup_runs WHERE run_date = %s AND status = 'success'", (today,), one=True)
+            if not already_run:
+                # If it's a fresh day and no backup yet, we might want to check if there's data to backup
+                count_res = query_db("SELECT COUNT(*) as count FROM attendance", one=True)
+                if count_res and count_res['count'] > 0:
+                    # Check if the data is actually from "today" (meaning it survived from yesterday)
+                    # For simplicity and safety, we'll run it if there's any data and it hasn't run today.
+                    print(f"Missed or pending attendance backup for {today} detected on startup. Running safety backup...")
+                    scheduled_attendance_backup()
+        except Exception as e:
+            print(f"Error checking for missed backup on startup: {e}")
+
     # Ensure scheduler shuts down when app stops
     import atexit
     atexit.register(lambda: scheduler.shutdown(wait=False))
@@ -2992,17 +3099,15 @@ def attendance_table():
             flash(f"Error loading attendance: {str(e)}", "error")
             return render_template("attendance_table.html", members_data=[], page=1, total_pages=1, total_count=0, user_permissions={})
 
+    # This part handles the GET request (default view)
     try:
-        # Pagination: 50 items per page
         page = request.args.get('page', 1, type=int)
         per_page = 50
         offset = (page - 1) * per_page
         
-        # Get total count for pagination
         total_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
         total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
         
-        # Get paginated data - use actual end_date from members table
         data = query_db("""
             SELECT a.num, a.member_id, a.name, 
                    COALESCE(m.end_date, a.end_date) as end_date,
@@ -3013,20 +3118,16 @@ def attendance_table():
             ORDER BY a.num ASC
             LIMIT %s OFFSET %s
         """, (per_page, offset))
-        # Get current user permissions for template
-        try:
-            user = get_current_user()
-            user_permissions = {}
-            if user and user.get('username'):
-                if user.get('username') == 'rino':
-                    user_permissions = {'super_admin': True}
-                else:
-                    user_permissions = user.get('permissions') or {}
-                    if not isinstance(user_permissions, dict):
-                        user_permissions = {}
-        except Exception as perm_error:
-            print(f"Error getting user in attendance_table: {perm_error}")
-            user_permissions = {}
+        
+        user = get_current_user()
+        user_permissions = {}
+        if user and user.get('username'):
+            if user.get('username') == 'rino':
+                user_permissions = {'super_admin': True}
+            else:
+                user_permissions = user.get('permissions') or {}
+                if not isinstance(user_permissions, dict):
+                    user_permissions = {}
         
         today = get_cairo_date().strftime('%Y-%m-%d')
         
@@ -3038,58 +3139,48 @@ def attendance_table():
                             user_permissions=user_permissions,
                             today=today)
     except Exception as e:
-        print(f"Error loading attendance data: {e}")
-        import traceback
-        traceback.print_exc()
-        flash(f"Error loading attendance: {str(e)}", "error")
+        print(f"Error in attendance_table GET: {e}")
         return render_template("attendance_table.html", members_data=[], user_permissions={})
-
-
-
 
 @app.route('/delete_attendance_data', methods=['POST'])
 @login_required
 def delete_attendance_data():
     try:
+        # Check permissions
+        user = get_current_user()
+        user_permissions = user.get('permissions') or {}
+        if not (user_permissions.get('super_admin') or user_permissions.get('attendance')):
+             flash("You do not have permission to perform this action.", "error")
+             return redirect(url_for('attendance_table'))
 
-        # Use one connection for all operations so TRUNCATE works
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-        cur = conn.cursor()
+        # Use the centralized backup logic
+        success, rows_moved, error = perform_attendance_backup_and_clear(performed_by=session.get('username', 'Unknown'))
         
-        try:
-            # 1) Copy data to backup
-            cur.execute("""
-                INSERT INTO attendance_backup 
-                (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
-                SELECT member_id, name, end_date, membership_status, attendance_time, attendance_date, day
-                FROM attendance
-            """)
-            
-            # 2) Clear table and reset numbering
-            cur.execute("TRUNCATE TABLE attendance RESTART IDENTITY")
-            
-            # Confirm operations
-            conn.commit()
-            
-            flash("All attendance data moved to backup and table cleared successfully!", "success")
-
-        except Exception as e:
-            conn.rollback()
-            print("===== Error during transfer or clear =====")
-            import traceback
-            traceback.print_exc()
-            print("Error:", e)
-            flash("An error occurred while clearing data! Check the console.", "error")
-        
-        finally:
-            cur.close()
-            conn.close()
+        if success:
+            if rows_moved > 0:
+                # Record manual run in tracking table
+                today = get_cairo_date()
+                cairo_now = get_cairo_now()
+                query_db("""
+                    INSERT INTO attendance_backup_runs (run_date, executed_at, status, rows_moved, rows_deleted)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (run_date) DO UPDATE SET
+                        executed_at = EXCLUDED.executed_at,
+                        status = EXCLUDED.status,
+                        rows_moved = EXCLUDED.rows_moved,
+                        rows_deleted = EXCLUDED.rows_deleted
+                """, (today, cairo_now, 'success', rows_moved, rows_moved), commit=True)
+                
+                flash(f"All attendance data ({rows_moved} rows) moved to backup and table cleared successfully!", "success")
+            else:
+                flash("No attendance data found to backup.", "info")
+        else:
+            flash(f"Error during backup: {error}", "error")
 
     except Exception as e:
-        print("===== Failed to connect to database =====")
-        print(e)
-        flash("Failed to connect to database!", "error")
-
+        print(f"Error in delete_attendance_data: {e}")
+        flash(f"Error: {str(e)}", "error")
+        
     return redirect(url_for('attendance_table'))
 
 

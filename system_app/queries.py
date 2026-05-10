@@ -151,6 +151,18 @@ def create_table():
         ''')
 
         cr.execute('''
+            CREATE TABLE IF NOT EXISTS attendance_backup_runs (
+                id SERIAL PRIMARY KEY,
+                run_date DATE UNIQUE NOT NULL,
+                executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT NOT NULL,
+                rows_moved INTEGER DEFAULT 0,
+                rows_deleted INTEGER DEFAULT 0,
+                error_message TEXT
+            )
+        ''')
+
+        cr.execute('''
             CREATE TABLE IF NOT EXISTS member_logs (
                 id SERIAL PRIMARY KEY,
                 member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
