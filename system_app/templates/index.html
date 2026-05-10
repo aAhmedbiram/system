@@ -1317,6 +1317,9 @@
                 {% endif %}
                 {% if session.username == 'rino' %}
                 <a href="{{ url_for('online_users') }}" class="nav-btn cyan"><span>👥 {{ t.online_users }}</span></a>
+                <a href="{{ url_for('attendance_backup_runs') }}" class="nav-btn" style="border-color: rgba(33, 150, 243, 0.3); background: rgba(33, 150, 243, 0.05);">
+                    <span>📋 Attendance Backup Runs</span>
+                </a>
                 <a href="{{ url_for('user_permissions') }}" class="nav-btn" style="border-color: rgba(255, 152, 0, 0.3); background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 193, 7, 0.1));">
                     <span>🔐 User Permissions</span>
                 </a>

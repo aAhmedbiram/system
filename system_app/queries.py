@@ -1404,6 +1404,14 @@ def get_supplement_statistics():
     
     return stats
 
+def get_attendance_backup_runs():
+    """Get all attendance backup runs ordered by execution time DESC"""
+    return query_db('''
+        SELECT id, run_date, executed_at, status, rows_moved, error_message
+        FROM attendance_backup_runs
+        ORDER BY executed_at DESC
+    ''')
+
 
 # === Staff Management Functions ===
 def add_staff(name, role, phone=None, email=None, hire_date=None, status='active', notes=None):

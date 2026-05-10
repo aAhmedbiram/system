@@ -386,7 +386,8 @@ from .queries import (
     add_staff, get_staff, get_all_staff, update_staff, delete_staff,
     add_staff_purchase, get_staff_purchases, get_staff_statistics,
     log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total,
-    create_invoice, get_invoice, get_invoice_by_number, get_all_invoices
+    create_invoice, get_invoice, get_invoice_by_number, get_all_invoices,
+    get_attendance_backup_runs
 )
 from .queries import delete_all_data as delete_all_data_from_db
 
@@ -3240,6 +3241,18 @@ def attendance_backup_table():
         traceback.print_exc()
         flash("An error occurred while loading the backup!", "error")
         return redirect(url_for('attendance_table'))
+
+@app.route('/attendance_backup_runs', methods=['GET'])
+@rino_required
+def attendance_backup_runs_page():
+    """Rino-only page to view automated attendance backup logs"""
+    try:
+        runs = get_attendance_backup_runs()
+        return render_template('attendance_backup_runs.html', runs=runs)
+    except Exception as e:
+        print(f"Error loading attendance backup runs: {e}")
+        flash("An error occurred while loading backup logs.", "error")
+        return redirect(url_for('index'))
 
 
 
