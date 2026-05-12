@@ -404,6 +404,7 @@
                                 <th>{{ t.membership_package }}</th>
                                 <th>{{ t.fees }}</th>
                                 <th>{{ t.status }}</th>
+                                <th>{{ t.invitations }}</th>
                                 <th>{{ t.comment }}</th>
                                 <th>{{ t.edit }}</th>
                             </tr>
@@ -428,6 +429,13 @@
                                         <span class="status-light ex" title="{{ t.expired }}"></span>
                                     {% else %}
                                         <span class="status-light unknown" title="Unknown"></span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if member_data.membership_status == 'EX' %}
+                                        <span style="color: #888;">N/A</span>
+                                    {% else %}
+                                        <span style="color: #ffd43b; font-weight: bold;">{{ member_data.invitations or 0 }}</span>
                                     {% endif %}
                                 </td>
                                 <td style="text-align: left; max-width: 200px; word-wrap: break-word;">{{ member_data.comment or '-' }}</td>
