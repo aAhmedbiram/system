@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,7 +37,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: 
+            background-image:
                 radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
                 radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
                 radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
@@ -45,8 +46,15 @@
         }
 
         @keyframes backgroundShift {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(-20px, -20px) scale(1.1); }
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(-20px, -20px) scale(1.1);
+            }
         }
 
         /* Grid pattern overlay */
@@ -57,7 +65,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: 
+            background-image:
                 linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
             background-size: 50px 50px;
@@ -123,7 +131,8 @@
             transform: translateY(-2px);
         }
 
-        h2, h3 {
+        h2,
+        h3 {
             color: #4caf50;
             margin-bottom: 20px;
             font-weight: 700;
@@ -162,7 +171,8 @@
             background: transparent;
         }
 
-        th, td {
+        th,
+        td {
             border: 1px solid rgba(76, 175, 80, 0.2);
             padding: 12px;
             text-align: center;
@@ -262,10 +272,13 @@
         }
 
         @keyframes pulse-green {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
                 box-shadow: 0 0 8px #4caf50;
             }
+
             50% {
                 opacity: 0.7;
                 box-shadow: 0 0 12px #4caf50;
@@ -273,14 +286,43 @@
         }
 
         @keyframes pulse-red {
-            0%, 100% {
+            0%,
+            100% {
                 opacity: 1;
                 box-shadow: 0 0 8px #f44336;
             }
+
             50% {
                 opacity: 0.7;
                 box-shadow: 0 0 12px #f44336;
             }
+        }
+
+        .freeze-link {
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+        }
+
+        .freeze-link:hover:not(:disabled) {
+            transform: translateY(-2px);
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.5);
+        }
+
+        .freeze-used {
+            color: #999;
+            font-size: 12px;
+            font-style: italic;
         }
 
         /* Mobile Responsive Design */
@@ -314,7 +356,8 @@
                 min-width: 800px;
             }
 
-            th, td {
+            th,
+            td {
                 padding: 8px 6px;
                 font-size: 11px;
             }
@@ -352,7 +395,8 @@
                 min-width: 700px;
             }
 
-            th, td {
+            th,
+            td {
                 padding: 6px 4px;
                 font-size: 10px;
             }
@@ -364,83 +408,124 @@
         }
     </style>
 </head>
-<body {% if is_rtl %}dir="rtl"{% endif %}>
+
+<body {% if is_rtl %}dir="rtl" {% endif %}>
     <div class="content-wrapper">
         <header>
             <div class="header-content">
                 <h1>{{ t.rival_gym_system }} - {{ t.member_name }}</h1>
                 <a href="{{ url_for('toggle_language') }}" class="language-toggle-btn">
                     {% if current_lang == 'en' %}
-                        🇸🇦 {{ t.arabic }}
+                    🇸🇦 {{ t.arabic }}
                     {% else %}
-                        🇬🇧 {{ t.english }}
+                    🇬🇧 {{ t.english }}
                     {% endif %}
                 </a>
             </div>
         </header>
-        <section class="member-data">    
+        <section class="member-data">
             {% if member_data %}
-                <div class="table-container">
-                    <h3>{{ t.member_name }}</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>{{ t.member_id }}</th>
-                                <th>{{ t.name }}</th>
-                                <th>{{ t.email }}</th>
-                                <th>{{ t.phone }}</th>
-                                <th>{{ t.age }}</th>
-                                <th>{{ t.gender }}</th>
-                                <th>{{ t.actual_starting_date }}</th>
-                                <th>{{ t.starting_date }}</th>
-                                <th>{{ t.end_date }}</th>
-                                <th>{{ t.membership_package }}</th>
-                                <th>{{ t.fees }}</th>
-                                <th>{{ t.status }}</th>
-                                <th>{{ t.invitations }}</th>
-                                <th>{{ t.comment }}</th>
-                                <th>{{ t.edit }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>{{ member_data.id }}</td>
-                                <td>{{ member_data.name }}</td>
-                                <td>{{ member_data.email }}</td>
-                                <td>{{ member_data.phone }}</td>
-                                <td>{{ member_data.age }}</td>
-                                <td>{{ member_data.gender }}</td>
-                                <td>{{ member_data.actual_starting_date }}</td>
-                                <td>{{ member_data.starting_date }}</td>
-                                <td>{{ member_data.end_date }}</td>
-                                <td>{{ member_data.membership_packages }}</td>
-                                <td>{{ member_data.membership_fees }}</td>
-                                <td>
-                                    {% if member_data.membership_status == 'VAL' %}
-                                        <span class="status-light val" title="{{ t.valid }}"></span>
-                                    {% elif member_data.membership_status == 'EX' %}
-                                        <span class="status-light ex" title="{{ t.expired }}"></span>
-                                    {% else %}
-                                        <span class="status-light unknown" title="Unknown"></span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if member_data.membership_status == 'EX' %}
-                                        <span style="color: #888;">N/A</span>
-                                    {% else %}
-                                        <span style="color: #ffd43b; font-weight: bold;">{{ member_data.invitations or 0 }}</span>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: left; max-width: 200px; word-wrap: break-word;">{{ member_data.comment or '-' }}</td>
-                                <td>
-                                    <a class="edit-link" href="{{ url_for('edit_member', member_id=member_data.id) }}">{{ t.edit }}</a>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-container">
+                <h3>{{ t.member_name }}</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>{{ t.member_id }}</th>
+                            <th>{{ t.name }}</th>
+                            <th>{{ t.email }}</th>
+                            <th>{{ t.phone }}</th>
+                            <th>{{ t.age }}</th>
+                            <th>{{ t.gender }}</th>
+                            <th>{{ t.actual_starting_date }}</th>
+                            <th>{{ t.starting_date }}</th>
+                            <th>{{ t.end_date }}</th>
+                            <th>{{ t.membership_package }}</th>
+                            <th>{{ t.fees }}</th>
+                            <th>{{ t.status }}</th>
+                            <th>{{ t.invitations }}</th>
+                            <th>{{ t.freeze }}</th>
+                            <th>{{ t.comment }}</th>
+                            <th>{{ t.edit }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ member_data.id }}</td>
+                            <td>{{ member_data.name }}</td>
+                            <td>{{ member_data.email }}</td>
+                            <td>{{ member_data.phone }}</td>
+                            <td>{{ member_data.age }}</td>
+                            <td>{{ member_data.gender }}</td>
+                            <td>{{ member_data.actual_starting_date }}</td>
+                            <td>{{ member_data.starting_date }}</td>
+                            <td>{{ member_data.end_date }}</td>
+                            <td>{{ member_data.membership_packages }}</td>
+                            <td>{{ member_data.membership_fees }}</td>
+                            <td>
+                                {% if member_data.membership_status == 'VAL' %}
+                                <span class="status-light val" title="{{ t.valid }}"></span>
+                                {% elif member_data.membership_status == 'EX' %}
+                                <span class="status-light ex" title="{{ t.expired }}"></span>
+                                {% else %}
+                                <span class="status-light unknown" title="Unknown"></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if member_data.membership_status == 'EX' %}
+                                    <span style="color: #888;">N/A</span>
+                                {% else %}
+                                    <span style="color: #ffd43b; font-weight: bold;">{{ member_data.invitations or 0 }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set package = (member_data.membership_packages or '').strip() %}
+                                {% set package_lower = package.lower() %}
+                                {% set has_freeze = False %}
+                                {% set freeze_days = 0 %}
+                                
+                                {# Check package formats: "1 Month", "2 Months", "3 Months", "4 Months", "6 Months", "12 Months" #}
+                                {% if '3 month' in package_lower %}
+                                    {% set has_freeze = True %}
+                                    {% set freeze_days = 7 %}
+                                {% elif '4 month' in package_lower %}
+                                    {% set has_freeze = True %}
+                                    {% set freeze_days = 7 %}
+                                {% elif '6 month' in package_lower %}
+                                    {% set has_freeze = True %}
+                                    {% set freeze_days = 14 %}
+                                {% elif '12 month' in package_lower or '1 year' in package_lower or 'year' in package_lower %}
+                                    {% set has_freeze = True %}
+                                    {% set freeze_days = 30 %}
+                                {% endif %}
+                                
+                                {# Show N/A if end_date is expired, otherwise show normal freeze logic #}
+                                {% if member_data.membership_status == 'EX' %}
+                                    <span class="freeze-used">N/A</span>
+                                {% elif member_data.freeze_used %}
+                                    <span class="freeze-used">Used</span>
+                                {% elif has_freeze %}
+                                    <form method="POST" action="{{ url_for('use_freeze', member_id=member_data.id) }}" 
+                                          onsubmit="return confirm('Are you sure you want to use freeze for {{ member_data.name }}? This will extend the membership by {{ freeze_days }} days and cannot be undone!');" 
+                                          style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> 
+                                        <button type="submit" class="freeze-link" style="border: none; cursor: pointer;">Use Freeze</button>
+                                    </form>
+                                {% else %}
+                                    <span class="freeze-used">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: left; max-width: 200px; word-wrap: break-word;">{{
+                                member_data.comment or '-' }}</td>
+                            <td>
+                                <a class="edit-link" href="{{ url_for('edit_member', member_id=member_data.id) }}">{{
+                                    t.edit }}</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             {% else %}
-                <div class="no-member-found">{{ t.no_results }}</div>
+            <div class="no-member-found">{{ t.no_results }}</div>
             {% endif %}
             <div style="text-align: center;">
                 <a class="back-btn" href="{{ url_for('index') }}">{{ t.back }}</a>
@@ -448,4 +533,5 @@
         </section>
     </div>
 </body>
+
 </html>
