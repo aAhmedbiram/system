@@ -3035,16 +3035,7 @@ def attendance_table():
                 flash(f"Error loading member: {str(e)}", "error")
 
         try:
-            # Pagination: 50 items per page
-            page = request.args.get('page', 1, type=int)
-            per_page = 50
-            offset = (page - 1) * per_page
-            
-            # Get total count for pagination
-            total_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
-            total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
-            
-            # Get paginated data - use actual end_date from members table
+            # Get all attendance data - use actual end_date from members table
             data = query_db("""
                 SELECT a.num, a.member_id, a.name, 
                        COALESCE(m.end_date, a.end_date) as end_date,
@@ -3053,8 +3044,7 @@ def attendance_table():
                 FROM attendance a 
                 LEFT JOIN members m ON a.member_id = m.id 
                 ORDER BY a.num ASC
-                LIMIT %s OFFSET %s
-            """, (per_page, offset))
+            """)
             # Get current user permissions for template
             try:
                 user = get_current_user()
@@ -3074,9 +3064,6 @@ def attendance_table():
             
             return render_template("attendance_table.html", 
                                 members_data=data or [],
-                                page=page,
-                                total_pages=total_pages,
-                                total_count=total_count['count'] if total_count else 0,
                                 user_permissions=user_permissions,
                                 today=today)
         except Exception as e:
@@ -3084,17 +3071,10 @@ def attendance_table():
             import traceback
             traceback.print_exc()
             flash(f"Error loading attendance: {str(e)}", "error")
-            return render_template("attendance_table.html", members_data=[], page=1, total_pages=1, total_count=0, user_permissions={})
+            return render_template("attendance_table.html", members_data=[], user_permissions={})
 
     # This part handles the GET request (default view)
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = 50
-        offset = (page - 1) * per_page
-        
-        total_count = query_db('SELECT COUNT(*) as count FROM attendance', one=True)
-        total_pages = (total_count['count'] + per_page - 1) // per_page if total_count else 1
-        
         data = query_db("""
             SELECT a.num, a.member_id, a.name, 
                    COALESCE(m.end_date, a.end_date) as end_date,
@@ -3103,8 +3083,7 @@ def attendance_table():
             FROM attendance a 
             LEFT JOIN members m ON a.member_id = m.id 
             ORDER BY a.num ASC
-            LIMIT %s OFFSET %s
-        """, (per_page, offset))
+        """)
         
         user = get_current_user()
         user_permissions = {}
@@ -3120,9 +3099,6 @@ def attendance_table():
         
         return render_template("attendance_table.html", 
                             members_data=data or [], 
-                            page=page,
-                            total_pages=total_pages,
-                            total_count=total_count['count'] if total_count else 0,
                             user_permissions=user_permissions,
                             today=today)
     except Exception as e:

@@ -435,17 +435,6 @@
         {% else %}
         <div class="no-data">No attendance records yet</div>
         {% endif %}
-
-        <!-- Pagination -->
-        {% if total_pages > 1 %}
-        <div class="pagination">
-            <a href="?page=1" class="pagination-btn {% if page == 1 %}disabled{% endif %}">First</a>
-            <a href="?page={{ page - 1 }}" class="pagination-btn {% if page == 1 %}disabled{% endif %}">Previous</a>
-            <span class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total_count }} total records)</span>
-            <a href="?page={{ page + 1 }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Next</a>
-            <a href="?page={{ total_pages }}" class="pagination-btn {% if page >= total_pages %}disabled{% endif %}">Last</a>
-        </div>
-        {% endif %}
     </div>
 
     <div class="bottom-actions">
