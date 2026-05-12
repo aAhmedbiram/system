@@ -2865,14 +2865,14 @@ def use_freeze(member_id):
         )
         
         flash(f"Freeze applied successfully! {member['name']}'s membership extended by {freeze_days} days. New end date: {new_end_date.strftime('%Y-%m-%d')}.", "success")
-        return redirect(url_for("all_members"))
+        return redirect(request.referrer or url_for("all_members"))
         
     except Exception as e:
         print(f"Error in use_freeze route: {e}")
         import traceback
         traceback.print_exc()
         flash(f"Error applying freeze: {str(e)}", "error")
-        return redirect(url_for("all_members"))
+        return redirect(request.referrer or url_for("all_members"))
 
 @app.route("/show_member_data", methods=["POST"])
 @login_required
