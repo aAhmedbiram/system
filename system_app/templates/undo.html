@@ -220,7 +220,7 @@
                                         Will restore the deleted member with all their information:
                                         <ul style="margin: 5px 0; padding-left: 20px;">
                                             <li>Name: {{ action_data.get('name', 'N/A') }}</li>
-                                            <li>Email: {{ action_data.get('email', 'N/A') }}</li>
+                                            <li>National ID: {{ action_data.get('national_id', 'N/A') }}</li>
                                             <li>Phone: {{ action_data.get('phone', 'N/A') }}</li>
                                             <li>Package: {{ action_data.get('membership_packages', 'N/A') }}</li>
                                             <li>Status: {{ action_data.get('membership_status', 'N/A') }}</li>
@@ -229,7 +229,7 @@
                                         Will remove the newly added member:
                                         <ul style="margin: 5px 0; padding-left: 20px;">
                                             <li>Name: {{ action_data.get('name', 'N/A') }}</li>
-                                            <li>Email: {{ action_data.get('email', 'N/A') }}</li>
+                                            <li>National ID: {{ action_data.get('national_id', 'N/A') }}</li>
                                             <li>Package: {{ action_data.get('membership_packages', 'N/A') }}</li>
                                         </ul>
                                     {% elif action.action_type == 'use_freeze' %}
@@ -244,7 +244,7 @@
                                         <ul style="margin: 5px 0; padding-left: 20px;">
                                             {% set old_values = action_data.get('old_values', {}) %}
                                             <li>Name: {{ old_values.get('name', 'N/A') }}</li>
-                                            <li>Email: {{ old_values.get('email', 'N/A') }}</li>
+                                            <li>National ID: {{ old_values.get('national_id', 'N/A') }}</li>
                                             <li>Phone: {{ old_values.get('phone', 'N/A') }}</li>
                                             <li>Package: {{ old_values.get('membership_packages', 'N/A') }}</li>
                                             <li>Fees: {{ old_values.get('membership_fees', 'N/A') }}</li>

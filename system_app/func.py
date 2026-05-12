@@ -108,6 +108,7 @@ def compare_dates(end_date_str):
         return "Unknown"
 
 
+
 def calculate_invitations(package_name):
     """Returns number of invitations based on package: 1 Month = 1, 2 Months = 2, 1 year = 12, etc."""
     if not package_name:
@@ -148,5 +149,13 @@ def calculate_invitations(package_name):
         "1 Year": 12
     }
     return invitations_map.get(package_name, 0)
+
+
+def validate_national_id(id_str):
+    """Validates Egyptian National ID (exactly 14 digits, numeric only)"""
+    if not id_str:
+        return False
+    id_str = str(id_str).strip()
+    return len(id_str) == 14 and id_str.isdigit()
 
 

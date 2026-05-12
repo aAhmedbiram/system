@@ -1165,8 +1165,8 @@
                         <label for="add_member_name">{{ t.name }}</label>
                         <input type="text" id="add_member_name" name="member_name" required placeholder="{{ t.full_name }}">
                         
-                        <label for="add_member_email">{{ t.email }}</label>
-                        <input type="email" id="add_member_email" name="member_email" required placeholder="{{ t.email_address }}">
+                        <label for="add_member_national_id">{{ t.national_id }}</label>
+                        <input type="text" id="add_member_national_id" name="member_national_id" required placeholder="{{ t.national_id }}" maxlength="14" pattern="\d{14}">
                         
                         <label for="add_member_phone">{{ t.phone }}</label>
                         <input type="text" id="add_member_phone" name="member_phone" required placeholder="{{ t.phone_number }}">

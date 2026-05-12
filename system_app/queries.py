@@ -64,9 +64,18 @@ def create_table():
                 membership_fees REAL,
                 membership_status TEXT,
                 invitations INTEGER DEFAULT 0,
-                comment TEXT
+                comment TEXT,
+                national_id TEXT UNIQUE
             )
         ''')
+        
+        # Add national_id column if it doesn't exist (for existing databases)
+        try:
+            cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS national_id TEXT')
+            # Create unique index for national_id but allow multiple NULLs
+            cr.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_members_national_id_unique ON members(national_id) WHERE national_id IS NOT NULL AND national_id != \'\'')
+        except:
+            pass
         
         # Add invitations column if it doesn't exist (for existing databases)
         try:
@@ -519,30 +528,30 @@ def query_db(query, args=(), one=False, commit=False):
 def add_member(name, email, phone, age, gender, birthdate,
             actual_starting_date, starting_date, end_date,
             membership_packages, membership_fees, membership_status,
-            custom_id=None, invitations=0, comment=None):
+            custom_id=None, invitations=0, comment=None, national_id=None):
     try:
         if custom_id is not None:
             result = query_db('''
                 INSERT INTO members 
                 (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 custom_id, name, email, phone, age, gender, birthdate, actual_starting_date,
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id
             ), one=True, commit=True)
             return result['id']
         else:
             result = query_db('''
                 INSERT INTO members 
                 (name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 name, email, phone, age, gender, birthdate, actual_starting_date,
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id
             ), one=True, commit=True)
             return result['id']
     except Exception as e:
@@ -555,7 +564,7 @@ def bulk_add_members(members_list):
     Bulk insert members for faster import.
     members_list: List of tuples, each tuple contains member data in order:
     (custom_id, name, email, phone, age, gender, birthdate, actual_starting_date,
-     starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
+     starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
     Returns: number of successfully inserted members
     """
     if not members_list:
@@ -578,16 +587,16 @@ def bulk_add_members(members_list):
             insert_query = '''
                 INSERT INTO members 
                 (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             '''
         else:
             # Bulk insert without custom_id
             insert_query = '''
                 INSERT INTO members 
                 (name, email, phone, age, gender, birthdate, actual_starting_date, 
-                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             '''
         
         # Use execute_batch for efficient bulk insert
@@ -606,7 +615,7 @@ def bulk_add_members(members_list):
         for member_data in members_list:
             try:
                 # Check length of each individual tuple to handle mixed batches correctly
-                if len(member_data) == 15:
+                if len(member_data) == 16:
                     add_member(
                         name=member_data[1],
                         email=member_data[2],
@@ -622,6 +631,7 @@ def bulk_add_members(members_list):
                         membership_status=member_data[12],
                         invitations=member_data[13],
                         comment=member_data[14],
+                        national_id=member_data[15],
                         custom_id=member_data[0]
                     )
                 else:
@@ -639,7 +649,8 @@ def bulk_add_members(members_list):
                         membership_fees=member_data[10],
                         membership_status=member_data[11],
                         invitations=member_data[12],
-                        comment=member_data[13]
+                        comment=member_data[13],
+                        national_id=member_data[14] if len(member_data) > 14 else None
                     )
                 inserted += 1
             except Exception as individual_error:
@@ -725,7 +736,7 @@ def delete_all_data():
         conn.close()
 
 
-def search_members(name=None, phone=None, email=None):
+def search_members(name=None, phone=None, national_id=None):
     conditions = []
     args = []
     if name:
@@ -734,9 +745,9 @@ def search_members(name=None, phone=None, email=None):
     if phone:
         conditions.append("phone ILIKE %s")
         args.append(f"%{phone}%")
-    if email:
-        conditions.append("email ILIKE %s")
-        args.append(f"%{email}%")
+    if national_id:
+        conditions.append("national_id ILIKE %s")
+        args.append(f"%{national_id}%")
     
     query = "SELECT * FROM members"
     if conditions:

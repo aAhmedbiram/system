@@ -440,7 +440,7 @@
                         <tr>
                             <th>{{ t.member_id }}</th>
                             <th>{{ t.name }}</th>
-                            <th>{{ t.email }}</th>
+                            <th>{{ t.national_id }}</th>
                             <th>{{ t.phone }}</th>
                             <th>{{ t.age }}</th>
                             <th>{{ t.gender }}</th>
@@ -460,7 +460,7 @@
                         <tr>
                             <td>{{ member_data.id }}</td>
                             <td>{{ member_data.name }}</td>
-                            <td>{{ member_data.email }}</td>
+                            <td>{{ member_data.national_id or '-' }}</td>
                             <td>{{ member_data.phone }}</td>
                             <td>{{ member_data.age }}</td>
                             <td>{{ member_data.gender }}</td>

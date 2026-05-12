@@ -313,7 +313,7 @@
         /* Fixed column widths */
         th:nth-child(1), td:nth-child(1) { width: 80px; } /* Member ID */
         th:nth-child(2), td:nth-child(2) { width: 120px; } /* Name */
-        th:nth-child(3), td:nth-child(3) { width: 150px; } /* Email */
+        th:nth-child(3), td:nth-child(3) { width: 150px; } /* National ID */
         th:nth-child(4), td:nth-child(4) { width: 120px; } /* Phone */
         th:nth-child(5), td:nth-child(5) { width: 60px; } /* Age */
         th:nth-child(6), td:nth-child(6) { width: 80px; } /* Gender */
@@ -502,7 +502,7 @@
     <tr>
         <th onclick="sortTable(0)">{{ t.member_id }} ▲▼</th>
         <th onclick="sortTable(1)">{{ t.name }} ▲▼</th>
-        <th onclick="sortTable(2)">{{ t.email }} ▲▼</th>
+        <th onclick="sortTable(2)">{{ t.national_id }} ▲▼</th>
         <th onclick="sortTable(3)">{{ t.phone }} ▲▼</th>
         <th onclick="sortTable(4)">{{ t.age }} ▲▼</th>
         <th onclick="sortTable(5)">{{ t.gender }} ▲▼</th>
@@ -523,7 +523,7 @@
     <tr class="filter-row">
         <th><input type="text" id="search_id" placeholder="{{ t.search }}" value="{{ search_id or '' }}" onkeyup="handleColumnSearch()"></th>
         <th><input type="text" id="search_name" placeholder="{{ t.search }}" value="{{ search_name or '' }}" onkeyup="handleColumnSearch()"></th>
-        <th><input type="text" id="search_email" placeholder="{{ t.search }}" value="{{ search_email or '' }}" onkeyup="handleColumnSearch()"></th>
+        <th><input type="text" id="search_national_id" placeholder="{{ t.search }}" value="{{ search_national_id or '' }}" onkeyup="handleColumnSearch()"></th>
         <th><input type="text" id="search_phone" placeholder="{{ t.search }}" value="{{ search_phone or '' }}" onkeyup="handleColumnSearch()"></th>
         <th><input type="text" id="search_age" placeholder="{{ t.search }}" value="{{ search_age or '' }}" onkeyup="handleColumnSearch()"></th>
         <th><input type="text" id="search_gender" placeholder="{{ t.search }}" value="{{ search_gender or '' }}" onkeyup="handleColumnSearch()"></th>
@@ -546,7 +546,7 @@
     <tr>
         <td>{{ member.id }}</td>
         <td>{{ member.name }}</td>
-        <td>{{ member.email }}</td>
+        <td>{{ member.national_id or '-' }}</td>
         <td>{{ member.phone }}</td>
         <td>{{ member.age }}</td>
         <td>{{ "Male" if member.gender == "Male" else "Female" }}</td>
@@ -676,7 +676,7 @@
             
             const searchId = document.getElementById('search_id').value.trim();
             const searchName = document.getElementById('search_name').value.trim();
-            const searchEmail = document.getElementById('search_email').value.trim();
+            const searchNationalId = document.getElementById('search_national_id').value.trim();
             const searchPhone = document.getElementById('search_phone').value.trim();
             const searchAge = document.getElementById('search_age').value.trim();
             const searchGender = document.getElementById('search_gender').value.trim();
@@ -694,7 +694,7 @@
             
             if (searchId) url.searchParams.set('search_id', searchId); else url.searchParams.delete('search_id');
             if (searchName) url.searchParams.set('search_name', searchName); else url.searchParams.delete('search_name');
-            if (searchEmail) url.searchParams.set('search_email', searchEmail); else url.searchParams.delete('search_email');
+            if (searchNationalId) url.searchParams.set('search_national_id', searchNationalId); else url.searchParams.delete('search_national_id');
             if (searchPhone) url.searchParams.set('search_phone', searchPhone); else url.searchParams.delete('search_phone');
             if (searchAge) url.searchParams.set('search_age', searchAge); else url.searchParams.delete('search_age');
             if (searchGender) url.searchParams.set('search_gender', searchGender); else url.searchParams.delete('search_gender');
@@ -753,7 +753,7 @@
         const currentView = url.searchParams.get('view') || 'all';
         if (currentView) params.set('view', currentView);
         
-        const searchFields = ['search_id', 'search_name', 'search_email', 'search_phone', 'search_age', 
+        const searchFields = ['search_id', 'search_name', 'search_national_id', 'search_phone', 'search_age', 
                             'search_gender', 'search_actual_start', 'search_start_date', 'search_end_date',
                             'search_package', 'search_fees', 'search_invitations', 'search_comment'];
         
@@ -877,7 +877,7 @@
         tr.innerHTML = `
             <td>${member.id}</td>
             <td>${getValue(member.name)}</td>
-            <td>${getValue(member.email)}</td>
+            <td>${getValue(member.national_id)}</td>
             <td>${getValue(member.phone)}</td>
             <td>${getValue(member.age)}</td>
             <td>${member.gender === 'Male' ? 'Male' : 'Female'}</td>

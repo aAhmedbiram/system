@@ -628,10 +628,10 @@
             </div>
         </th>
         <th>
-            {{ t.email }}
+            {{ t.national_id }}
             <div style="display: inline-block; margin-left: 5px;">
-                <button onclick="sortByColumn('email', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
-                <button onclick="sortByColumn('email', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
+                <button onclick="sortByColumn('national_id', 'asc')" class="sort-btn" title="Sort Ascending">↑</button>
+                <button onclick="sortByColumn('national_id', 'desc')" class="sort-btn" title="Sort Descending">↓</button>
             </div>
         </th>
         <th>
@@ -710,7 +710,7 @@
     <tr>
         <td>{{ member.id }}</td>
         <td>{{ member.name }}</td>
-        <td>{{ member.email }}</td>
+        <td>{{ member.national_id or '-' }}</td>
         <td>{{ member.phone }}</td>
         <td>{{ member.age }}</td>
         <td>{{ "Male" if member.gender == "Male" else "Female" }}</td>

@@ -405,9 +405,9 @@
                     <label for="edit_member_name">{{ t.name }}:</label>
                     <input type="text" id="edit_member_name" name="edit_member_name" value="{{ member.name }}" required>
 
-                    <label for="edit_member_email">{{ t.email }}:</label>
-                    <input type="email" id="edit_member_email" name="edit_member_email"
-                        value="{{ member.email or '' }}">
+                    <label for="edit_member_national_id">{{ t.national_id }}:</label>
+                    <input type="text" id="edit_member_national_id" name="edit_member_national_id"
+                        value="{{ member.national_id or '' }}" required maxlength="14" pattern="\d{14}">
 
                     <label for="edit_member_phone">{{ t.phone }}:</label>
                     <input type="text" id="edit_member_phone" name="edit_member_phone" value="{{ member.phone }}"

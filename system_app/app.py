@@ -375,7 +375,7 @@ def handle_csrf_error(e):
     flash('CSRF token missing or invalid. Please try again.', 'error')
     return redirect(request.url or url_for('index'))
 
-from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations, get_cairo_date, get_cairo_now
+from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations, get_cairo_date, get_cairo_now, validate_national_id
 from .queries import (
     DATABASE_URL, create_table, query_db, check_name_exists, check_id_exists,
     add_member, get_member, update_member, delete_member,
@@ -1035,6 +1035,7 @@ TRANSLATIONS = {
         'enter_phone_number': 'Enter Phone Number',
         'full_name': 'Full Name',
         'email_address': 'Email Address',
+        'national_id': 'National ID',
         'select_package': 'Select Package',
         'search': 'Search',
         'rival_gym_system': 'Rival Gym System',
@@ -1136,6 +1137,7 @@ TRANSLATIONS = {
         'enter_phone_number': 'أدخل رقم الهاتف',
         'full_name': 'الاسم الكامل',
         'email_address': 'عنوان البريد الإلكتروني',
+        'national_id': 'الرقم القومي',
         'select_package': 'اختر الباقة',
         'search': 'بحث',
         'rival_gym_system': 'نظام ريڤال جيم',
@@ -1863,8 +1865,14 @@ def add_member_route():
             flash("Member name is required!", "error")
             return redirect(url_for("index"))
 
-        member_email = request.form.get("member_email", "").strip().lower()
+        member_national_id = request.form.get("member_national_id", "").strip()
         member_phone = request.form.get("member_phone", "").strip()
+
+        # --- Validation ---
+        if not validate_national_id(member_national_id):
+            flash("Invalid National ID! Must be exactly 14 digits.", "error")
+            return redirect(url_for("index"))
+
         birthdate_input = request.form.get("member_birthdate", "").strip()
         member_age = calculate_age(birthdate_input) if birthdate_input else None
         member_birthdate = birthdate_input
@@ -1900,12 +1908,12 @@ def add_member_route():
         member_membership_status = compare_dates(member_end_date) or "Unknown"
         member_invitations = calculate_invitations(user_input)
 
-        # --- 1. Check for duplicates ---
+        # --- 1. Check for duplicates (National ID or Phone) ---
         existing = query_db('''
             SELECT id FROM members 
-            WHERE email = %s OR phone = %s
+            WHERE national_id = %s OR phone = %s
             LIMIT 1
-        ''', (member_email, member_phone), one=True)
+        ''', (member_national_id, member_phone), one=True)
 
         if existing:
             flash(
@@ -1920,12 +1928,13 @@ def add_member_route():
 
         # --- 3. Add new member ---
         added_id = add_member(
-            member_name, member_email, member_phone, member_age, member_gender,
+            member_name, None, member_phone, member_age, member_gender,
             member_birthdate, member_actual_starting_date, member_starting_date,
             member_end_date, package_to_save, member_membership_fees,
             member_membership_status,
             custom_id=new_member_id,
-            invitations=member_invitations
+            invitations=member_invitations,
+            national_id=member_national_id
         )
         
         # Log the addition action for undo
@@ -1933,7 +1942,7 @@ def add_member_route():
         import json
         member_data = {
             'name': member_name,
-            'email': member_email,
+            'national_id': member_national_id,
             'phone': member_phone,
             'age': member_age,
             'gender': member_gender,
@@ -2179,7 +2188,7 @@ def filtered_members():
         # Get individual column search queries
         search_id = request.args.get('search_id', '').strip()
         search_name = request.args.get('search_name', '').strip()
-        search_email = request.args.get('search_email', '').strip()
+        search_national_id = request.args.get('search_national_id', '').strip()
         search_phone = request.args.get('search_phone', '').strip()
         search_age = request.args.get('search_age', '').strip()
         search_gender = request.args.get('search_gender', '').strip()
@@ -2244,9 +2253,9 @@ def filtered_members():
             where_conditions.append("name ILIKE %s")
             params.append(f'%{search_name}%')
         
-        if search_email:
-            where_conditions.append("COALESCE(email, '') ILIKE %s")
-            params.append(f'%{search_email}%')
+        if search_national_id:
+            where_conditions.append("COALESCE(national_id, '') ILIKE %s")
+            params.append(f'%{search_national_id}%')
         
         if search_phone:
             where_conditions.append("COALESCE(phone, '') ILIKE %s")
@@ -2428,7 +2437,7 @@ def filtered_members():
                             expired_count=expired_count,
                             search_id=search_id,
                             search_name=search_name,
-                            search_email=search_email,
+                            search_national_id=search_national_id,
                             search_phone=search_phone,
                             search_age=search_age,
                             search_gender=search_gender,
@@ -2511,10 +2520,25 @@ def edit_member(member_id):
     elif request.method == "POST":
         try:
             name = request.form.get("edit_member_name", "").capitalize()
-            email = request.form.get("edit_member_email", "").strip()
-            # Convert empty email to None to avoid UNIQUE constraint issues
-            email = email if email else None
+            national_id = request.form.get("edit_member_national_id", "").strip()
+            
+            # --- Validation ---
+            if not validate_national_id(national_id):
+                flash("Invalid National ID! Must be exactly 14 digits.", "error")
+                return redirect(url_for("edit_member", member_id=member_id))
+            
+            # --- Duplicate Check ---
             phone = request.form.get("edit_member_phone", "")
+            existing = query_db('''
+                SELECT id FROM members 
+                WHERE (national_id = %s OR phone = %s) AND id != %s
+                LIMIT 1
+            ''', (national_id, phone, member_id), one=True)
+            
+            if existing:
+                flash(f"A member with this National ID or Phone already exists (ID: {existing['id']})!", "error")
+                return redirect(url_for("edit_member", member_id=member_id))
+
             birthdate = request.form.get("edit_member_birthdate", "")
             age = calculate_age(birthdate)  # ← int always
             gender = request.form.get("edit_member_gender", "")
@@ -2567,7 +2591,7 @@ def edit_member(member_id):
                 if ask_for_approval and username == 'hossam_marghany':
                     # Prepare new data
                     new_data = {
-                        'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
+                        'name': name, 'national_id': national_id, 'phone': phone, 'age': age, 'gender': gender,
                         'birthdate': birthdate, 'actual_starting_date': actual_starting_date,
                         'starting_date': starting_date, 'end_date': end_date,
                         'membership_packages': package_to_save,
@@ -2673,7 +2697,7 @@ def edit_member(member_id):
                 # Prepare update parameters
                 # Note: actual_starting_date is not editable, so we don't include it in update_params
                 update_params = {
-                    'name': name, 'email': email, 'phone': phone, 'age': age, 'gender': gender,
+                    'name': name, 'national_id': national_id, 'phone': phone, 'age': age, 'gender': gender,
                     'birthdate': birthdate,
                     'starting_date': starting_date, 'end_date': end_date,
                     'membership_packages': package_to_save,
@@ -4389,6 +4413,16 @@ def data_management():
                                         if membership_status == 'nan' or membership_status == '':
                                             membership_status = None
                                 
+                                # National ID
+                                national_id = None
+                                nid_col = mapped_columns.get('national id') or mapped_columns.get('National ID') or mapped_columns.get('ID Card')
+                                if nid_col and nid_col in row.index:
+                                    nid_val = row.get(nid_col)
+                                    if pd.notna(nid_val):
+                                        national_id = str(nid_val).strip()
+                                        if national_id == 'nan' or national_id == '':
+                                            national_id = None
+
                                 # Email (optional - not in user's list but keep for compatibility)
                                 email = None
                                 
@@ -4406,14 +4440,14 @@ def data_management():
                                         custom_id, name, email, phone, age, gender, birthdate,
                                         actual_starting_date, starting_date, end_date,
                                         membership_packages, membership_fees, membership_status,
-                                        invitations, comment, idx + 2 # Add row number for logging
+                                        invitations, comment, national_id, idx + 2 # Add row number for logging
                                     ))
                                 else:
                                     batch_members.append((
                                         name, email, phone, age, gender, birthdate,
                                         actual_starting_date, starting_date, end_date,
                                         membership_packages, membership_fees, membership_status,
-                                        invitations, comment, idx + 2 # Add row number for logging
+                                        invitations, comment, national_id, idx + 2 # Add row number for logging
                                     ))
                                 
                             except Exception as e:
@@ -6021,16 +6055,18 @@ def api_search_members():
         
         # Search by name, phone, or ID
         results = query_db("""
-            SELECT id, name, phone, email, membership_status
+            SELECT id, name, phone, national_id, membership_status
             FROM members 
             WHERE name ILIKE %s 
                OR phone ILIKE %s 
+               OR national_id ILIKE %s
                OR CAST(id AS TEXT) LIKE %s
             ORDER BY 
                 CASE 
                     WHEN name ILIKE %s THEN 1
                     WHEN phone ILIKE %s THEN 2
-                    ELSE 3
+                    WHEN national_id ILIKE %s THEN 3
+                    ELSE 4
                 END,
                 id DESC
             LIMIT %s
@@ -6038,7 +6074,9 @@ def api_search_members():
             f'%{query}%',
             f'%{query}%',
             f'%{query}%',
+            f'%{query}%',
             f'{query}%',  # Exact start match gets priority
+            f'{query}%',
             f'{query}%',
             limit
         ))
@@ -6049,7 +6087,7 @@ def api_search_members():
                 'id': member.get('id'),
                 'name': member.get('name'),
                 'phone': member.get('phone'),
-                'email': member.get('email'),
+                'national_id': member.get('national_id'),
                 'status': member.get('membership_status'),
                 'display': f"{member.get('name')} ({member.get('phone') or 'No phone'})"
             })
