@@ -658,6 +658,250 @@ def rino_required(f):
     return decorated_function
 
 
+def get_common_template_context():
+    """Helper to get common dashboard variables used across rino-accessible pages"""
+    try:
+        from datetime import datetime, timedelta
+        today = get_cairo_date()
+        username = session.get('username', '')
+        
+        # 1. User permissions
+        user = get_current_user()
+        user_permissions = {}
+        if user:
+            if user.get('username') == 'rino':
+                user_permissions = {'super_admin': True}
+            else:
+                user_permissions = user.get('permissions') or {}
+        
+        # 2. Pending approvals count
+        pending_count = 0
+        if username in ['rino', 'ahmed_adel', 'malit_deng']:
+            try:
+                count_result = query_db(
+                    'SELECT COUNT(*) as count FROM pending_member_edits WHERE status = %s',
+                    ('pending',),
+                    one=True
+                )
+                pending_count = count_result['count'] if count_result else 0
+            except:
+                pending_count = 0
+                
+        # 3. Monthly Statistics (New and Renewed)
+        current_month = today.month
+        current_year = today.year
+        current_month_start = datetime(current_year, current_month, 1)
+        
+        # New members this month
+        new_members_count = get_cached('new_members_count', timeout=300)
+        if new_members_count is None:
+            try:
+                month_name = today.strftime('%B')
+                month_num_str = f'{current_month:02d}'
+                year_str = str(current_year)
+                year_month_pattern = f'{current_year}-{month_num_str}'
+                
+                new_res = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE actual_starting_date IS NOT NULL AND actual_starting_date != ''
+                    AND (
+                        (LENGTH(TRIM(actual_starting_date)) >= 10 
+                         AND SUBSTRING(TRIM(actual_starting_date), 1, 7) = %s)
+                        OR (actual_starting_date LIKE %s)
+                        OR (actual_starting_date LIKE %s)
+                        OR (actual_starting_date ILIKE %s AND actual_starting_date ILIKE %s)
+                    )
+                """, (year_month_pattern, f'{year_month_pattern}-%', f'%,{month_num_str},{year_str}%', f'%{month_name}%', f'%{year_str}%'), one=True)
+                new_members_count = new_res['count'] if new_res else 0
+                set_cached('new_members_count', new_members_count, timeout=300)
+            except:
+                new_members_count = 0
+                
+        # Updated members this month
+        updated_count = get_cached('updated_members_count', timeout=300)
+        if updated_count is None:
+            try:
+                upd_res = query_db("""
+                    SELECT COUNT(DISTINCT member_id) as count FROM member_logs 
+                    WHERE field_name = 'starting_date' 
+                    AND edit_time >= %s
+                """, (current_month_start,), one=True)
+                updated_count = upd_res['count'] if upd_res else 0
+                set_cached('updated_members_count', updated_count, timeout=300)
+            except:
+                updated_count = 0
+
+        # 4. Expiring memberships (7, 14, 30 days)
+        expiring_7_days = get_cached('expiring_7_days', timeout=60)
+        if expiring_7_days is None:
+            try:
+                seven_days_from_now = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+                expiring_7_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                """, (seven_days_from_now, today.strftime('%Y-%m-%d')), one=True)
+                expiring_7_days = expiring_7_result['count'] if expiring_7_result else 0
+                set_cached('expiring_7_days', expiring_7_days, timeout=60)
+            except:
+                expiring_7_days = 0
+        
+        expiring_14_days = get_cached('expiring_14_days', timeout=60)
+        if expiring_14_days is None:
+            try:
+                fourteen_days_from_now = (today + timedelta(days=14)).strftime('%Y-%m-%d')
+                expiring_14_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                """, (fourteen_days_from_now, (today + timedelta(days=7)).strftime('%Y-%m-%d')), one=True)
+                expiring_14_days = expiring_14_result['count'] if expiring_14_result else 0
+                set_cached('expiring_14_days', expiring_14_days, timeout=60)
+            except:
+                expiring_14_days = 0
+        
+        expiring_30_days = get_cached('expiring_30_days', timeout=60)
+        if expiring_30_days is None:
+            try:
+                thirty_days_from_now = (today + timedelta(days=30)).strftime('%Y-%m-%d')
+                expiring_30_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                """, (thirty_days_from_now, (today + timedelta(days=14)).strftime('%Y-%m-%d')), one=True)
+                expiring_30_days = expiring_30_result['count'] if expiring_30_result else 0
+                set_cached('expiring_30_days', expiring_30_days, timeout=60)
+            except:
+                expiring_30_days = 0
+        
+        # 5. Get total active members
+        total_active_members = get_cached('total_active_members', timeout=300)
+        if total_active_members is None:
+            try:
+                active_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE end_date IS NOT NULL 
+                    AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                """, one=True)
+                total_active_members = active_result['count'] if active_result else 0
+                set_cached('total_active_members', total_active_members, timeout=300)
+            except:
+                total_active_members = 0
+                
+        # 6. Get expired count
+        expired_count = get_cached('total_expired_members', timeout=300)
+        if expired_count is None:
+            try:
+                expired_result = query_db("""
+                    SELECT COUNT(*) as count FROM members 
+                    WHERE (end_date IS NULL OR end_date = '' OR 
+                          (LENGTH(TRIM(end_date)) >= 10 AND 
+                           SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND 
+                           CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE))
+                """, one=True)
+                expired_count = expired_result['count'] if expired_result else 0
+                set_cached('total_expired_members', expired_count, timeout=300)
+            except:
+                expired_count = 0
+
+        # 7. Revenue analytics
+        revenue_this_month = get_cached('revenue_this_month', timeout=300)
+        if revenue_this_month is None:
+            try:
+                from .queries import get_monthly_total
+                revenue_this_month = get_monthly_total(current_year, current_month)
+                set_cached('revenue_this_month', revenue_this_month, timeout=300)
+            except:
+                revenue_this_month = 0.0
+                
+        revenue_last_month = get_cached('revenue_last_month', timeout=300)
+        if revenue_last_month is None:
+            try:
+                from .queries import get_monthly_total
+                last_month = current_month - 1 if current_month > 1 else 12
+                last_year = current_year if current_month > 1 else current_year - 1
+                revenue_last_month = get_monthly_total(last_year, last_month)
+                set_cached('revenue_last_month', revenue_last_month, timeout=300)
+            except:
+                revenue_last_month = 0.0
+                
+        revenue_growth = 0.0
+        if revenue_last_month > 0:
+            revenue_growth = ((revenue_this_month - revenue_last_month) / revenue_last_month) * 100
+        elif revenue_this_month > 0:
+            revenue_growth = 100.0
+            
+        revenue_by_package = get_cached('revenue_by_package', timeout=300)
+        if revenue_by_package is None:
+            try:
+                package_revenue = query_db("""
+                    SELECT 
+                        package_name, COUNT(*) as count, SUM(fees) as total_revenue
+                    FROM renewal_logs
+                    WHERE EXTRACT(YEAR FROM renewal_date) = %s AND EXTRACT(MONTH FROM renewal_date) = %s
+                    GROUP BY package_name ORDER BY total_revenue DESC LIMIT 5
+                """, (current_year, current_month))
+                revenue_by_package = package_revenue or []
+                set_cached('revenue_by_package', revenue_by_package, timeout=300)
+            except:
+                revenue_by_package = []
+
+        return {
+            'user_permissions': user_permissions,
+            'pending_approvals_count': pending_count,
+            'new_members_count': new_members_count,
+            'updated_starting_date_count': updated_count,
+            'expiring_7_days': expiring_7_days,
+            'expiring_14_days': expiring_14_days,
+            'expiring_30_days': expiring_30_days,
+            'total_active_members': total_active_members,
+            'active_count': total_active_members,
+            'expired_count': expired_count,
+            'revenue_this_month': revenue_this_month,
+            'revenue_last_month': revenue_last_month,
+            'revenue_growth': revenue_growth,
+            'revenue_by_package': revenue_by_package,
+            'server_now_iso': get_cairo_now().isoformat()
+        }
+    except Exception as e:
+        print(f"Error in get_common_template_context: {e}")
+        return {
+            'user_permissions': {},
+            'pending_approvals_count': 0,
+            'new_members_count': 0,
+            'updated_starting_date_count': 0,
+            'expiring_7_days': 0,
+            'expiring_14_days': 0,
+            'expiring_30_days': 0,
+            'total_active_members': 0,
+            'active_count': 0,
+            'expired_count': 0,
+            'revenue_this_month': 0.0,
+            'revenue_last_month': 0.0,
+            'revenue_growth': 0.0,
+            'revenue_by_package': [],
+            'server_now_iso': datetime.now().isoformat()
+        }
+
+
 @app.route('/user_permissions', methods=['GET', 'POST'])
 @rino_required
 def user_permissions():
@@ -1057,257 +1301,13 @@ def index():
             members_data = query_db('SELECT * FROM members ORDER BY id DESC LIMIT 50')
             set_cached(cache_key_members, members_data, timeout=60)
         
-        # Get current user permissions for template
-        user = get_current_user()
-        user_permissions = {}
-        if user:
-            if user.get('username') == 'rino':
-                # Rino has all permissions
-                user_permissions = {'super_admin': True}
-            else:
-                user_permissions = user.get('permissions') or {}
-        
-        # Get pending approvals count for rino, ahmed_adel, malit_deng
-        pending_count = 0
-        username = session.get('username', '')
-        if username in ['rino', 'ahmed_adel', 'malit_deng']:
-            try:
-                count_result = query_db(
-                    'SELECT COUNT(*) as count FROM pending_member_edits WHERE status = %s',
-                    ('pending',),
-                    one=True
-                )
-                pending_count = count_result['count'] if count_result else 0
-            except:
-                pending_count = 0
-        
-        # Calculate statistics for the current month
-        from datetime import datetime
-        today = datetime.now()
-        current_month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        current_month = today.month
-        current_year = today.year
-        
-        # Count new members in current month (based on actual_starting_date)
-        new_members_count = 0
-        try:
-            # Calculate next month start for date range
-            if current_month == 12:
-                next_month_start = datetime(current_year + 1, 1, 1)
-            else:
-                next_month_start = datetime(current_year, current_month + 1, 1)
-            
-            # Count members where actual_starting_date falls in current month
-            # New members added through the form will have actual_starting_date in YYYY-MM-DD format
-            month_name = today.strftime('%B')  # Full month name like "January"
-            month_num_str = f'{current_month:02d}'
-            year_str = str(current_year)
-            year_month_pattern = f'{current_year}-{month_num_str}'  # e.g., "2025-12"
-            
-            # Query to count members with actual_starting_date in current month
-            # Try multiple formats to catch all cases
-            new_members_result = query_db("""
-                SELECT COUNT(*) as count FROM members 
-                WHERE actual_starting_date IS NOT NULL 
-                AND actual_starting_date != ''
-                AND (
-                    -- YYYY-MM-DD format (standard HTML date input - new members from form)
-                    (LENGTH(TRIM(actual_starting_date)) >= 10 
-                     AND SUBSTRING(TRIM(actual_starting_date), 1, 7) = %s
-                     AND SUBSTRING(TRIM(actual_starting_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                     AND CAST(SUBSTRING(TRIM(actual_starting_date), 1, 10) AS DATE) >= %s
-                     AND CAST(SUBSTRING(TRIM(actual_starting_date), 1, 10) AS DATE) < %s)
-                    OR
-                    -- Simple pattern match for YYYY-MM-DD format (fallback)
-                    (actual_starting_date LIKE %s)
-                    OR
-                    -- DD,MM,YYYY format (formatted display - e.g., "08,12,2025")
-                    (actual_starting_date LIKE %s)
-                    OR
-                    -- Day name format: "Monday, December 8, 2025" or similar
-                    (actual_starting_date ILIKE %s AND actual_starting_date ILIKE %s)
-                )
-            """, (
-                year_month_pattern,  # YYYY-MM pattern
-                current_month_start,
-                next_month_start,
-                f'{year_month_pattern}-%',  # YYYY-MM-DD pattern
-                f'%,{month_num_str},{year_str}%',  # DD,MM,YYYY format
-                f'%{month_name}%',  # Contains month name
-                f'%{year_str}%'  # Contains current year
-            ), one=True)
-            new_members_count = new_members_result['count'] if new_members_result else 0
-        except Exception as e:
-            print(f"Error counting new members: {e}")
-            import traceback
-            traceback.print_exc()
-            new_members_count = 0
-        
-        # Count members who updated starting_date in current month (from member_logs)
-        updated_starting_date_count = 0
-        try:
-            updated_result = query_db("""
-                SELECT COUNT(DISTINCT member_id) as count FROM member_logs 
-                WHERE field_name = 'starting_date' 
-                AND edit_time >= %s
-                AND edit_time < %s
-            """, (
-                current_month_start,
-                datetime(current_year, current_month % 12 + 1, 1) if current_month < 12 else datetime(current_year + 1, 1, 1)
-            ), one=True)
-            updated_starting_date_count = updated_result['count'] if updated_result else 0
-        except Exception as e:
-            print(f"Error counting updated starting dates: {e}")
-            updated_starting_date_count = 0
-        
-        # === Enhanced Analytics ===
-        # Get revenue analytics
-        revenue_this_month = get_cached('revenue_this_month', timeout=300)
-        if revenue_this_month is None:
-            try:
-                from .queries import get_monthly_total
-                revenue_this_month = get_monthly_total(current_year, current_month)
-                set_cached('revenue_this_month', revenue_this_month, timeout=300)
-            except:
-                revenue_this_month = 0.0
-        
-        # Get revenue last month for comparison
-        revenue_last_month = get_cached('revenue_last_month', timeout=300)
-        if revenue_last_month is None:
-            try:
-                from .queries import get_monthly_total
-                last_month = current_month - 1 if current_month > 1 else 12
-                last_year = current_year if current_month > 1 else current_year - 1
-                revenue_last_month = get_monthly_total(last_year, last_month)
-                set_cached('revenue_last_month', revenue_last_month, timeout=300)
-            except:
-                revenue_last_month = 0.0
-        
-        # Get expiring memberships (7, 14, 30 days)
-        expiring_7_days = get_cached('expiring_7_days', timeout=60)
-        if expiring_7_days is None:
-            try:
-                from datetime import timedelta
-                seven_days_from_now = (today + timedelta(days=7)).strftime('%Y-%m-%d')
-                expiring_7_result = query_db("""
-                    SELECT COUNT(*) as count FROM members 
-                    WHERE end_date IS NOT NULL 
-                    AND end_date != ''
-                    AND LENGTH(TRIM(end_date)) >= 10
-                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
-                """, (seven_days_from_now, today.strftime('%Y-%m-%d')), one=True)
-                expiring_7_days = expiring_7_result['count'] if expiring_7_result else 0
-                set_cached('expiring_7_days', expiring_7_days, timeout=60)
-            except Exception as e:
-                print(f"Error getting expiring members: {e}")
-                expiring_7_days = 0
-        
-        expiring_14_days = get_cached('expiring_14_days', timeout=60)
-        if expiring_14_days is None:
-            try:
-                from datetime import timedelta
-                fourteen_days_from_now = (today + timedelta(days=14)).strftime('%Y-%m-%d')
-                expiring_14_result = query_db("""
-                    SELECT COUNT(*) as count FROM members 
-                    WHERE end_date IS NOT NULL 
-                    AND end_date != ''
-                    AND LENGTH(TRIM(end_date)) >= 10
-                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
-                """, (fourteen_days_from_now, (today + timedelta(days=7)).strftime('%Y-%m-%d')), one=True)
-                expiring_14_days = expiring_14_result['count'] if expiring_14_result else 0
-                set_cached('expiring_14_days', expiring_14_days, timeout=60)
-            except:
-                expiring_14_days = 0
-        
-        expiring_30_days = get_cached('expiring_30_days', timeout=60)
-        if expiring_30_days is None:
-            try:
-                from datetime import timedelta
-                thirty_days_from_now = (today + timedelta(days=30)).strftime('%Y-%m-%d')
-                expiring_30_result = query_db("""
-                    SELECT COUNT(*) as count FROM members 
-                    WHERE end_date IS NOT NULL 
-                    AND end_date != ''
-                    AND LENGTH(TRIM(end_date)) >= 10
-                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
-                """, (thirty_days_from_now, (today + timedelta(days=14)).strftime('%Y-%m-%d')), one=True)
-                expiring_30_days = expiring_30_result['count'] if expiring_30_result else 0
-                set_cached('expiring_30_days', expiring_30_days, timeout=60)
-            except:
-                expiring_30_days = 0
-        
-        # Get total active members - based on end_date >= today
-        total_active_members = get_cached('total_active_members', timeout=300)
-        if total_active_members is None:
-            try:
-                active_result = query_db("""
-                    SELECT COUNT(*) as count FROM members 
-                    WHERE end_date IS NOT NULL 
-                    AND end_date != ''
-                    AND LENGTH(TRIM(end_date)) >= 10
-                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
-                """, one=True)
-                total_active_members = active_result['count'] if active_result else 0
-                set_cached('total_active_members', total_active_members, timeout=300)
-            except Exception as e:
-                print(f"Error counting total active members: {e}")
-                total_active_members = 0
-        
-        # Get revenue by package type (this month)
-        revenue_by_package = get_cached('revenue_by_package', timeout=300)
-        if revenue_by_package is None:
-            try:
-                package_revenue = query_db("""
-                    SELECT 
-                        package_name,
-                        COUNT(*) as count,
-                        SUM(fees) as total_revenue
-                    FROM renewal_logs
-                    WHERE EXTRACT(YEAR FROM renewal_date) = %s
-                    AND EXTRACT(MONTH FROM renewal_date) = %s
-                    GROUP BY package_name
-                    ORDER BY total_revenue DESC
-                    LIMIT 5
-                """, (current_year, current_month))
-                revenue_by_package = package_revenue or []
-                set_cached('revenue_by_package', revenue_by_package, timeout=300)
-            except Exception as e:
-                print(f"Error getting revenue by package: {e}")
-                revenue_by_package = []
-        
-        # Calculate revenue growth percentage
-        revenue_growth = 0.0
-        if revenue_last_month > 0:
-            revenue_growth = ((revenue_this_month - revenue_last_month) / revenue_last_month) * 100
-        elif revenue_this_month > 0:
-            revenue_growth = 100.0  # 100% growth if last month was 0
+        # Use the common context helper for dashboard variables
+        common_context = get_common_template_context()
         
         return render_template("index.html", 
                                 attendance_data=attendance_data or [], 
                                 members_data=members_data or [],
-                                user_permissions=user_permissions,
-                                pending_approvals_count=pending_count,
-                                new_members_count=new_members_count,
-                                updated_starting_date_count=updated_starting_date_count,
-                                revenue_this_month=revenue_this_month,
-                                revenue_last_month=revenue_last_month,
-                                revenue_growth=revenue_growth,
-                                expiring_7_days=expiring_7_days,
-                                expiring_14_days=expiring_14_days,
-                                expiring_30_days=expiring_30_days,
-                                total_active_members=total_active_members,
-                                revenue_by_package=revenue_by_package,
-                                server_now_iso=get_cairo_now().isoformat())
+                                **common_context)
     except Exception as e:
         print(f"Error in index route: {e}")
         import traceback
@@ -3248,7 +3248,9 @@ def attendance_backup_runs_page():
     """Rino-only page to view automated attendance backup logs"""
     try:
         runs = get_attendance_backup_runs()
-        return render_template('attendance_backup_runs.html', runs=runs)
+        # Get common context/dashboard variables
+        common_context = get_common_template_context()
+        return render_template('attendance_backup_runs.html', runs=runs, **common_context)
     except Exception as e:
         print(f"Error loading attendance backup runs: {e}")
         flash("An error occurred while loading backup logs.", "error")
