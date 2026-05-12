@@ -393,7 +393,7 @@
                     <td>{{ loop.index }}</td>
                     <td>{{ member.member_id }}</td>
                     <td>{{ member.name }}</td>
-                    <td>{{ member.end_date or '-' }}</td>
+                    <td>{{ (member.end_date|string).split(' ')[0] if member.end_date else '-' }}</td>
                     <td>
                         {% set end_date_str = (member.end_date or '')|string %}
                         {% if end_date_str and end_date_str != '-' and end_date_str != 'None' %}

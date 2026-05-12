@@ -714,9 +714,9 @@
         <td>{{ member.phone }}</td>
         <td>{{ member.age }}</td>
         <td>{{ "Male" if member.gender == "Male" else "Female" }}</td>
-        <td>{{ member.actual_starting_date }}</td>
-        <td>{{ member.starting_date }}</td>
-        <td>{{ member.end_date }}</td>
+        <td>{{ (member.actual_starting_date|string).split(' ')[0] if member.actual_starting_date else '-' }}</td>
+        <td>{{ (member.starting_date|string).split(' ')[0] if member.starting_date else '-' }}</td>
+        <td>{{ (member.end_date|string).split(' ')[0] if member.end_date else '-' }}</td>
         <td>{{ member.membership_packages }}</td>
         <td>{{ member.membership_fees }}</td>
         <td>
