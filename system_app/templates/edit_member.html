@@ -467,14 +467,10 @@
                         {% elif member.freeze_used %}
                             <span style="color: #f44336; font-weight: bold;">Used</span>
                         {% elif has_freeze %}
-                            <form method="POST" action="{{ url_for('use_freeze', member_id=member.id) }}" 
-                                  onsubmit="return confirm('Are you sure you want to use freeze for {{ member.name }}? This will extend the membership by {{ freeze_days }} days and cannot be undone!');" 
-                                  style="display: inline;">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> 
-                                <button type="submit" style="background: linear-gradient(135deg, #ff9800, #ffb74d); color: white; padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 10px rgba(255, 152, 0, 0.3);">
-                                    Use Freeze ({{ freeze_days }} Days)
-                                </button>
-                            </form>
+                            <button type="button" onclick="if(confirm('Are you sure you want to use freeze for {{ member.name }}? This will extend the membership by {{ freeze_days }} days and cannot be undone!')) { document.getElementById('freeze_form_{{ member.id }}').submit(); }" 
+                                  style="background: linear-gradient(135deg, #ff9800, #ffb74d); color: white; padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 10px rgba(255, 152, 0, 0.3);">
+                                Use Freeze ({{ freeze_days }} Days)
+                            </button>
                         {% else %}
                             <span style="color: #888; font-style: italic; font-size: 14px;">N/A</span>
                         {% endif %}
@@ -518,35 +514,13 @@
                     {% endif %}
                 </div>
             </section>
+            
+            {% if has_freeze and not member.freeze_used %}
+            <form id="freeze_form_{{ member.id }}" method="POST" action="{{ url_for('use_freeze', member_id=member.id) }}" style="display: none;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            </form>
+            {% endif %}
         </div>
     </div>
 </body>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            if (!form.checkValidity()) {
-                e.preventDefault();
-                let errors = [];
-                const elements = form.elements;
-                for (let i = 0; i < elements.length; i++) {
-                    if (!elements[i].checkValidity()) {
-                        let msg = elements[i].name + ' is invalid: ' + elements[i].validationMessage + ' (Value: "' + elements[i].value + '")';
-                        errors.push(msg);
-                        elements[i].style.border = '2px solid red';
-                        elements[i].style.boxShadow = '0 0 10px red';
-                    } else {
-                        elements[i].style.border = '';
-                        elements[i].style.boxShadow = '';
-                    }
-                }
-                alert("Form validation blocked submit!\n\n" + errors.join("\n\n"));
-                console.error("Validation Errors:", errors);
-            }
-        });
-    }
-});
-</script>
 </html>
