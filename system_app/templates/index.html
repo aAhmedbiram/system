@@ -1233,7 +1233,8 @@
 
                         <label for="add_member_national_id">{{ t.national_id }} <span style="font-size: 0.8em; font-weight: normal; color: #888;">({{ 'اختياري' if session.get('lang') == 'ar' else 'Optional' }})</span></label>
                         <input type="text" id="add_member_national_id" name="member_national_id"
-                            placeholder="{{ t.national_id }}" maxlength="14" pattern="^$|^\d{14}$">
+                            placeholder="{{ t.national_id }}" maxlength="14" pattern="^$|^\d{14}$"
+                            title="National ID must be exactly 14 digits or left empty">
 
                         <label for="add_member_phone">{{ t.phone }}</label>
                         <input type="text" id="add_member_phone" name="member_phone" required

@@ -407,7 +407,8 @@
 
                     <label for="edit_member_national_id">{{ t.national_id }} <span style="font-size: 0.8em; font-weight: normal; color: #888;">({{ 'اختياري' if session.get('lang') == 'ar' else 'Optional' }})</span>:</label>
                     <input type="text" id="edit_member_national_id" name="edit_member_national_id"
-                        value="{{ member.national_id or '' }}" maxlength="14" pattern="^$|^\d{14}$">
+                        value="{{ '' if member.national_id in ['None', 'none', 'NaN', 'nan'] or member.national_id is none else member.national_id }}" maxlength="14" pattern="^$|^\d{14}$"
+                        title="National ID must be exactly 14 digits or left empty">
 
                     <label for="edit_member_phone">{{ t.phone }}:</label>
                     <input type="text" id="edit_member_phone" name="edit_member_phone" value="{{ member.phone }}"
@@ -521,4 +522,31 @@
     </div>
 </body>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!form.checkValidity()) {
+                e.preventDefault();
+                let errors = [];
+                const elements = form.elements;
+                for (let i = 0; i < elements.length; i++) {
+                    if (!elements[i].checkValidity()) {
+                        let msg = elements[i].name + ' is invalid: ' + elements[i].validationMessage + ' (Value: "' + elements[i].value + '")';
+                        errors.push(msg);
+                        elements[i].style.border = '2px solid red';
+                        elements[i].style.boxShadow = '0 0 10px red';
+                    } else {
+                        elements[i].style.border = '';
+                        elements[i].style.boxShadow = '';
+                    }
+                }
+                alert("Form validation blocked submit!\n\n" + errors.join("\n\n"));
+                console.error("Validation Errors:", errors);
+            }
+        });
+    }
+});
+</script>
 </html>
