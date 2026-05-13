@@ -2,11 +2,8 @@
 import os
 import sys
 
-# Add the system_app directory to the path
-sys.path.append(os.path.join(os.getcwd(), 'system_app'))
-
 try:
-    from queries import query_db
+    from system_app.queries import query_db
     
     print("--- STARTING NATIONAL ID MIGRATION ---")
     
@@ -25,6 +22,35 @@ try:
     print("Created unique partial index on national_id.")
     
     print("--- MIGRATION COMPLETED SUCCESSFULLY ---")
+    
+    print("\n--- VERIFICATION ---")
+    
+    # Verify column exists
+    column_check = query_db('''
+        SELECT column_name, data_type, is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = 'members' AND column_name = 'national_id'
+    ''')
+    
+    if column_check:
+        print(f"Column verified: {column_check[0]}")
+    else:
+        print("WARNING: Column 'national_id' not found in members table!")
+        
+    # Verify index exists
+    index_check = query_db('''
+        SELECT indexname, indexdef 
+        FROM pg_indexes 
+        WHERE tablename = 'members' AND indexname = 'idx_members_national_id_unique'
+    ''')
+    
+    if index_check:
+        print(f"Index verified: {index_check[0]['indexname']}")
+        print(f"Index definition: {index_check[0]['indexdef']}")
+    else:
+        print("WARNING: Index 'idx_members_national_id_unique' not found!")
+        
+    print("--- VERIFICATION COMPLETED ---")
 
 except Exception as e:
     print(f"Migration Error: {e}")

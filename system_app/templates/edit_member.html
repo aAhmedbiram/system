@@ -405,9 +405,9 @@
                     <label for="edit_member_name">{{ t.name }}:</label>
                     <input type="text" id="edit_member_name" name="edit_member_name" value="{{ member.name }}" required>
 
-                    <label for="edit_member_national_id">{{ t.national_id }}:</label>
+                    <label for="edit_member_national_id">{{ t.national_id }} <span style="font-size: 0.8em; font-weight: normal; color: #888;">({{ 'اختياري' if session.get('lang') == 'ar' else 'Optional' }})</span>:</label>
                     <input type="text" id="edit_member_national_id" name="edit_member_national_id"
-                        value="{{ member.national_id or '' }}" required maxlength="14" pattern="\d{14}">
+                        value="{{ member.national_id or '' }}" maxlength="14" pattern="^$|^\d{14}$">
 
                     <label for="edit_member_phone">{{ t.phone }}:</label>
                     <input type="text" id="edit_member_phone" name="edit_member_phone" value="{{ member.phone }}"

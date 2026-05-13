@@ -1866,10 +1866,13 @@ def add_member_route():
             return redirect(url_for("index"))
 
         member_national_id = request.form.get("member_national_id", "").strip()
+        if not member_national_id:
+            member_national_id = None
+
         member_phone = request.form.get("member_phone", "").strip()
 
         # --- Validation ---
-        if not validate_national_id(member_national_id):
+        if member_national_id and not validate_national_id(member_national_id):
             flash("Invalid National ID! Must be exactly 14 digits.", "error")
             return redirect(url_for("index"))
 
@@ -1909,11 +1912,18 @@ def add_member_route():
         member_invitations = calculate_invitations(user_input)
 
         # --- 1. Check for duplicates (National ID or Phone) ---
-        existing = query_db('''
-            SELECT id FROM members 
-            WHERE national_id = %s OR phone = %s
-            LIMIT 1
-        ''', (member_national_id, member_phone), one=True)
+        if member_national_id:
+            existing = query_db('''
+                SELECT id FROM members 
+                WHERE national_id = %s OR phone = %s
+                LIMIT 1
+            ''', (member_national_id, member_phone), one=True)
+        else:
+            existing = query_db('''
+                SELECT id FROM members 
+                WHERE phone = %s
+                LIMIT 1
+            ''', (member_phone,), one=True)
 
         if existing:
             flash(
@@ -2521,19 +2531,28 @@ def edit_member(member_id):
         try:
             name = request.form.get("edit_member_name", "").capitalize()
             national_id = request.form.get("edit_member_national_id", "").strip()
+            if not national_id:
+                national_id = None
             
             # --- Validation ---
-            if not validate_national_id(national_id):
+            if national_id and not validate_national_id(national_id):
                 flash("Invalid National ID! Must be exactly 14 digits.", "error")
                 return redirect(url_for("edit_member", member_id=member_id))
             
             # --- Duplicate Check ---
             phone = request.form.get("edit_member_phone", "")
-            existing = query_db('''
-                SELECT id FROM members 
-                WHERE (national_id = %s OR phone = %s) AND id != %s
-                LIMIT 1
-            ''', (national_id, phone, member_id), one=True)
+            if national_id:
+                existing = query_db('''
+                    SELECT id FROM members 
+                    WHERE (national_id = %s OR phone = %s) AND id != %s
+                    LIMIT 1
+                ''', (national_id, phone, member_id), one=True)
+            else:
+                existing = query_db('''
+                    SELECT id FROM members 
+                    WHERE phone = %s AND id != %s
+                    LIMIT 1
+                ''', (phone, member_id), one=True)
             
             if existing:
                 flash(f"A member with this National ID or Phone already exists (ID: {existing['id']})!", "error")
@@ -4183,7 +4202,8 @@ def data_management():
                     'starting date': ['Starting Date', 'Starting date', 'starting date', 'STARTING DATE'],
                     'end date': ['End Date', 'End date', 'end date', 'END DATE'],
                     'status': ['Status', 'status', 'STATUS'],
-                    'phone': ['Phone', 'phone', 'PHONE']
+                    'phone': ['Phone', 'phone', 'PHONE'],
+                    'national id': ['National ID', 'national id', 'ID Card']
                 }
                 
                 # Map columns (case-insensitive matching)
@@ -4422,7 +4442,11 @@ def data_management():
                                         national_id = str(nid_val).strip()
                                         if national_id == 'nan' or national_id == '':
                                             national_id = None
-
+                                        
+                                        if national_id and not validate_national_id(national_id):
+                                            skipped += 1
+                                            errors.append(f"Row {idx + 2}: Invalid National ID '{national_id}' for '{name}'. Must be exactly 14 digits.")
+                                            continue
                                 # Email (optional - not in user's list but keep for compatibility)
                                 email = None
                                 
