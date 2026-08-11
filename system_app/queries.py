@@ -33,8 +33,7 @@ def get_connection_pool():
                     _connection_pool = psycopg2.pool.ThreadedConnectionPool(
                         minconn=1,
                         maxconn=20,  # Maximum 20 connections in pool
-                        dsn=db_url,
-                        sslmode='require'
+                        dsn=db_url
                     )
                     print("Database connection pool created successfully")
                 except Exception as e:
@@ -45,7 +44,7 @@ def get_connection_pool():
 # === Create tables (once on startup) ===
 def create_table():
     db_url = get_database_url()
-    conn = psycopg2.connect(db_url, sslmode='require')
+    conn = psycopg2.connect(db_url)
     cr = conn.cursor()
     try:
         cr.execute('''
@@ -95,20 +94,6 @@ def create_table():
         except:
             pass
         
-        # Add email verification columns to users table if they don't exist
-        try:
-            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE')
-        except:
-            pass
-        try:
-            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT')
-        except:
-            pass
-        try:
-            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS token_expires TIMESTAMP')
-        except:
-            pass
-
         cr.execute('''
             CREATE TABLE IF NOT EXISTS attendance (
                 num SERIAL PRIMARY KEY,
@@ -135,6 +120,19 @@ def create_table():
                 permissions JSONB
             )
         ''')
+        # Add email verification columns to users table if they don't exist
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE')
+        except:
+            pass
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT')
+        except:
+            pass
+        try:
+            cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS token_expires TIMESTAMP')
+        except:
+            pass
 
         # Add authorization columns for existing databases
         try:
@@ -463,7 +461,7 @@ def query_db(query, args=(), one=False, commit=False):
     if pool is None:
         try:
             db_url = get_database_url()
-            conn = psycopg2.connect(db_url, sslmode='require')
+            conn = psycopg2.connect(db_url)
         except Exception as e:
             print(f"Error creating direct connection: {e}")
             raise e
@@ -475,7 +473,7 @@ def query_db(query, args=(), one=False, commit=False):
             # Fallback to direct connection
             try:
                 db_url = get_database_url()
-                conn = psycopg2.connect(db_url, sslmode='require')
+                conn = psycopg2.connect(db_url)
             except Exception as fallback_error:
                 print(f"Fallback connection also failed: {fallback_error}")
                 raise fallback_error
@@ -576,7 +574,7 @@ def bulk_add_members(members_list):
     
     try:
         db_url = get_database_url()
-        conn = psycopg2.connect(db_url, sslmode='require')
+        conn = psycopg2.connect(db_url)
         cur = conn.cursor()
         
         # Check if first member has custom_id
@@ -711,7 +709,7 @@ def delete_member(member_id):
 def delete_all_data():
     """Delete all data from all tables (except users table)"""
     db_url = get_database_url()
-    conn = psycopg2.connect(db_url, sslmode='require')
+    conn = psycopg2.connect(db_url)
     cur = conn.cursor()
     try:
         # Use CASCADE to truncate members table and all child tables that reference it

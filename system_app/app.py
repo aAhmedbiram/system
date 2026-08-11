@@ -206,7 +206,7 @@ def perform_attendance_backup_and_clear(performed_by='System'):
             return True, 0, "No attendance data to move"
 
         # Use one connection for transaction safety
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         
         try:

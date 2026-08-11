@@ -28,7 +28,7 @@ def run_migration(sql_file):
         
         # Connect to database
         print(f"🔌 Connecting to database...")
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        conn = psycopg2.connect(DATABASE_URL)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cur = conn.cursor()
         
