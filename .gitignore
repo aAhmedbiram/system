@@ -5,14 +5,20 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.venv/
 .pytest_cache/
 dist/
 build/
+
+# Virtual Environments
+.venv/
+venv/
 
 # Application Logs
 logs/
 
 # Environment and Data
 .env
+.env.*
 *.sqlite3
+*.sqlite3*
+*.sql
