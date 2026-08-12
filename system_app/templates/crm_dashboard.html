@@ -275,6 +275,57 @@
             color: #f44336;
             font-size: 16px;
         }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-item {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            padding: 15px 20px;
+            border-radius: 12px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-item:hover {
+            transform: translateY(-2px);
+            border-color: #4caf50;
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.2);
+        }
+
+        .stat-item.overdue {
+            border-color: rgba(244, 67, 54, 0.4);
+        }
+
+        .stat-item.overdue:hover {
+            border-color: #f44336;
+            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.3);
+        }
+
+        .stat-item-label {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .stat-item-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4caf50;
+        }
+
+        .stat-item.overdue .stat-item-value {
+            color: #f44336;
+        }
     </style>
 </head>
 <body>
@@ -283,6 +334,60 @@
             <h1>📞 CRM Leads Dashboard</h1>
             <a href="{{ url_for('index') }}" class="index-btn">🏠 Home</a>
         </header>
+
+        <!-- Pipeline Stats Grid -->
+        <h2 style="color: #4caf50; margin-bottom: 15px; font-size: 18px;">📊 Pipeline Summary</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-item-label">Total Leads</div>
+                <div id="statTotal" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">New</div>
+                <div id="statNew" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Contacted</div>
+                <div id="statContacted" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Follow-Up</div>
+                <div id="statFollowUp" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Interested</div>
+                <div id="statInterested" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Trial</div>
+                <div id="statTrial" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Won</div>
+                <div id="statWon" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Lost</div>
+                <div id="statLost" class="stat-item-value">—</div>
+            </div>
+        </div>
+
+        <!-- Follow-ups Stats Grid -->
+        <h2 style="color: #4caf50; margin-bottom: 15px; font-size: 18px;">📅 Follow-Ups</h2>
+        <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
+            <div class="stat-item overdue">
+                <div class="stat-item-label">Overdue</div>
+                <div id="followOverdue" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Today</div>
+                <div id="followToday" class="stat-item-value">—</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">Upcoming</div>
+                <div id="followUpcoming" class="stat-item-value">—</div>
+            </div>
+        </div>
 
         <!-- Filters Section -->
         <div class="filters-panel">
@@ -310,6 +415,10 @@
                     <option value="prospect">Prospect</option>
                     <option value="member">Existing Member</option>
                 </select>
+            </div>
+            <div class="filter-group">
+                <label for="sourceFilter">Source</label>
+                <input type="text" id="sourceFilter" placeholder="Filter by source...">
             </div>
         </div>
 

@@ -308,3 +308,24 @@ def get_lead_by_id_for_update(cur, lead_id):
     """Fetches a lead record and locks it exclusively using FOR UPDATE inside a transaction cursor."""
     cur.execute("SELECT * FROM crm_leads WHERE id = %s FOR UPDATE", (lead_id,))
     return cur.fetchone()
+
+def get_follow_up_summary_counts(where_clauses, args, now_cairo, today_start, today_end):
+    """Fetches summary counts of overdue, today, and upcoming follow-ups in a single aggregate query.
+    Note: The overdue dashboard count checks against today_start to guarantee mutually exclusive buckets.
+    """
+    clause_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    query = f"""
+        SELECT
+            COUNT(*) FILTER (WHERE l.next_follow_up_at < %s) AS overdue,
+            COUNT(*) FILTER (WHERE l.next_follow_up_at >= %s AND l.next_follow_up_at < %s) AS today,
+            COUNT(*) FILTER (WHERE l.next_follow_up_at >= %s) AS upcoming
+        FROM crm_leads l
+        {clause_str}
+    """
+    full_args = [today_start, today_start, today_end, today_end] + list(args)
+    res = query_db(query, tuple(full_args), one=True)
+    return {
+        "overdue": res["overdue"] if res else 0,
+        "today": res["today"] if res else 0,
+        "upcoming": res["upcoming"] if res else 0
+    }

@@ -2,11 +2,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentPage = 1;
     const perPage = 25;
     let searchTimeout = null;
+    let sourceTimeout = null;
 
     // Elements
     const searchInput = document.getElementById("searchQuery");
     const stageSelect = document.getElementById("stageFilter");
     const typeSelect = document.getElementById("typeFilter");
+    const sourceInput = document.getElementById("sourceFilter");
 
     const loadingState = document.getElementById("loadingState");
     const errorState = document.getElementById("errorState");
@@ -18,7 +20,99 @@ document.addEventListener("DOMContentLoaded", () => {
     const nextBtn = document.getElementById("nextBtn");
     const pageIndicator = document.getElementById("pageIndicator");
 
-    // Fetch and render function
+    // Restore state from URL
+    function restoreStateFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has("page")) {
+            currentPage = parseInt(urlParams.get("page")) || 1;
+        }
+        if (urlParams.has("search")) {
+            searchInput.value = urlParams.get("search");
+        }
+        if (urlParams.has("stage")) {
+            stageSelect.value = urlParams.get("stage");
+        }
+        if (urlParams.has("member_status")) {
+            typeSelect.value = urlParams.get("member_status");
+        }
+        if (urlParams.has("source")) {
+            sourceInput.value = urlParams.get("source");
+        }
+    }
+
+    // Update URL state
+    function updateUrlState() {
+        const params = new URLSearchParams();
+        if (currentPage > 1) {
+            params.append("page", currentPage);
+        }
+        const search = searchInput.value.trim();
+        if (search) {
+            params.append("search", search);
+        }
+        const stage = stageSelect.value;
+        if (stage) {
+            params.append("stage", stage);
+        }
+        const type = typeSelect.value;
+        if (type) {
+            params.append("member_status", type);
+        }
+        const source = sourceInput.value.trim();
+        if (source) {
+            params.append("source", source);
+        }
+
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "");
+        history.replaceState(null, "", newUrl);
+    }
+
+    // Fetch and render pipeline cards
+    function loadPipelineSummary() {
+        fetch("/crm/pipeline")
+            .then(res => {
+                if (!res.ok) throw new Error("Status " + res.status);
+                return res.json();
+            })
+            .then(data => {
+                let total = 0;
+                const stages = ["NEW", "CONTACTED", "FOLLOW_UP", "INTERESTED", "TRIAL", "WON", "LOST"];
+
+                stages.forEach(stage => {
+                    const count = data[stage] || 0;
+                    total += count;
+                    const elId = "stat" + stage.replace("_", "").toLowerCase().split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("");
+                    const el = document.getElementById(elId);
+                    if (el) el.textContent = count;
+                });
+
+                const totalEl = document.getElementById("statTotal");
+                if (totalEl) totalEl.textContent = total;
+            })
+            .catch(err => {
+                console.error("Failed to load pipeline stats:", err);
+            });
+    }
+
+    // Fetch and render follow-up cards
+    function loadFollowUpSummary() {
+        fetch("/crm/follow-ups/summary")
+            .then(res => {
+                if (!res.ok) throw new Error("Status " + res.status);
+                return res.json();
+            })
+            .then(data => {
+                document.getElementById("followOverdue").textContent = data.overdue ?? 0;
+                document.getElementById("followToday").textContent = data.today ?? 0;
+                document.getElementById("followUpcoming").textContent = data.upcoming ?? 0;
+            })
+            .catch(err => {
+                console.error("Failed to load follow-up stats:", err);
+            });
+    }
+
+    // Fetch and render table rows
     function fetchLeads() {
         // Show loading state
         loadingState.style.display = "block";
@@ -45,6 +139,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (memberStatus) {
             params.append("member_status", memberStatus);
         }
+
+        const source = sourceInput.value.trim();
+        if (source) {
+            params.append("source", source);
+        }
+
+        updateUrlState();
 
         fetch(`/crm/leads?${params.toString()}`)
             .then(res => {
@@ -204,6 +305,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 300); // 300ms debounce
     });
 
-    // Initial fetch
+    sourceInput.addEventListener("input", () => {
+        clearTimeout(sourceTimeout);
+        sourceTimeout = setTimeout(() => {
+            onFilterChange();
+        }, 300); // 300ms debounce
+    });
+
+    // Initial setup and load
+    restoreStateFromUrl();
+    loadPipelineSummary();
+    loadFollowUpSummary();
     fetchLeads();
 });

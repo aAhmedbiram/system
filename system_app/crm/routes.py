@@ -320,3 +320,12 @@ def convert_lead_route(lead_id):
         return jsonify({"error": "forbidden", "message": str(e)}), 403
     except CRMConflictError as e:
         return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/follow-ups/summary', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+def get_follow_ups_summary_route():
+    """Gets follow-up counts for overdue, today, and upcoming."""
+    current_user = get_current_user()
+    summary = services.get_follow_up_summary(current_user)
+    return jsonify(summary), 200

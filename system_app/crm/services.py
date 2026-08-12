@@ -842,3 +842,20 @@ def convert_lead(current_user, lead_id, data):
             }
 
     return run_in_transaction(callback)
+
+def get_follow_up_summary(current_user):
+    """Calculates counts of overdue, today, and upcoming follow-ups for the user."""
+    import datetime
+    now_cairo = datetime.datetime.now(CAIRO_TZ)
+    today_start = now_cairo.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + datetime.timedelta(days=1)
+
+    where_clauses = ["l.is_archived = FALSE", "l.stage NOT IN ('WON', 'LOST')", "l.next_follow_up_at IS NOT NULL"]
+    args = []
+
+    # Enforce visibility rules
+    if not can_view_all_leads(current_user):
+        where_clauses.append("(l.assigned_user_id = %s OR (l.created_by_user_id = %s AND l.assigned_user_id IS NULL))")
+        args.extend([current_user['id'], current_user['id']])
+
+    return queries.get_follow_up_summary_counts(where_clauses, args, now_cairo, today_start, today_end)
