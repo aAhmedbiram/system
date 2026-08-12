@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from system_app.crm.permissions import (
     login_required, crm_permission_required, get_current_user,
-    CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN
+    CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN, CRM_UPDATE_STAGE
 )
 from system_app.crm import services
 from system_app.crm.services import CRMConflictError, CRMForbiddenError, CRMNotFoundError, CRMProtectedFieldError
@@ -245,3 +245,50 @@ def list_follow_ups_route():
         return jsonify(follow_ups), 200
     except ValueError as e:
         return jsonify({"error": "invalid_input", "message": str(e)}), 400
+
+@crm_routes.route('/leads/<int:lead_id>/stage', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_UPDATE_STAGE)
+def change_lead_stage_route(lead_id):
+    """Updates lead stage with pipeline rules."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    try:
+        res = services.change_lead_stage(current_user, lead_id, data)
+        return jsonify(res), 200
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/leads/<int:lead_id>/reopen', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_UPDATE_STAGE)
+def reopen_lead_route(lead_id):
+    """Reopens a LOST lead."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    try:
+        res = services.reopen_lead(current_user, lead_id, data)
+        return jsonify(res), 200
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/pipeline', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+def get_pipeline_summary_route():
+    """Retrieves lead counts grouped by stage."""
+    current_user = get_current_user()
+    summary = services.get_pipeline_summary(current_user)
+    return jsonify(summary), 200

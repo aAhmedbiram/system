@@ -4,7 +4,8 @@ from system_app.crm.validators import (
     validate_required_string, validate_optional_string, validate_email,
     validate_positive_int, validate_pagination, validate_stage_filter,
     validate_member_status_filter, validate_user_activity_type,
-    validate_iso_timestamp, validate_future_timestamp
+    validate_iso_timestamp, validate_future_timestamp,
+    validate_stage_transition, validate_lost_reason, validate_reopen_stage
 )
 from system_app.crm import queries
 from zoneinfo import ZoneInfo
@@ -566,3 +567,139 @@ def list_follow_ups(current_user, page_param, per_page_param, filters):
         "total": total,
         "pages": pages
     }
+
+def change_lead_stage(current_user, lead_id, data):
+    """Updates a lead's sales pipeline stage and logs a STAGE_CHANGE activity record."""
+    # 1. Fetch and validate lead
+    lead = queries.get_lead_by_id(lead_id)
+    if not lead:
+        raise CRMNotFoundError("Lead not found")
+    if lead.get('is_archived'):
+        raise CRMConflictError("lead_archived", "Archived leads cannot change stage.")
+
+    # 2. Check visibility
+    if not check_lead_visibility(current_user, lead):
+        raise CRMForbiddenError("You are not authorized to view or edit this lead")
+
+    # 3. Validate transition
+    old_stage = lead['stage']
+    new_stage = validate_stage_transition(old_stage, data.get('stage'))
+    lost_reason = validate_lost_reason(new_stage, data.get('lost_reason'))
+
+    # 4. Prepare transactional queries
+    operations = []
+
+    # Update lead stage
+    # If moving to LOST, clear next_follow_up_at automatically
+    if new_stage == 'LOST':
+        lead_query = """
+            UPDATE crm_leads
+            SET stage = %s,
+                lost_reason = %s,
+                next_follow_up_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """
+        lead_args = (new_stage, lost_reason, lead_id)
+    else:
+        lead_query = """
+            UPDATE crm_leads
+            SET stage = %s,
+                lost_reason = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """
+        lead_args = (new_stage, lead_id)
+
+    operations.append((lead_query, lead_args))
+
+    # Log STAGE_CHANGE activity
+    username_snapshot = current_user.get('username')
+    activity_query = """
+        INSERT INTO crm_activities (
+            lead_id, user_id, user_username_snapshot, activity_type,
+            old_stage, new_stage, result
+        ) VALUES (%s, %s, %s, 'STAGE_CHANGE', %s, %s, %s)
+    """
+    operations.append((activity_query, (lead_id, current_user['id'], username_snapshot, old_stage, new_stage, lost_reason)))
+
+    queries.execute_transaction(operations)
+    return {
+        "status": "updated",
+        "lead_id": lead_id,
+        "old_stage": old_stage,
+        "new_stage": new_stage,
+        "lost_reason": lost_reason
+    }
+
+def reopen_lead(current_user, lead_id, data):
+    """Reopens a LOST lead, moving it back to an active stage and logging a REOPENED activity."""
+    # 1. Fetch and validate lead
+    lead = queries.get_lead_by_id(lead_id)
+    if not lead:
+        raise CRMNotFoundError("Lead not found")
+    if lead.get('is_archived'):
+        raise CRMConflictError("lead_archived", "Archived leads cannot be reopened.")
+
+    # 2. Check visibility
+    if not check_lead_visibility(current_user, lead):
+        raise CRMForbiddenError("You are not authorized to view or edit this lead")
+
+    # 3. Validate current state and target stage
+    old_stage = lead['stage']
+    if old_stage != 'LOST':
+        raise CRMConflictError("lead_not_lost", f"Only LOST leads can be reopened. Current stage: {old_stage}")
+
+    new_stage = validate_reopen_stage(data.get('stage'))
+
+    # 4. Prepare transactional queries
+    operations = []
+
+    # Update lead stage, clearing lost_reason (next_follow_up_at remains NULL until scheduled)
+    lead_query = """
+        UPDATE crm_leads
+        SET stage = %s,
+            lost_reason = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """
+    operations.append((lead_query, (new_stage, lead_id)))
+
+    # Log REOPENED activity
+    username_snapshot = current_user.get('username')
+    activity_query = """
+        INSERT INTO crm_activities (
+            lead_id, user_id, user_username_snapshot, activity_type,
+            old_stage, new_stage
+        ) VALUES (%s, %s, %s, 'REOPENED', %s, %s)
+    """
+    operations.append((activity_query, (lead_id, current_user['id'], username_snapshot, old_stage, new_stage)))
+
+    queries.execute_transaction(operations)
+    return {
+        "status": "updated",
+        "lead_id": lead_id,
+        "old_stage": old_stage,
+        "new_stage": new_stage
+    }
+
+def get_pipeline_summary(current_user):
+    """Aggregates leads counts across all valid crm stages respecting access controls."""
+    where_clauses = ["is_archived = FALSE"]
+    args = []
+
+    # 1. Enforce visibility constraints
+    if not can_view_all_leads(current_user):
+        where_clauses.append("(assigned_user_id = %s OR (created_by_user_id = %s AND assigned_user_id IS NULL))")
+        args.extend([current_user['id'], current_user['id']])
+
+    # 2. Fetch counts
+    rows = queries.get_pipeline_stage_counts(where_clauses, args)
+
+    # 3. Initialize mapping for all stages to 0
+    from system_app.crm.validators import VALID_LEAD_STAGES
+    summary = {stage: 0 for stage in VALID_LEAD_STAGES}
+    for row in rows:
+        summary[row['stage']] = row['count']
+
+    return summary

@@ -259,3 +259,14 @@ def count_follow_up_leads(where_clauses, args):
     query = f"SELECT COUNT(*) as count FROM crm_leads {where_str}"
     res = query_db(query, tuple(args), one=True)
     return res['count'] if res else 0
+
+def get_pipeline_stage_counts(where_clauses, args):
+    """Aggregates active lead stage counts respecting access restrictions."""
+    where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    query = f"""
+        SELECT stage, COUNT(*) as count
+        FROM crm_leads
+        {where_str}
+        GROUP BY stage
+    """
+    return query_db(query, tuple(args)) or []

@@ -152,3 +152,45 @@ def validate_future_timestamp(dt):
     if dt < now:
         raise ValueError("Scheduled follow-up time cannot be in the past")
     return dt
+
+ACTIVE_LEAD_STAGES = {'NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL'}
+TERMINAL_LEAD_STAGES = {'WON', 'LOST'}
+VALID_LOST_REASONS = {'PRICE', 'NO_RESPONSE', 'NOT_INTERESTED', 'JOINED_COMPETITOR', 'TIMING', 'WRONG_NUMBER', 'DUPLICATE', 'OTHER'}
+
+def validate_stage_transition(old_stage, new_stage):
+    old_upper = str(old_stage).upper().strip()
+    new_upper = str(new_stage).upper().strip()
+
+    if new_upper == 'WON':
+        raise ValueError("WON stage cannot be manually selected.")
+    if old_upper == 'WON':
+        raise ValueError("Transitions from WON stage are not allowed.")
+    if old_upper == new_upper:
+        raise ValueError("Stage change must be to a different stage.")
+    if old_upper == 'LOST':
+        raise ValueError("Stage change from LOST is not allowed through this endpoint. Please use the reopen endpoint.")
+
+    if old_upper in ACTIVE_LEAD_STAGES:
+        if new_upper in ACTIVE_LEAD_STAGES or new_upper == 'LOST':
+            return new_upper
+
+    raise ValueError(f"Invalid transition from {old_upper} to {new_upper}")
+
+def validate_lost_reason(new_stage, lost_reason):
+    new_upper = str(new_stage).upper().strip()
+    if new_upper == 'LOST':
+        if not lost_reason:
+            raise ValueError("Lost reason is required when stage is set to LOST.")
+        reason_upper = str(lost_reason).upper().strip()
+        if reason_upper not in VALID_LOST_REASONS:
+            raise ValueError(f"Invalid lost reason: {lost_reason}. Allowed: {', '.join(VALID_LOST_REASONS)}")
+        return reason_upper
+    return None
+
+def validate_reopen_stage(stage):
+    if not stage:
+        return 'FOLLOW_UP'
+    stage_upper = str(stage).upper().strip()
+    if stage_upper not in ACTIVE_LEAD_STAGES:
+        raise ValueError(f"Reopen stage must be one of the active stages: {', '.join(ACTIVE_LEAD_STAGES)}")
+    return stage_upper
