@@ -247,7 +247,12 @@
     <div class="content-wrapper">
         <header>
             <h1 id="pageHeaderTitle">📞 Lead Details</h1>
-            <a href="/crm/" class="index-btn">🔙 CRM Dashboard</a>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                {% if user_permissions.get('super_admin') or user_permissions.get('crm_edit') %}
+                <button id="openEditModalBtn" class="index-btn" style="background: linear-gradient(135deg, #2196F3, #42a5f5); border-color: rgba(33, 150, 243, 0.3);">✏️ Edit Lead</button>
+                {% endif %}
+                <a href="/crm/" class="index-btn">🔙 CRM Dashboard</a>
+            </div>
         </header>
 
         <!-- Spinner -->
@@ -332,6 +337,54 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Lead Modal -->
+    {% if user_permissions.get('super_admin') or user_permissions.get('crm_edit') %}
+    <div id="editLeadModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px);">
+        <div class="modal-content" style="background-color: rgba(30, 30, 40, 0.95); margin: 5% auto; padding: 30px; border: 1px solid rgba(76, 175, 80, 0.4); width: 85%; max-width: 600px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(76, 175, 80, 0.2); padding-bottom: 10px;">
+                <h2 style="color: #4caf50; font-size: 20px;">✏️ Edit Lead Profile</h2>
+                <span id="closeEditModal" style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+            </div>
+
+            <!-- Warning helper if linked member -->
+            <div id="editMemberWarning" style="display: none; margin-bottom: 15px; padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 6px; font-size: 12px; color: #ffc107; line-height: 1.4;">
+                💡 Note: Editing these CRM contact details does not modify the linked gym member record.
+            </div>
+
+            <form id="editLeadForm" onsubmit="event.preventDefault();">
+                <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                    <label for="editName" style="font-size: 12px; color: #4caf50; font-weight: 600;">Name</label>
+                    <input type="text" id="editName" style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                </div>
+                <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                    <label for="editPhone" style="font-size: 12px; color: #4caf50; font-weight: 600;">Phone</label>
+                    <input type="text" id="editPhone" style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                </div>
+                <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                    <label for="editEmail" style="font-size: 12px; color: #4caf50; font-weight: 600;">Email</label>
+                    <input type="email" id="editEmail" style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                </div>
+                <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                    <label for="editSource" style="font-size: 12px; color: #4caf50; font-weight: 600;">Source</label>
+                    <input type="text" id="editSource" style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                </div>
+                <div class="filter-group" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 5px;">
+                    <label for="editNotes" style="font-size: 12px; color: #4caf50; font-weight: 600;">Notes</label>
+                    <textarea id="editNotes" style="width: 100%; height: 80px; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+
+                <!-- Inline Feedback -->
+                <div id="editLeadFeedback" style="display: none; margin-bottom: 20px; padding: 15px; border-radius: 8px; font-size: 14px; background: rgba(244,67,54,0.1); border: 1px solid rgba(244,67,54,0.3); color: #f44336; line-height: 1.5;"></div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button id="cancelEditLead" type="button" class="index-btn" style="background: rgba(120,120,120,0.2); border-color: rgba(120,120,120,0.4); color: #aaa;">Cancel</button>
+                    <button id="submitEditLeadBtn" type="submit" class="index-btn" style="background: linear-gradient(135deg, #4caf50, #66d66a); border-color: rgba(76, 175, 80, 0.3);">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Hidden variable for JS -->
     <script>
