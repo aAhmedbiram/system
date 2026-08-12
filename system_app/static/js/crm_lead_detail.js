@@ -266,3 +266,355 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 });
+
+// ============================================================
+// Activity Timeline — independent module, own closure
+// Shares window.CRM_LEAD_ID set by the Jinja template.
+// Does NOT share state with the lead profile module above.
+// ============================================================
+(function () {
+    "use strict";
+
+    // ---- Constants ----
+    const PER_PAGE = 25;
+
+    // ---- State ----
+    let currentPage = 0;
+    let totalPages = 1;
+    let isLoadingActivities = false;
+
+    // ---- DOM refs ----
+    const activityLoading = document.getElementById("activityLoading");
+    const activityError   = document.getElementById("activityError");
+    const activityList    = document.getElementById("activityList");
+    const activityLoadMore= document.getElementById("activityLoadMore");
+    const loadMoreBtn     = document.getElementById("loadMoreActivitiesBtn");
+    const countBadge      = document.getElementById("activityCountBadge");
+
+    // ---- Utility: Cairo-aware timestamp formatter ----
+    function formatCairoDatetime(dtString) {
+        if (!dtString) return "—";
+        try {
+            const date = new Date(dtString);
+            return new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Africa/Cairo",
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+            }).format(date);
+        } catch (e) {
+            return dtString;
+        }
+    }
+
+    // ---- Activity type metadata ----
+    const TYPE_META = {
+        CALL:        { label: "Call",         icon: "📞", css: "type-call"     },
+        WHATSAPP:    { label: "WhatsApp",     icon: "💬", css: "type-whatsapp" },
+        VISIT:       { label: "Visit",        icon: "🏃", css: "type-visit"    },
+        NOTE:        { label: "Note",         icon: "📝", css: "type-note"     },
+        FOLLOW_UP:   { label: "Follow-Up",    icon: "🔔", css: "type-followup" },
+        STAGE_CHANGE:{ label: "Stage Changed",icon: "🔄", css: "type-system"   },
+        ASSIGNED:    { label: "Assigned",     icon: "👤", css: "type-system"   },
+        REASSIGNED:  { label: "Reassigned",   icon: "👤", css: "type-system"   },
+        CONVERTED:   { label: "Converted",    icon: "✅", css: "type-won"      },
+        REACTIVATED: { label: "Reactivated",  icon: "♻️", css: "type-system"   },
+        LOST:        { label: "Lost",         icon: "❌", css: "type-lost"     },
+        REOPENED:    { label: "Reopened",     icon: "🔓", css: "type-reopened" }
+    };
+
+    function getTypeMeta(activityType) {
+        if (TYPE_META[activityType]) return TYPE_META[activityType];
+        // Graceful fallback for unknown/future types
+        const humanLabel = activityType
+            .split("_")
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(" ");
+        return { label: humanLabel, icon: "📋", css: "type-system" };
+    }
+
+    // ---- Stage label mapper ----
+    const STAGE_LABELS = {
+        NEW: "New", CONTACTED: "Contacted", FOLLOW_UP: "Follow-Up",
+        INTERESTED: "Interested", TRIAL: "Trial", WON: "Won", LOST: "Lost"
+    };
+    function stageLabel(s) {
+        return s ? (STAGE_LABELS[s] || s) : null;
+    }
+
+    // ---- FOLLOW_UP_CLEARED marker handling ----
+    // Possible stored formats (confirmed from services.py):
+    //   "FOLLOW_UP_CLEARED"
+    //   "<user text> [FOLLOW_UP_CLEARED]"
+    const CLEARED_STANDALONE = "FOLLOW_UP_CLEARED";
+    const CLEARED_SUFFIX     = " [FOLLOW_UP_CLEARED]";
+
+    function parseResult(resultStr) {
+        if (!resultStr) return { userText: null, cleared: false };
+        let cleared = false;
+        let userText = resultStr;
+
+        if (resultStr === CLEARED_STANDALONE) {
+            return { userText: null, cleared: true };
+        }
+        if (resultStr.endsWith(CLEARED_SUFFIX)) {
+            cleared = true;
+            userText = resultStr.slice(0, resultStr.length - CLEARED_SUFFIX.length).trim() || null;
+        }
+        return { userText, cleared };
+    }
+
+    // ---- Safe text node helper ----
+    function textEl(tag, text, className) {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        el.textContent = text;
+        return el;
+    }
+
+    // ---- Render a single activity item ----
+    function renderActivityItem(item) {
+        const meta   = getTypeMeta(item.activity_type || "");
+        const actor  = item.user_username_snapshot || "System";
+        const ts     = formatCairoDatetime(item.created_at);
+
+        // Outer row
+        const row = document.createElement("div");
+        row.className = "timeline-item";
+
+        // Icon circle
+        const iconDiv = document.createElement("div");
+        iconDiv.className = "timeline-icon";
+        iconDiv.textContent = meta.icon;
+        row.appendChild(iconDiv);
+
+        // Body
+        const body = document.createElement("div");
+        body.className = "timeline-body";
+
+        // Header row: [type badge] [actor] [timestamp]
+        const headerRow = document.createElement("div");
+        headerRow.className = "timeline-header-row";
+
+        const typeBadge = document.createElement("span");
+        typeBadge.className = "timeline-type-badge " + meta.css;
+        typeBadge.textContent = meta.label;
+        headerRow.appendChild(typeBadge);
+
+        const actorSpan = document.createElement("span");
+        actorSpan.className = "timeline-actor";
+        actorSpan.textContent = actor;
+        headerRow.appendChild(actorSpan);
+
+        const tsSpan = document.createElement("span");
+        tsSpan.className = "timeline-ts";
+        tsSpan.textContent = ts;
+        headerRow.appendChild(tsSpan);
+
+        body.appendChild(headerRow);
+
+        // Note (if present)
+        if (item.note) {
+            body.appendChild(textEl("div", item.note, "timeline-note"));
+        }
+
+        // Result (strip/present FOLLOW_UP_CLEARED marker)
+        if (item.result) {
+            const parsed = parseResult(item.result);
+            if (parsed.userText) {
+                body.appendChild(textEl("div", parsed.userText, "timeline-result"));
+            }
+            if (parsed.cleared) {
+                const clearedBadge = document.createElement("span");
+                clearedBadge.className = "badge-cleared";
+                clearedBadge.textContent = "Follow-up cleared";
+                body.appendChild(clearedBadge);
+            }
+        }
+
+        // Stage change metadata (STAGE_CHANGE, LOST, REOPENED)
+        const oldSt = stageLabel(item.old_stage);
+        const newSt = stageLabel(item.new_stage);
+        if (oldSt || newSt) {
+            const metaRow = document.createElement("div");
+            metaRow.className = "timeline-meta-row";
+
+            const lbl = document.createElement("span");
+            lbl.className = "timeline-meta-label";
+            lbl.textContent = "Stage:";
+            metaRow.appendChild(lbl);
+
+            if (oldSt) {
+                metaRow.appendChild(textEl("span", oldSt, null));
+                const arrow = document.createElement("span");
+                arrow.className = "timeline-stage-arrow";
+                arrow.textContent = " → ";
+                metaRow.appendChild(arrow);
+            }
+            if (newSt) {
+                metaRow.appendChild(textEl("span", newSt, null));
+            }
+            body.appendChild(metaRow);
+        }
+
+        // Assignment metadata — only show user IDs since no snapshot for old/new assignees
+        // (backend only stores old_assigned_user_id / new_assigned_user_id, no username snapshots for them)
+        const oldAssign = item.old_assigned_user_id;
+        const newAssign = item.new_assigned_user_id;
+        if (newAssign !== null && newAssign !== undefined) {
+            const metaRow = document.createElement("div");
+            metaRow.className = "timeline-meta-row";
+            const lbl = document.createElement("span");
+            lbl.className = "timeline-meta-label";
+            lbl.textContent = "Assigned to:";
+            metaRow.appendChild(lbl);
+            metaRow.appendChild(textEl("span", "User #" + newAssign, null));
+            body.appendChild(metaRow);
+        } else if (oldAssign !== null && oldAssign !== undefined &&
+                   (item.activity_type === "ASSIGNED" || item.activity_type === "REASSIGNED")) {
+            // Reassigned to unassigned (cleared assignment)
+            const metaRow = document.createElement("div");
+            metaRow.className = "timeline-meta-row";
+            const lbl = document.createElement("span");
+            lbl.className = "timeline-meta-label";
+            lbl.textContent = "Assignment:";
+            metaRow.appendChild(lbl);
+            metaRow.appendChild(textEl("span", "Unassigned", null));
+            body.appendChild(metaRow);
+        }
+
+        // Scheduled follow-up timestamp on this activity record
+        if (item.follow_up_at) {
+            const metaRow = document.createElement("div");
+            metaRow.className = "timeline-meta-row";
+            const lbl = document.createElement("span");
+            lbl.className = "timeline-meta-label";
+            lbl.textContent = "Follow-up scheduled:";
+            metaRow.appendChild(lbl);
+            metaRow.appendChild(textEl("span", formatCairoDatetime(item.follow_up_at), null));
+            body.appendChild(metaRow);
+        }
+
+        row.appendChild(body);
+        return row;
+    }
+
+    // ---- Show/hide timeline UI states ----
+    function showTimelineLoading() {
+        activityLoading.style.display = "block";
+        activityError.style.display   = "none";
+    }
+
+    function hideTimelineLoading() {
+        activityLoading.style.display = "none";
+    }
+
+    function showTimelineError(message) {
+        activityLoading.style.display = "none";
+        activityError.textContent     = message;
+        activityError.style.display   = "block";
+    }
+
+    // ---- Load a page of activities ----
+    function loadActivities(page) {
+        if (isLoadingActivities) return;
+        const leadId = window.CRM_LEAD_ID;
+        if (!leadId) return;
+
+        isLoadingActivities = true;
+
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled    = true;
+            loadMoreBtn.textContent = "Loading...";
+        }
+
+        if (page === 1) {
+            showTimelineLoading();
+        }
+
+        fetch("/crm/leads/" + leadId + "/activities?page=" + page + "&per_page=" + PER_PAGE)
+            .then(function (res) {
+                if (res.status === 403) {
+                    throw new Error("Access denied to activity timeline.");
+                }
+                if (res.status === 404) {
+                    throw new Error("Lead not found.");
+                }
+                if (!res.ok) {
+                    throw new Error("Timeline request failed (" + res.status + ").");
+                }
+                return res.json();
+            })
+            .then(function (data) {
+                hideTimelineLoading();
+
+                currentPage = data.page;
+                totalPages  = data.pages;
+
+                // Update count badge
+                if (countBadge) {
+                    countBadge.textContent = data.total;
+                    countBadge.style.display = "inline-block";
+                }
+
+                const items = data.items || [];
+
+                if (page === 1 && items.length === 0) {
+                    // Empty state
+                    const emptyEl = document.createElement("div");
+                    emptyEl.className = "timeline-empty";
+                    emptyEl.textContent = "No CRM activity has been recorded for this lead yet.";
+                    activityList.appendChild(emptyEl);
+                } else {
+                    // Append items (page 2+ appends below existing)
+                    items.forEach(function (item) {
+                        activityList.appendChild(renderActivityItem(item));
+                    });
+                }
+
+                // Load More button visibility
+                if (currentPage < totalPages) {
+                    activityLoadMore.style.display = "block";
+                    if (loadMoreBtn) {
+                        loadMoreBtn.disabled    = false;
+                        loadMoreBtn.textContent = "Load More";
+                    }
+                } else {
+                    activityLoadMore.style.display = "none";
+                }
+
+                isLoadingActivities = false;
+            })
+            .catch(function (err) {
+                hideTimelineLoading();
+                isLoadingActivities = false;
+                // Re-enable load more for retry if on page > 1
+                if (page > 1) {
+                    activityLoadMore.style.display = "block";
+                    if (loadMoreBtn) {
+                        loadMoreBtn.disabled    = false;
+                        loadMoreBtn.textContent = "Retry";
+                    }
+                }
+                showTimelineError("Could not load activity timeline. " + (err.message || ""));
+            });
+    }
+
+    // ---- Load More button handler ----
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener("click", function () {
+            if (!isLoadingActivities && currentPage < totalPages) {
+                loadActivities(currentPage + 1);
+            }
+        });
+    }
+
+    // ---- Initial load (after DOM ready) ----
+    document.addEventListener("DOMContentLoaded", function () {
+        loadActivities(1);
+    });
+
+}());
