@@ -3,7 +3,8 @@ from system_app.crm.permissions import can_view_all_leads
 from system_app.crm.validators import (
     validate_required_string, validate_optional_string, validate_email,
     validate_positive_int, validate_pagination, validate_stage_filter,
-    validate_member_status_filter
+    validate_member_status_filter, validate_user_activity_type,
+    validate_iso_timestamp, validate_future_timestamp
 )
 from system_app.crm import queries
 
@@ -403,3 +404,157 @@ def bulk_assign_leads(current_user, lead_ids_raw, target_user_id):
     if operations:
         queries.execute_transaction(operations)
     return True
+
+def add_activity(current_user, lead_id, data):
+    """Creates a new timeline activity record and atomically manages follow-up scheduling."""
+    # 1. Fetch and validate lead
+    lead = queries.get_lead_by_id(lead_id)
+    if not lead:
+        raise CRMNotFoundError("Lead not found")
+    if lead.get('is_archived'):
+        raise CRMConflictError("lead_archived", "Archived leads cannot receive new activities.")
+
+    # 2. Check visibility
+    if not check_lead_visibility(current_user, lead):
+        raise CRMForbiddenError("You are not authorized to view or edit this lead")
+
+    # 3. Parse and validate parameters
+    activity_type = validate_user_activity_type(data.get('activity_type'))
+    note = validate_optional_string(data.get('note'))
+    result = validate_optional_string(data.get('result'))
+
+    # Check follow-up field semantics
+    # We check if key exists in dictionary to distinguish omitted vs explicit null
+    has_follow_up_key = 'next_follow_up_at' in data
+    follow_up_dt = None
+
+    if has_follow_up_key:
+        raw_val = data.get('next_follow_up_at')
+        if raw_val is not None:
+            # Timestamp provided
+            follow_up_dt = validate_iso_timestamp(raw_val)
+            validate_future_timestamp(follow_up_dt)
+
+    # Business constraint rule for FOLLOW_UP type: requires note or timestamp
+    if activity_type == 'FOLLOW_UP':
+        if not note and (not has_follow_up_key or data.get('next_follow_up_at') is None):
+            raise ValueError("FOLLOW_UP activity requires either a note or a scheduled follow-up time.")
+
+    # 4. Prepare database transactional statements
+    operations = []
+
+    # A. Insert Activity
+    username_snapshot = current_user.get('username')
+    activity_query = """
+        INSERT INTO crm_activities (
+            lead_id, user_id, user_username_snapshot, activity_type,
+            note, result, follow_up_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """
+    operations.append((activity_query, (lead_id, current_user['id'], username_snapshot, activity_type, note, result, follow_up_dt)))
+
+    # B. Update Lead next_follow_up_at if follow-up key is present
+    if has_follow_up_key:
+        lead_update_query = """
+            UPDATE crm_leads
+            SET next_follow_up_at = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """
+        operations.append((lead_update_query, (follow_up_dt, lead_id)))
+
+    # Run atomically
+    queries.execute_transaction(operations)
+    return True
+
+def list_activities(current_user, lead_id, page_param, per_page_param):
+    """Retrieves chronological activity log timeline for an authorized user."""
+    # 1. Fetch and validate lead
+    lead = queries.get_lead_by_id(lead_id)
+    if not lead:
+        raise CRMNotFoundError("Lead not found")
+
+    # 2. Check visibility
+    if not check_lead_visibility(current_user, lead):
+        raise CRMForbiddenError("You are not authorized to view this lead's activities")
+
+    # 3. Paginate
+    page, per_page = validate_pagination(page_param, per_page_param)
+    offset = (page - 1) * per_page
+
+    # Fetch
+    items = queries.get_activities(lead_id, per_page, offset)
+    total = queries.count_activities(lead_id)
+    pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+    # Serialize items safely converting datetime objects to strings if needed
+    serialized = []
+    for item in items:
+        serialized.append(dict(item))
+
+    return {
+        "items": serialized,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "pages": pages
+    }
+
+def list_follow_ups(current_user, page_param, per_page_param, filters):
+    """Lists leads scheduled for follow-up, sorted and timezone-filtered."""
+    page, per_page = validate_pagination(page_param, per_page_param)
+    offset = (page - 1) * per_page
+
+    # Active stage constraint: NEW, CONTACTED, FOLLOW_UP, INTERESTED, TRIAL (non-terminal)
+    where_clauses = [
+        "is_archived = FALSE",
+        "stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')",
+        "next_follow_up_at IS NOT NULL"
+    ]
+    args = []
+
+    # 1. Enforce visibility rules
+    if not can_view_all_leads(current_user):
+        where_clauses.append("(assigned_user_id = %s OR (created_by_user_id = %s AND assigned_user_id IS NULL))")
+        args.extend([current_user['id'], current_user['id']])
+
+    # 2. Cairo calendar day computations (GMT+3 offset)
+    import datetime
+    tz_cairo = datetime.timezone(datetime.timedelta(hours=3))
+    now_cairo = datetime.datetime.now(tz_cairo)
+    today_start = now_cairo.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + datetime.timedelta(days=1)
+
+    # 3. Filter statuses
+    status_filter = filters.get('status')
+    order_by = "next_follow_up_at ASC"  # Default ordering
+
+    if status_filter == 'today':
+        where_clauses.append("next_follow_up_at >= %s AND next_follow_up_at < %s")
+        args.extend([today_start, today_end])
+    elif status_filter == 'overdue':
+        where_clauses.append("next_follow_up_at < %s")
+        args.append(now_cairo)
+    elif status_filter == 'upcoming':
+        where_clauses.append("next_follow_up_at >= %s")
+        args.append(today_end)
+
+    # Fetch
+    items = queries.get_follow_up_leads(where_clauses, args, per_page, offset, order_by)
+    total = queries.count_follow_up_leads(where_clauses, args)
+    pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+    # Map items to include is_existing_member flag
+    serialized = []
+    for item in items:
+        lead_dict = dict(item)
+        lead_dict['is_existing_member'] = lead_dict['member_id'] is not None
+        serialized.append(lead_dict)
+
+    return {
+        "items": serialized,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "pages": pages
+    }

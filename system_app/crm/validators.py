@@ -112,3 +112,40 @@ def validate_integer_list(val, name):
         return cleaned
     except (ValueError, TypeError):
         raise ValueError(f"'{name}' must contain integers only")
+
+USER_ACTIVITY_TYPES = {
+    'CALL',
+    'WHATSAPP',
+    'VISIT',
+    'NOTE',
+    'FOLLOW_UP'
+}
+
+def validate_user_activity_type(val):
+    if not val:
+        raise ValueError("'activity_type' is required")
+    val_upper = str(val).upper().strip()
+    if val_upper not in USER_ACTIVITY_TYPES:
+        raise ValueError(f"Invalid activity type: {val}. Allowed: {', '.join(USER_ACTIVITY_TYPES)}")
+    return val_upper
+
+def validate_iso_timestamp(val):
+    if val is None:
+        return None
+    import datetime
+    try:
+        dt = datetime.datetime.fromisoformat(str(val))
+        if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+            raise ValueError("Timestamp must be timezone-aware (e.g. +03:00)")
+        return dt
+    except Exception as e:
+        raise ValueError(f"Invalid timezone-aware ISO-8601 timestamp: {e}")
+
+def validate_future_timestamp(dt):
+    if dt is None:
+        return None
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if dt < now:
+        raise ValueError("Scheduled follow-up time cannot be in the past")
+    return dt

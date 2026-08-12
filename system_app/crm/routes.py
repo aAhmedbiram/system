@@ -193,3 +193,55 @@ def bulk_assign_leads_route():
         return jsonify({"error": e.error_code if hasattr(e, 'error_code') else "not_found", "message": str(e)}), 404
     except CRMConflictError as e:
         return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/leads/<int:lead_id>/activities', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_EDIT)
+def create_activity_route(lead_id):
+    """Creates a new activity entry and updates lead follow-ups."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    try:
+        services.add_activity(current_user, lead_id, data)
+        return jsonify({"status": "created"}), 201
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/leads/<int:lead_id>/activities', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+def list_activities_route(lead_id):
+    """Retrieves lead activity log timeline."""
+    current_user = get_current_user()
+    page = request.args.get('page')
+    per_page = request.args.get('per_page')
+    try:
+        timeline = services.list_activities(current_user, lead_id, page, per_page)
+        return jsonify(timeline), 200
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+
+@crm_routes.route('/follow-ups', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+def list_follow_ups_route():
+    """Lists pending follow-up leads for the user or organization."""
+    current_user = get_current_user()
+    page = request.args.get('page')
+    per_page = request.args.get('per_page')
+    filters = {
+        'status': request.args.get('status')
+    }
+    try:
+        follow_ups = services.list_follow_ups(current_user, page, per_page, filters)
+        return jsonify(follow_ups), 200
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400

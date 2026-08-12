@@ -223,3 +223,39 @@ def execute_transaction(operations):
                 pool.putconn(conn)
             else:
                 conn.close()
+
+def get_activities(lead_id, limit, offset):
+    """Fetches chronological list of activities for a lead."""
+    query = """
+        SELECT * FROM crm_activities
+        WHERE lead_id = %s
+        ORDER BY created_at DESC, id DESC
+        LIMIT %s OFFSET %s
+    """
+    return query_db(query, (lead_id, limit, offset)) or []
+
+def count_activities(lead_id):
+    """Counts total activity timeline items for a lead."""
+    res = query_db("SELECT COUNT(*) as count FROM crm_activities WHERE lead_id = %s", (lead_id,), one=True)
+    return res['count'] if res else 0
+
+def get_follow_up_leads(where_clauses, args, limit, offset, order_by_clause):
+    """Retrieves lead records that have pending follow-up schedules."""
+    where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    query = f"""
+        SELECT id, member_id, name, phone, email, source, stage,
+               assigned_user_id, next_follow_up_at, is_archived
+        FROM crm_leads
+        {where_str}
+        ORDER BY {order_by_clause}
+        LIMIT %s OFFSET %s
+    """
+    full_args = list(args) + [limit, offset]
+    return query_db(query, tuple(full_args)) or []
+
+def count_follow_up_leads(where_clauses, args):
+    """Counts total lead records that match follow-up filters."""
+    where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    query = f"SELECT COUNT(*) as count FROM crm_leads {where_str}"
+    res = query_db(query, tuple(args), one=True)
+    return res['count'] if res else 0
