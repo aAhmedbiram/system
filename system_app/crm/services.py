@@ -8,6 +8,8 @@ from system_app.crm.validators import (
     validate_stage_transition, validate_lost_reason, validate_reopen_stage
 )
 from system_app.crm import queries
+from system_app.crm.queries import run_in_transaction
+from system_app.member_services import create_member_in_transaction, renew_member_in_transaction, DuplicateMemberError
 from zoneinfo import ZoneInfo
 
 CAIRO_TZ = ZoneInfo("Africa/Cairo")
@@ -703,3 +705,140 @@ def get_pipeline_summary(current_user):
         summary[row['stage']] = row['count']
 
     return summary
+
+def convert_lead(current_user, lead_id, data):
+    """Converts a prospect or reactivates an existing member lead atomically inside a locked transaction."""
+    def callback(cur):
+        # 1. Fetch lead and lock row FOR UPDATE
+        lead = queries.get_lead_by_id_for_update(cur, lead_id)
+        if not lead:
+            raise CRMNotFoundError("Lead not found")
+
+        # 2. Revalidate state after lock
+        if lead.get('is_archived'):
+            raise CRMConflictError("lead_archived", "Archived leads cannot be converted.")
+        if lead.get('stage') == 'WON' or lead.get('converted_at') is not None:
+            raise CRMConflictError("already_converted", "This lead is already converted.")
+        if lead.get('stage') == 'LOST':
+            raise CRMConflictError("lead_lost", "LOST leads cannot be directly converted. Please reopen them first.")
+
+        # 3. Check Visibility
+        if not check_lead_visibility(current_user, lead):
+            raise CRMForbiddenError("You are not authorized to convert this lead.")
+
+        username = current_user.get('username', 'Unknown')
+
+        # Branch Case A / Case B
+        if lead.get('member_id') is None:
+            # CASE A: New Prospect
+            member_data = {
+                "name": lead['name'],
+                "phone": lead['phone'],
+                "email": lead.get('email'),
+                "gender": data.get('gender'),
+                "birthdate": data.get('birthdate'),
+                "starting_date": data.get('starting_date'),
+                "actual_starting_date": data.get('actual_starting_date'),
+                "membership_packages": data.get('membership_packages'),
+                "membership_fees": data.get('membership_fees'),
+                "comment": data.get('comment'),
+                "national_id": data.get('national_id')
+            }
+            import psycopg2
+            try:
+                res = create_member_in_transaction(cur, member_data, username)
+            except DuplicateMemberError as e:
+                raise CRMConflictError("duplicate_member", str(e))
+            except ValueError as e:
+                raise e
+            except psycopg2.IntegrityError as e:
+                if hasattr(e, 'pgcode') and e.pgcode == '23505':
+                    raise CRMConflictError("duplicate_member", "A member with this phone or national ID already exists.")
+                raise e
+
+            member_id = res['member_id']
+            invoice_id = res['invoice_id']
+            invoice_number = res['invoice_number']
+
+            # Update CRM Lead
+            query_update = """
+                UPDATE crm_leads
+                SET member_id = %s,
+                    stage = 'WON',
+                    converted_by_user_id = %s,
+                    converted_at = CURRENT_TIMESTAMP,
+                    next_follow_up_at = NULL,
+                    lost_reason = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s;
+            """
+            cur.execute(query_update, (member_id, current_user['id'], lead_id))
+
+            # Log CRM Activity
+            query_act = """
+                INSERT INTO crm_activities (
+                    lead_id, user_id, user_username_snapshot, activity_type,
+                    old_stage, new_stage, result, note
+                ) VALUES (%s, %s, %s, 'CONVERTED', %s, 'WON', 'NEW_MEMBER', %s);
+            """
+            note_str = f"Converted to member ID: {member_id}"
+            cur.execute(query_act, (lead_id, current_user['id'], username, lead['stage'], note_str))
+
+            return {
+                "status": "converted",
+                "conversion_type": "new_member",
+                "lead_id": lead_id,
+                "member_id": member_id,
+                "stage": "WON",
+                "invoice_id": invoice_id,
+                "invoice_number": invoice_number
+            }
+        else:
+            # CASE B: Existing Member Reactivation
+            member_id = lead['member_id']
+            renew_data = {
+                "starting_date": data.get('starting_date'),
+                "membership_packages": data.get('membership_packages'),
+                "membership_fees": data.get('membership_fees')
+            }
+            try:
+                res = renew_member_in_transaction(cur, member_id, renew_data, username)
+            except ValueError as e:
+                raise CRMConflictError("reactivation_failed", str(e))
+
+            invoice_id = res['invoice_id']
+            invoice_number = res['invoice_number']
+
+            # Update CRM Lead
+            query_update = """
+                UPDATE crm_leads
+                SET stage = 'WON',
+                    converted_by_user_id = %s,
+                    converted_at = CURRENT_TIMESTAMP,
+                    next_follow_up_at = NULL,
+                    lost_reason = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s;
+            """
+            cur.execute(query_update, (current_user['id'], lead_id))
+
+            # Log CRM Activity
+            query_act = """
+                INSERT INTO crm_activities (
+                    lead_id, user_id, user_username_snapshot, activity_type,
+                    old_stage, new_stage, result
+                ) VALUES (%s, %s, %s, 'REACTIVATED', %s, 'WON', 'REACTIVATION');
+            """
+            cur.execute(query_act, (lead_id, current_user['id'], username, lead['stage']))
+
+            return {
+                "status": "converted",
+                "conversion_type": "reactivation",
+                "lead_id": lead_id,
+                "member_id": member_id,
+                "stage": "WON",
+                "invoice_id": invoice_id,
+                "invoice_number": invoice_number
+            }
+
+    return run_in_transaction(callback)

@@ -5,6 +5,10 @@ from system_app.func import (
     compare_dates, calculate_invitations, validate_national_id
 )
 
+class DuplicateMemberError(ValueError):
+    """Exception raised when trying to create a member that already exists."""
+    pass
+
 def generate_invoice_number_in_transaction(cur):
     """Generates a unique invoice number inside a locked transaction to prevent collisions."""
     # Lock the invoices table exclusively for the duration of this transaction
@@ -32,12 +36,12 @@ def generate_invoice_number_in_transaction(cur):
 
 def create_member_in_transaction(cur, data, actor_username='Unknown'):
     """Atomic transaction-aware creation of a new member, including invoice and logging."""
-    name = str(data.get('name', '')).strip().capitalize()
+    name = str(data.get('name') or '').strip().capitalize()
     if not name:
         raise ValueError("Member name is required!")
 
-    phone = str(data.get('phone', '')).strip()
-    national_id = str(data.get('national_id', '')).strip() if data.get('national_id') else None
+    phone = str(data.get('phone') or '').strip()
+    national_id = str(data.get('national_id') or '').strip() if data.get('national_id') else None
 
     if national_id and not validate_national_id(national_id):
         raise ValueError("Invalid National ID! Must be exactly 14 digits.")
@@ -57,16 +61,18 @@ def create_member_in_transaction(cur, data, actor_username='Unknown'):
         existing = cur.fetchone()
 
     if existing:
-        raise ValueError(f"The member you tried to add is already a member. His ID is: {existing['id']}")
+        raise DuplicateMemberError(f"The member you tried to add is already a member. His ID is: {existing['id']}")
 
-    gender = data.get('gender', '')
-    birthdate = data.get('birthdate', '')
+    gender = data.get('gender') or ''
+    birthdate = data.get('birthdate') or ''
     age = calculate_age(birthdate) if birthdate else None
 
-    starting_date = data.get('starting_date', '')
-    actual_starting_date = data.get('actual_starting_date', '')
+    starting_date = data.get('starting_date') or ''
+    actual_starting_date = data.get('actual_starting_date') or ''
 
-    package = data.get('membership_packages', '').strip()
+    package = (data.get('membership_packages') or '').strip()
+    if not package:
+        raise ValueError("Membership package is required!")
 
     # Parse package duration
     numeric_value, unit = ("", "")

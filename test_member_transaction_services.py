@@ -6,7 +6,7 @@ from system_app.queries import query_db
 from system_app.crm.queries import run_in_transaction
 from system_app.member_services import (
     create_member_in_transaction, renew_member_in_transaction,
-    generate_invoice_number_in_transaction
+    generate_invoice_number_in_transaction, DuplicateMemberError
 )
 
 class TestMemberTransactionServices(unittest.TestCase):
@@ -182,7 +182,7 @@ class TestMemberTransactionServices(unittest.TestCase):
         run_in_transaction(lambda cur: create_member_in_transaction(cur, data1))
 
         # Try second
-        with self.assertRaises(ValueError):
+        with self.assertRaises(DuplicateMemberError):
             run_in_transaction(lambda cur: create_member_in_transaction(cur, data2))
 
     # ==========================================

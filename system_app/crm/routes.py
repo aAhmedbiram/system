@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from system_app.crm.permissions import (
     login_required, crm_permission_required, get_current_user,
-    CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN, CRM_UPDATE_STAGE
+    CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN, CRM_UPDATE_STAGE, CRM_CONVERT
 )
 from system_app.crm import services
 from system_app.crm.services import CRMConflictError, CRMForbiddenError, CRMNotFoundError, CRMProtectedFieldError
@@ -292,3 +292,22 @@ def get_pipeline_summary_route():
     current_user = get_current_user()
     summary = services.get_pipeline_summary(current_user)
     return jsonify(summary), 200
+
+@crm_routes.route('/leads/<int:lead_id>/convert', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_CONVERT)
+def convert_lead_route(lead_id):
+    """Converts a lead into a gym member or reactivates an existing member."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    try:
+        res = services.convert_lead(current_user, lead_id, data)
+        return jsonify(res), 200
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409

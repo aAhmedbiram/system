@@ -301,3 +301,8 @@ def get_pipeline_stage_counts(where_clauses, args):
         GROUP BY stage
     """
     return query_db(query, tuple(args)) or []
+
+def get_lead_by_id_for_update(cur, lead_id):
+    """Fetches a lead record and locks it exclusively using FOR UPDATE inside a transaction cursor."""
+    cur.execute("SELECT * FROM crm_leads WHERE id = %s FOR UPDATE", (lead_id,))
+    return cur.fetchone()
