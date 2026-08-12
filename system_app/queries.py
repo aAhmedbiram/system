@@ -385,6 +385,63 @@ def create_table():
             )
         ''')
 
+        # --- CRM MODULE TABLES (Phase 1A) ---
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS crm_campaigns (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                description TEXT NULL,
+                created_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE
+            )
+        ''')
+
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS crm_leads (
+                id SERIAL PRIMARY KEY,
+                member_id INTEGER NULL REFERENCES members(id) ON DELETE SET NULL,
+                name VARCHAR(255) NOT NULL,
+                phone VARCHAR(50) NOT NULL,
+                email VARCHAR(255) NULL,
+                source VARCHAR(50) NOT NULL,
+                stage VARCHAR(50) NOT NULL DEFAULT 'NEW',
+                assigned_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                assigned_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                assigned_at TIMESTAMP WITH TIME ZONE NULL,
+                campaign_id INTEGER NULL REFERENCES crm_campaigns(id) ON DELETE SET NULL,
+                next_follow_up_at TIMESTAMP WITH TIME ZONE NULL,
+                lost_reason VARCHAR(100) NULL,
+                notes TEXT NULL,
+                created_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                converted_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                converted_at TIMESTAMP WITH TIME ZONE NULL,
+                is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+                CONSTRAINT chk_crm_leads_stage CHECK (stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL', 'WON', 'LOST'))
+            )
+        ''')
+
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS crm_activities (
+                id SERIAL PRIMARY KEY,
+                lead_id INTEGER NOT NULL REFERENCES crm_leads(id) ON DELETE RESTRICT,
+                user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                user_username_snapshot VARCHAR(255) NULL,
+                activity_type VARCHAR(50) NOT NULL,
+                note TEXT NULL,
+                result TEXT NULL,
+                old_stage VARCHAR(50) NULL,
+                new_stage VARCHAR(50) NULL,
+                old_assigned_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                new_assigned_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                follow_up_at TIMESTAMP WITH TIME ZONE NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT chk_crm_activities_type CHECK (activity_type IN ('CALL', 'WHATSAPP', 'VISIT', 'NOTE', 'FOLLOW_UP', 'STAGE_CHANGE', 'ASSIGNED', 'REASSIGNED', 'CONVERTED', 'REACTIVATED', 'LOST', 'REOPENED'))
+            )
+        ''')
+
         # Create indexes for better query performance
         try:
             # Indexes for members table (frequently queried columns)
@@ -392,6 +449,24 @@ def create_table():
             cr.execute('CREATE INDEX IF NOT EXISTS idx_members_phone ON members(phone)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_members_email ON members(email)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_members_id ON members(id)')
+
+            # Indexes for CRM module (Phase 1A)
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_leads_member_id ON crm_leads(member_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_leads_assigned_user ON crm_leads(assigned_user_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_leads_stage ON crm_leads(stage)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_leads_next_follow_up ON crm_leads(next_follow_up_at)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_leads_campaign ON crm_leads(campaign_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_leads_created_at ON crm_leads(created_at)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_activities_lead_id ON crm_activities(lead_id)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_activities_created_at ON crm_activities(created_at)')
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_crm_activities_user_id ON crm_activities(user_id)')
+            cr.execute('''
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_member_lead
+                ON crm_leads(member_id)
+                WHERE member_id IS NOT NULL
+                  AND stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')
+                  AND is_archived = FALSE
+            ''')
             
             # Indexes for training templates and plans
             cr.execute('CREATE INDEX IF NOT EXISTS idx_training_templates_category ON training_templates(category)')
