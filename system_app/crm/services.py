@@ -7,6 +7,9 @@ from system_app.crm.validators import (
     validate_iso_timestamp, validate_future_timestamp
 )
 from system_app.crm import queries
+from zoneinfo import ZoneInfo
+
+CAIRO_TZ = ZoneInfo("Africa/Cairo")
 
 class CRMConflictError(Exception):
     def __init__(self, error_code, message, details=None):
@@ -434,6 +437,12 @@ def add_activity(current_user, lead_id, data):
             # Timestamp provided
             follow_up_dt = validate_iso_timestamp(raw_val)
             validate_future_timestamp(follow_up_dt)
+        else:
+            # Explicit null: clear follow-up and mark activity record as cleared
+            if result:
+                result = f"{result} [FOLLOW_UP_CLEARED]"
+            else:
+                result = "FOLLOW_UP_CLEARED"
 
     # Business constraint rule for FOLLOW_UP type: requires note or timestamp
     if activity_type == 'FOLLOW_UP':
@@ -518,10 +527,9 @@ def list_follow_ups(current_user, page_param, per_page_param, filters):
         where_clauses.append("(assigned_user_id = %s OR (created_by_user_id = %s AND assigned_user_id IS NULL))")
         args.extend([current_user['id'], current_user['id']])
 
-    # 2. Cairo calendar day computations (GMT+3 offset)
+    # 2. Cairo calendar day computations using ZoneInfo("Africa/Cairo")
     import datetime
-    tz_cairo = datetime.timezone(datetime.timedelta(hours=3))
-    now_cairo = datetime.datetime.now(tz_cairo)
+    now_cairo = datetime.datetime.now(CAIRO_TZ)
     today_start = now_cairo.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + datetime.timedelta(days=1)
 

@@ -275,8 +275,9 @@ class TestCRMPhase1E(unittest.TestCase):
         self.assertIsNone(lead_cleared['next_follow_up_at'])
 
         # Check historical activity follow_up_at is indeed null
-        act = query_db("SELECT follow_up_at FROM crm_activities WHERE lead_id = %s ORDER BY id DESC LIMIT 1", (lead_id,), one=True)
+        act = query_db("SELECT * FROM crm_activities WHERE lead_id = %s ORDER BY id DESC LIMIT 1", (lead_id,), one=True)
         self.assertIsNone(act['follow_up_at'])
+        self.assertIn("FOLLOW_UP_CLEARED", act['result'])
 
     # ==========================================
     # G. VALIDATION
@@ -463,9 +464,10 @@ class TestCRMPhase1E(unittest.TestCase):
         res = self.client.post('/crm/leads', json={"name": "P18", "phone": "1021", "source": "WALK_IN"})
         lead_id = res.get_json()['id']
 
-        # Set next_follow_up_at to exactly 1 minute before Cairo midnight today
-        tz_cairo = datetime.timezone(datetime.timedelta(hours=3))
-        now_cairo = datetime.datetime.now(tz_cairo)
+        # Set next_follow_up_at to exactly 1 minute before Cairo midnight today using ZoneInfo
+        from zoneinfo import ZoneInfo
+        cairo_tz = ZoneInfo("Africa/Cairo")
+        now_cairo = datetime.datetime.now(cairo_tz)
         midnight_today = now_cairo.replace(hour=23, minute=59, second=0, microsecond=0)
 
         self.client.post(f'/crm/leads/{lead_id}/activities', json={

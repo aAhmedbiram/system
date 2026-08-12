@@ -1,4 +1,7 @@
 import re
+from zoneinfo import ZoneInfo
+
+CAIRO_TZ = ZoneInfo("Africa/Cairo")
 
 VALID_LEAD_STAGES = [
     'NEW',
@@ -145,7 +148,7 @@ def validate_future_timestamp(dt):
     if dt is None:
         return None
     import datetime
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(CAIRO_TZ)
     if dt < now:
         raise ValueError("Scheduled follow-up time cannot be in the past")
     return dt
