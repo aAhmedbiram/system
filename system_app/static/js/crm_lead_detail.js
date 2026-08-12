@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // CRM Info
         document.getElementById("leadSource").textContent = lead.source || "—";
         document.getElementById("leadAssignee").textContent = lead.assigned_username || "Unassigned";
-        document.getElementById("leadFollowUp").textContent = formatDatetime(lead.next_follow_up_at);
+        renderFollowUpVal(lead.next_follow_up_at);
         document.getElementById("leadCreated").textContent = formatDatetime(lead.created_at);
         document.getElementById("leadNotes").textContent = lead.notes || "—";
 
@@ -104,11 +104,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 currentLead = lead;
                 renderLead(lead);
                 container.style.display = "block";
+                // Notify composer that lead data is available
+                document.dispatchEvent(new CustomEvent("crm:leadLoaded", { detail: lead }));
             })
             .catch(err => {
                 console.error("Error fetching lead parameters:", err);
             });
     }
+
+    // Expose for composer cross-module reload
+    window.reloadLead = loadLead;
 
     // Initial load
     loadLead();
@@ -265,7 +270,281 @@ document.addEventListener("DOMContentLoaded", () => {
             return dtString;
         }
     }
+
+    // ---- Follow-up Cairo-aware urgency display ----
+    // Computes today_start / today_end in Africa/Cairo using Cairo calendar parts.
+    function getCairoDayBoundaries() {
+        const now = new Date();
+        const parts = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Africa/Cairo",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+        }).formatToParts(now);
+        const partMap = {};
+        parts.forEach(function (part) {
+            partMap[part.type] = part.value;
+        });
+        const cairoDateStr = partMap.year + "-" + partMap.month + "-" + partMap.day;
+        const todayStart = new Date(cairoDateStr + "T00:00:00+03:00");
+        const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+        return { todayStart, todayEnd };
+    }
+
+    function renderFollowUpVal(dtString) {
+        const container = document.getElementById("leadFollowUp");
+        container.innerHTML = "";
+        container.className = "info-val";
+
+        if (!dtString) {
+            container.textContent = "No follow-up scheduled";
+            return;
+        }
+
+        const dt = new Date(dtString);
+        if (isNaN(dt.getTime())) {
+            container.textContent = dtString;
+            return;
+        }
+
+        const { todayStart, todayEnd } = getCairoDayBoundaries();
+
+        // Format the time in Cairo
+        const formatted = new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Africa/Cairo",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false
+        }).format(dt);
+
+        // Determine urgency
+        let urgencyClass = null;
+        let urgencyLabel = null;
+        if (dt < todayStart) {
+            urgencyClass = "overdue";
+            urgencyLabel = "Overdue";
+        } else if (dt >= todayStart && dt < todayEnd) {
+            urgencyClass = "today";
+            urgencyLabel = "Today";
+        } else {
+            urgencyClass = "upcoming";
+            urgencyLabel = "Upcoming";
+        }
+
+        // Wrap in flex container
+        container.className = "info-val followup-val-wrap";
+
+        const timeSpan = document.createElement("span");
+        timeSpan.textContent = formatted;
+        container.appendChild(timeSpan);
+
+        const badge = document.createElement("span");
+        badge.className = "followup-urgency " + urgencyClass;
+        badge.textContent = urgencyLabel;
+        container.appendChild(badge);
+    }
 });
+
+// ============================================================
+// Activity Composer — independent module, own closure
+// Requires: window.CRM_LEAD_ID, window.CRM_USER_CAN_EDIT
+// Relies on the timeline module exposing window.reloadTimeline
+// ============================================================
+(function () {
+    "use strict";
+
+    // Wait for DOM
+    document.addEventListener("DOMContentLoaded", function () {
+
+        if (!window.CRM_USER_CAN_EDIT) return; // Non-editor: no composer in DOM
+
+        const leadId       = window.CRM_LEAD_ID;
+        const submitBtn    = document.getElementById("submitActivityBtn");
+        const clearBtn     = document.getElementById("clearFollowUpBtn");
+        const typeSelect   = document.getElementById("composerType");
+        const noteTA       = document.getElementById("composerNote");
+        const resultTA     = document.getElementById("composerResult");
+        const followUpIn   = document.getElementById("composerFollowUp");
+        const feedbackEl   = document.getElementById("composerFeedback");
+
+        if (!submitBtn || !leadId) return;
+
+        // ---- Double-submit guard ----
+        let isSubmitting = false;
+
+        // ---- Follow-up intent state ----
+        // null  = omit (keep current)
+        // false = explicit clear (send null)
+        // dt    = ISO string (set)
+        let followUpIntent = null; // null means omit
+        let clearIntentActive = false;
+
+        // ---- Cairo timezone constant ----
+        // Africa/Cairo is UTC+3 year-round (no DST)
+        const CAIRO_OFFSET_HOURS = 3;
+
+        // ---- Convert datetime-local value to Cairo-aware ISO 8601 string ----
+        // datetime-local gives "YYYY-MM-DDTHH:MM" without timezone.
+        // We treat it as Cairo local time and append +03:00.
+        function toCaroISO(localStr) {
+            if (!localStr) return null;
+            // Ensure seconds are present
+            const withSeconds = localStr.length === 16 ? localStr + ":00" : localStr;
+            return withSeconds + "+03:00";
+        }
+
+        // ---- Feedback helpers ----
+        function showFeedback(message, type) {
+            feedbackEl.textContent = "";
+            feedbackEl.className = "composer-feedback " + type;
+            feedbackEl.textContent = message;
+            feedbackEl.style.display = "block";
+        }
+
+        function clearFeedback() {
+            feedbackEl.style.display = "none";
+            feedbackEl.textContent = "";
+            feedbackEl.className = "composer-feedback";
+        }
+
+        // ---- Button state helpers ----
+        function disableSubmit() {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Saving...";
+        }
+
+        function enableSubmit() {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Log Activity";
+        }
+
+        // ---- Reset form after success ----
+        function resetComposer() {
+            if (typeSelect) typeSelect.value = "CALL";
+            if (noteTA)   noteTA.value = "";
+            if (resultTA) resultTA.value = "";
+            if (followUpIn) followUpIn.value = "";
+            clearIntentActive = false;
+            followUpIntent = null;
+            if (clearBtn) clearBtn.style.display = "none";
+            clearFeedback();
+        }
+
+        // ---- Clear Follow-Up button ----
+        // Shown only when the current lead has a scheduled follow-up
+        // It is wired to send explicit null
+        if (clearBtn) {
+            clearBtn.addEventListener("click", function () {
+                clearIntentActive = true;
+                if (followUpIn) followUpIn.value = ""; // Clear the datetime input too
+                clearBtn.style.display = "none";
+                showFeedback("Follow-up will be cleared when you log the next activity.", "success");
+            });
+        }
+
+        // ---- After lead loads, show Clear button if follow-up exists ----
+        // We poll window.currentLeadData set by the profile module
+        // Instead, listen for a custom event dispatched by loadLead
+        document.addEventListener("crm:leadLoaded", function (e) {
+            const lead = e.detail;
+            if (clearBtn) {
+                if (lead && lead.next_follow_up_at) {
+                    clearBtn.style.display = "inline-block";
+                } else {
+                    clearBtn.style.display = "none";
+                }
+            }
+        });
+
+        // ---- Submit activity ----
+        submitBtn.addEventListener("click", function () {
+            if (isSubmitting) return; // Double-submit guard
+
+            clearFeedback();
+
+            const actType = typeSelect ? typeSelect.value : "";
+            const note    = noteTA    ? noteTA.value.trim()    : "";
+            const result  = resultTA  ? resultTA.value.trim()  : "";
+            const fuRaw   = followUpIn ? followUpIn.value      : "";
+
+            // Build payload
+            const payload = { activity_type: actType };
+            if (note)   payload.note   = note;
+            if (result) payload.result = result;
+
+            // Follow-up semantics:
+            if (clearIntentActive) {
+                // Explicit clear — send null key
+                payload.next_follow_up_at = null;
+            } else if (fuRaw) {
+                // User filled the datetime input — convert to Cairo-aware ISO
+                payload.next_follow_up_at = toCaroISO(fuRaw);
+            }
+            // If neither: omit next_follow_up_at entirely (key not present = keep current)
+
+            // Client-side guard for FOLLOW_UP type
+            if (actType === "FOLLOW_UP" && !note && !payload.next_follow_up_at && !clearIntentActive) {
+                showFeedback("Follow-Up activity requires either a note or a scheduled follow-up time.", "error");
+                return;
+            }
+
+            isSubmitting = true;
+            disableSubmit();
+
+            fetch("/crm/leads/" + leadId + "/activities", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+            .then(function (res) {
+                return res.json().then(function (data) {
+                    return { status: res.status, data: data };
+                });
+            })
+            .then(function (r) {
+                isSubmitting = false;
+                enableSubmit();
+
+                if (r.status === 201) {
+                    resetComposer();
+                    // Reload timeline from page 1 (authoritative) and refresh lead data
+                    if (typeof window.reloadTimeline === "function") {
+                        window.reloadTimeline();
+                    }
+                    if (typeof window.reloadLead === "function") {
+                        window.reloadLead();
+                    }
+                    return;
+                }
+
+                // Error cases
+                const msg = (r.data && r.data.message) ? r.data.message : "Failed to log activity.";
+                if (r.status === 400) {
+                    showFeedback("Validation error: " + msg, "error");
+                } else if (r.status === 403) {
+                    showFeedback("Access denied: " + msg, "error");
+                } else if (r.status === 404) {
+                    showFeedback("Lead not found.", "error");
+                } else if (r.status === 409) {
+                    showFeedback("Conflict: " + msg, "error");
+                } else {
+                    showFeedback("Error " + r.status + ": " + msg, "error");
+                }
+            })
+            .catch(function (err) {
+                isSubmitting = false;
+                enableSubmit();
+                showFeedback("Network error. Please try again.", "error");
+                console.error("[Composer] POST activity failed:", err);
+            });
+        });
+
+    }); // end DOMContentLoaded
+
+}());
 
 // ============================================================
 // Activity Timeline — independent module, own closure
@@ -282,6 +561,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentPage = 0;
     let totalPages = 1;
     let isLoadingActivities = false;
+    let loadSequence = 0;
 
     // ---- DOM refs ----
     const activityLoading = document.getElementById("activityLoading");
@@ -525,6 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!leadId) return;
 
         isLoadingActivities = true;
+        const requestSequence = ++loadSequence;
 
         if (loadMoreBtn) {
             loadMoreBtn.disabled    = true;
@@ -549,6 +830,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 return res.json();
             })
             .then(function (data) {
+                if (requestSequence !== loadSequence) {
+                    return;
+                }
                 hideTimelineLoading();
 
                 currentPage = data.page;
@@ -589,6 +873,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 isLoadingActivities = false;
             })
             .catch(function (err) {
+                if (requestSequence !== loadSequence) {
+                    return;
+                }
                 hideTimelineLoading();
                 isLoadingActivities = false;
                 // Re-enable load more for retry if on page > 1
@@ -611,6 +898,19 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // ---- Expose public reload for composer cross-module use ----
+    // Resets pagination state and reloads from page 1.
+    window.reloadTimeline = function () {
+        loadSequence += 1;
+        currentPage = 0;
+        totalPages  = 1;
+        isLoadingActivities = false;
+        if (activityList) activityList.innerHTML = "";
+        if (activityLoadMore) activityLoadMore.style.display = "none";
+        if (countBadge) countBadge.style.display = "none";
+        loadActivities(1);
+    };
 
     // ---- Initial load (after DOM ready) ----
     document.addEventListener("DOMContentLoaded", function () {

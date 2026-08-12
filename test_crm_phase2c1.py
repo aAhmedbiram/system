@@ -354,14 +354,6 @@ class TestCRMPhase2C1(unittest.TestCase):
         self.assertIn(b'loadMoreActivitiesBtn', res.data)
         self.assertIn(b'Load More', res.data)
 
-    def test_28_no_activity_composer_in_2c1(self):
-        """Phase 2C-1 template does NOT include activity composer UI."""
-        self.login_as('c1_edit', 30002)
-        res = self.client.get('/crm/leads/5001/view')
-        self.assertEqual(res.status_code, 200)
-        self.assertNotIn(b'submitActivityBtn', res.data)
-        self.assertNotIn(b'activityComposer', res.data)
-
     def test_29_no_assignment_controls_in_2c1(self):
         """Phase 2C-1 template has no assignment UI."""
         self.login_as('c1_view', 30001)
