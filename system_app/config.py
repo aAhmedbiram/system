@@ -3,6 +3,10 @@
 Configuration Management for Rival Gym System
 """
 
+try:
+    from . import env_loader
+except ImportError:
+    import env_loader
 import os
 from datetime import timedelta
 

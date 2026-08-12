@@ -1,3 +1,7 @@
+try:
+    from . import env_loader
+except ImportError:
+    import env_loader
 # queries.py - Final guaranteed version on Railway
 import os
 import psycopg2

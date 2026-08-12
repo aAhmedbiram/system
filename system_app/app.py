@@ -1,3 +1,7 @@
+try:
+    from . import env_loader
+except ImportError:
+    import env_loader
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify, has_request_context
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from datetime import datetime, timedelta
@@ -390,6 +394,43 @@ from .queries import (
     get_attendance_backup_runs
 )
 from .queries import delete_all_data as delete_all_data_from_db
+
+# ==============================================================================
+# Environment Safety Guards and Startup Print Information
+# ==============================================================================
+app_env = os.environ.get('APP_ENV', 'DEV').upper()
+db_url = DATABASE_URL or ''
+db_name = "Unknown"
+if db_url:
+    try:
+        # Extract database name from connection string
+        db_name = db_url.split('/')[-1].split('?')[0]
+    except Exception:
+        db_name = "Unknown"
+
+# Safety Check: Abort if Flask is running in debug mode while connected to the production database
+prod_host = "ep-still-union-a4fzfij8.us-east-1.aws.neon.tech"
+is_debug = app.debug or os.environ.get('FLASK_DEBUG', '').lower() in ['1', 'true'] or os.environ.get('FLASK_ENV') == 'development'
+
+if is_debug and prod_host in db_url:
+    import sys
+    print("\n" + "="*60)
+    print("FATAL ERROR: Debug mode cannot run against the Production database.")
+    print("="*60 + "\n")
+    sys.exit("Debug mode cannot run against the Production database.")
+
+# Print environment information
+if app_env == 'TEST':
+    print("\n====================================")
+    print("RUNNING IN TEST DATABASE")
+    print("====================================\n")
+elif app_env == 'PRODUCTION':
+    print("\n====================================")
+    print("RUNNING IN PRODUCTION")
+    print(f"Connected Database: {db_name}")
+    print("====================================\n")
+# ==============================================================================
+
 
 # Initialize database tables on startup (disabled in production unless explicitly enabled)
 if not is_production or os.environ.get('RUN_DB_MIGRATIONS', '').lower() == 'true':
