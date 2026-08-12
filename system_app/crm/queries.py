@@ -224,6 +224,37 @@ def execute_transaction(operations):
             else:
                 conn.close()
 
+def run_in_transaction(callback, *args, **kwargs):
+    """Acquires a pooled connection and runs a callback inside a single transaction."""
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    from system_app.queries import get_connection_pool, get_database_url
+
+    pool = get_connection_pool()
+    conn = None
+    if pool is None:
+        conn = psycopg2.connect(get_database_url())
+    else:
+        conn = pool.getconn()
+
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        result = callback(cur, *args, **kwargs)
+        conn.commit()
+        return result
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            if pool:
+                pool.putconn(conn)
+            else:
+                conn.close()
+
 def get_activities(lead_id, limit, offset):
     """Fetches chronological list of activities for a lead."""
     query = """
