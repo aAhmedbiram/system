@@ -78,7 +78,7 @@ class TestCRMPhase1B(unittest.TestCase):
             sess['user_id'] = 10002
             sess['username'] = 'crm_agent'
 
-        response = self.client.get('/crm/')
+        response = self.client.get('/crm/summary')
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['module'], 'crm')
@@ -98,7 +98,7 @@ class TestCRMPhase1B(unittest.TestCase):
             sess['user_id'] = 10003
             sess['username'] = 'admin_user'
 
-        response = self.client.get('/crm/')
+        response = self.client.get('/crm/summary')
         self.assertEqual(response.status_code, 200)
 
         # Cleanup

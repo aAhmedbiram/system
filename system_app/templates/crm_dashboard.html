@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Dashboard - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            margin-bottom: 30px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .index-btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .index-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+        }
+
+        .filters-panel {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            color: #4caf50;
+            font-weight: 600;
+        }
+
+        .filter-group input, .filter-group select {
+            background: rgba(10, 10, 15, 0.8);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 180px;
+            transition: border-color 0.3s;
+        }
+
+        .filter-group input:focus, .filter-group select:focus {
+            border-color: #4caf50;
+            outline: none;
+        }
+
+        .table-container {
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            overflow-x: auto;
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1100px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            border: 1px solid rgba(76, 175, 80, 0.15);
+            text-align: center;
+            font-size: 14px;
+        }
+
+        th {
+            background: rgba(20, 20, 30, 0.9);
+            color: #4caf50;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: rgba(76, 175, 80, 0.05);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge.prospect {
+            background: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+            border: 1px solid rgba(33, 150, 243, 0.4);
+        }
+
+        .badge.member {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.4);
+        }
+
+        .badge.stage {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.4);
+        }
+
+        .badge.stage-won {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.4);
+        }
+
+        .badge.stage-lost {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.4);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .pagination-btn {
+            background: rgba(30, 30, 40, 0.8);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: #4caf50;
+            color: white;
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            font-size: 16px;
+            color: #4caf50;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+            font-size: 16px;
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 40px;
+            color: #f44336;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="content-wrapper">
+        <header>
+            <h1>📞 CRM Leads Dashboard</h1>
+            <a href="{{ url_for('index') }}" class="index-btn">🏠 Home</a>
+        </header>
+
+        <!-- Filters Section -->
+        <div class="filters-panel">
+            <div class="filter-group">
+                <label for="searchQuery">Search</label>
+                <input type="text" id="searchQuery" placeholder="Search by name, phone...">
+            </div>
+            <div class="filter-group">
+                <label for="stageFilter">Stage</label>
+                <select id="stageFilter">
+                    <option value="">All Stages</option>
+                    <option value="NEW">New</option>
+                    <option value="CONTACTED">Contacted</option>
+                    <option value="FOLLOW_UP">Follow-Up</option>
+                    <option value="INTERESTED">Interested</option>
+                    <option value="TRIAL">Trial</option>
+                    <option value="WON">Won</option>
+                    <option value="LOST">Lost</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="typeFilter">Type</label>
+                <select id="typeFilter">
+                    <option value="">All Types</option>
+                    <option value="prospect">Prospect</option>
+                    <option value="member">Existing Member</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Leads Table Container -->
+        <div class="table-container">
+            <div id="loadingState" class="loading-spinner">Loading leads data...</div>
+            <div id="errorState" class="error-state" style="display: none;">Failed to load CRM leads. Please try again.</div>
+            <div id="emptyState" class="empty-state" style="display: none;">No leads found matching your criteria.</div>
+
+            <table id="leadsTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Lead ID</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Type</th>
+                        <th>Member ID</th>
+                        <th>Stage</th>
+                        <th>Source</th>
+                        <th>Assigned To</th>
+                        <th>Next Follow-Up</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody id="leadsTableBody">
+                    <!-- Dynamic rendering -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination">
+            <button id="prevBtn" class="pagination-btn" disabled>Previous</button>
+            <span id="pageIndicator">Page 1 of 1</span>
+            <button id="nextBtn" class="pagination-btn" disabled>Next</button>
+        </div>
+    </div>
+
+    <!-- Frontend logic script -->
+    <script src="/static/js/crm_leads.js"></script>
+</body>
+</html>

@@ -86,12 +86,14 @@ def search_members(search_query, limit=20):
     return query_db(query, (term, term, term, f"{search_query}%", limit)) or []
 
 def get_leads(where_clauses, args, limit, offset):
-    """Fetches a paginated, filtered list of leads."""
+    """Fetches a paginated, filtered list of leads including assigned username."""
     clause_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     query = f"""
-        SELECT * FROM crm_leads
+        SELECT l.*, u.username AS assigned_username
+        FROM crm_leads l
+        LEFT JOIN users u ON u.id = l.assigned_user_id
         {clause_str}
-        ORDER BY created_at DESC, id DESC
+        ORDER BY l.created_at DESC, l.id DESC
         LIMIT %s OFFSET %s
     """
     full_args = list(args) + [limit, offset]
@@ -100,7 +102,7 @@ def get_leads(where_clauses, args, limit, offset):
 def count_leads(where_clauses, args):
     """Counts the total leads matching the given filter criteria."""
     clause_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-    query = f"SELECT COUNT(*) as count FROM crm_leads {clause_str}"
+    query = f"SELECT COUNT(*) as count FROM crm_leads l {clause_str}"
     res = query_db(query, tuple(args), one=True)
     return res['count'] if res else 0
 

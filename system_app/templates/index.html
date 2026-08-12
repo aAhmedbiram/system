@@ -1361,6 +1361,9 @@
 
             <!-- Navigation Grid -->
             <div class="nav-grid">
+                {% if user_permissions.get('super_admin') or user_permissions.get('crm_view') %}
+                <a href="{{ url_for('crm_routes.crm_home') }}" class="nav-btn" style="border-color: rgba(76, 175, 80, 0.3);"><span>📞 CRM Dashboard</span></a>
+                {% endif %}
                 {% if user_permissions.get('super_admin') or user_permissions.get('members_view') %}
                 <a href="{{ url_for('all_members') }}" class="nav-btn"><span>👥 {{ t.view_all_members }}</span></a>
                 <a href="{{ url_for('filtered_members') }}" class="nav-btn"

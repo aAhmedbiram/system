@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from system_app.crm.permissions import (
     login_required, crm_permission_required, get_current_user,
     CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN, CRM_UPDATE_STAGE, CRM_CONVERT
@@ -12,7 +12,16 @@ crm_routes = Blueprint('crm_routes', __name__)
 @login_required
 @crm_permission_required(CRM_VIEW)
 def crm_home():
-    """CRM Root Placeholder Endpoint."""
+    """CRM Root Dashboard Page."""
+    from system_app.app import get_common_template_context
+    common_context = get_common_template_context()
+    return render_template("crm_dashboard.html", **common_context)
+
+@crm_routes.route('/summary')
+@login_required
+@crm_permission_required(CRM_VIEW)
+def crm_summary_json():
+    """CRM JSON summary endpoint for legacy compatibility or UI fetch."""
     summary = services.get_crm_home_summary()
     return jsonify(summary)
 

@@ -118,40 +118,40 @@ def list_leads(current_user, page_param, per_page_param, filters):
     page, per_page = validate_pagination(page_param, per_page_param)
     offset = (page - 1) * per_page
 
-    where_clauses = ["is_archived = FALSE"]
+    where_clauses = ["l.is_archived = FALSE"]
     args = []
 
     # 1. Enforce visibility rules
     if not can_view_all_leads(current_user):
-        where_clauses.append("(assigned_user_id = %s OR (created_by_user_id = %s AND assigned_user_id IS NULL))")
+        where_clauses.append("(l.assigned_user_id = %s OR (l.created_by_user_id = %s AND l.assigned_user_id IS NULL))")
         args.append(current_user['id'])
         args.append(current_user['id'])
 
     # 2. Apply filters
     stage_filter = validate_stage_filter(filters.get('stage'))
     if stage_filter:
-        where_clauses.append("stage = %s")
+        where_clauses.append("l.stage = %s")
         args.append(stage_filter)
 
     source_filter = validate_optional_string(filters.get('source'))
     if source_filter:
-        where_clauses.append("source = %s")
+        where_clauses.append("l.source = %s")
         args.append(source_filter)
 
     m_status = validate_member_status_filter(filters.get('member_status'))
     if m_status == 'member':
-        where_clauses.append("member_id IS NOT NULL")
+        where_clauses.append("l.member_id IS NOT NULL")
     elif m_status == 'prospect':
-        where_clauses.append("member_id IS NULL")
+        where_clauses.append("l.member_id IS NULL")
 
     search_q = validate_optional_string(filters.get('search'))
     if search_q:
         if search_q.isdigit():
-            where_clauses.append("(name ILIKE %s OR phone ILIKE %s OR email ILIKE %s OR member_id = %s)")
+            where_clauses.append("(l.name ILIKE %s OR l.phone ILIKE %s OR l.email ILIKE %s OR l.member_id = %s)")
             term = f"%{search_q}%"
             args.extend([term, term, term, int(search_q)])
         else:
-            where_clauses.append("(name ILIKE %s OR phone ILIKE %s OR email ILIKE %s)")
+            where_clauses.append("(l.name ILIKE %s OR l.phone ILIKE %s OR l.email ILIKE %s)")
             term = f"%{search_q}%"
             args.extend([term, term, term])
 
