@@ -129,3 +129,97 @@ def crm_schema_health_check():
         except Exception:
             health[table] = False
     return health
+
+def get_assignable_users():
+    """Gets approved users or user 'rino' who can receive lead assignments."""
+    query = """
+        SELECT id, username, email, is_approved
+        FROM users
+        WHERE is_approved = TRUE OR username = 'rino'
+        ORDER BY username ASC
+    """
+    return query_db(query) or []
+
+def get_user_by_id(user_id):
+    """Gets basic details of a user by ID."""
+    return query_db("SELECT id, username, email, is_approved FROM users WHERE id = %s", (user_id,), one=True)
+
+def assign_lead(lead_id, user_id, actor_id):
+    """Sets assigned_user_id, assigned_by_user_id, assigned_at on a lead."""
+    query = """
+        UPDATE crm_leads
+        SET assigned_user_id = %s,
+            assigned_by_user_id = %s,
+            assigned_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """
+    query_db(query, (user_id, actor_id, lead_id), commit=True)
+
+def unassign_lead(lead_id, actor_id):
+    """Clears assigned_user_id on a lead."""
+    query = """
+        UPDATE crm_leads
+        SET assigned_user_id = NULL,
+            assigned_by_user_id = %s,
+            assigned_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """
+    query_db(query, (actor_id, lead_id), commit=True)
+
+def create_activity(lead_id, user_id, activity_type, note=None, result=None, old_stage=None, new_stage=None, old_assigned_user_id=None, new_assigned_user_id=None, follow_up_at=None, commit=True):
+    """Log an activity record."""
+    # Resolve user's username snapshot
+    username_snapshot = None
+    if user_id:
+        u = get_user_by_id(user_id)
+        if u:
+            username_snapshot = u.get('username')
+
+    query = """
+        INSERT INTO crm_activities (
+            lead_id, user_id, user_username_snapshot, activity_type, note, result,
+            old_stage, new_stage, old_assigned_user_id, new_assigned_user_id, follow_up_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    query_db(query, (lead_id, user_id, username_snapshot, activity_type, note, result,
+                     old_stage, new_stage, old_assigned_user_id, new_assigned_user_id, follow_up_at), commit=commit)
+
+def execute_transaction(operations):
+    """Runs a batch of (query, args) inside a single transaction."""
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    from system_app.queries import get_connection_pool, get_database_url
+
+    pool = get_connection_pool()
+    conn = None
+    if pool is None:
+        conn = psycopg2.connect(get_database_url())
+    else:
+        conn = pool.getconn()
+
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        results = []
+        for query, args in operations:
+            cur.execute(query, args)
+            query_upper = query.strip().upper()
+            if query_upper.startswith('SELECT') or 'RETURNING' in query_upper:
+                results.append(cur.fetchall())
+            else:
+                results.append(None)
+        conn.commit()
+        return results
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            if pool:
+                pool.putconn(conn)
+            else:
+                conn.close()

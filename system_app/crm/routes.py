@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from system_app.crm.permissions import (
     login_required, crm_permission_required, get_current_user,
-    CRM_VIEW, CRM_CREATE, CRM_EDIT
+    CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN
 )
 from system_app.crm import services
 from system_app.crm.services import CRMConflictError, CRMForbiddenError, CRMNotFoundError, CRMProtectedFieldError
@@ -125,3 +125,71 @@ def search_members_route():
         return jsonify(results), 200
     except ValueError as e:
         return jsonify({"error": "invalid_input", "message": str(e)}), 400
+
+@crm_routes.route('/users', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_ASSIGN)
+def list_assignable_users_route():
+    """Returns a list of approved users that can receive lead assignments."""
+    current_user = get_current_user()
+    users_list = services.list_assignable_users(current_user)
+    return jsonify(users_list), 200
+
+@crm_routes.route('/leads/<int:lead_id>/assign', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_ASSIGN)
+def assign_lead_route(lead_id):
+    """Assigns or reassigns a single lead to a user."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    target_user_id = data.get('user_id')
+
+    if target_user_id is None:
+        return jsonify({"error": "invalid_input", "message": "'user_id' is required"}), 400
+
+    try:
+        services.assign_lead(current_user, lead_id, target_user_id)
+        return jsonify({"status": "assigned", "lead_id": lead_id, "assigned_to": target_user_id}), 200
+    except CRMNotFoundError as e:
+        return jsonify({"error": e.error_code if hasattr(e, 'error_code') else "not_found", "message": str(e)}), 404
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
+
+@crm_routes.route('/leads/<int:lead_id>/unassign', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_ASSIGN)
+def unassign_lead_route(lead_id):
+    """Unassigns a lead, clearing the assignee."""
+    current_user = get_current_user()
+    try:
+        services.unassign_lead(current_user, lead_id)
+        return jsonify({"status": "unassigned", "lead_id": lead_id}), 200
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/leads/bulk-assign', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_ASSIGN)
+def bulk_assign_leads_route():
+    """Bulk assigns multiple leads to a user."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    lead_ids = data.get('lead_ids')
+    target_user_id = data.get('user_id')
+
+    if target_user_id is None:
+        return jsonify({"error": "invalid_input", "message": "'user_id' is required"}), 400
+
+    try:
+        services.bulk_assign_leads(current_user, lead_ids, target_user_id)
+        return jsonify({"status": "bulk_assigned", "count": len(lead_ids)}), 200
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
+    except CRMNotFoundError as e:
+        return jsonify({"error": e.error_code if hasattr(e, 'error_code') else "not_found", "message": str(e)}), 404
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409

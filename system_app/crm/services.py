@@ -261,3 +261,145 @@ def get_crm_home_summary():
         "phase": "1B",
         "database_metrics": db_counts
     }
+
+def list_assignable_users(current_user):
+    """Lists approved assignment targets."""
+    return queries.get_assignable_users()
+
+def assign_lead(current_user, lead_id, target_user_id):
+    """Assigns or reassigns a single lead to a target user."""
+    # 1. Validate lead exists and is not archived
+    lead = queries.get_lead_by_id(lead_id)
+    if not lead:
+        raise CRMNotFoundError("Lead not found")
+    if lead.get('is_archived'):
+        raise CRMConflictError("lead_archived", "Archived leads cannot be assigned.")
+
+    # 2. Validate target user exists and is approved (unless Rino)
+    target_user = queries.get_user_by_id(target_user_id)
+    if not target_user:
+        raise CRMNotFoundError("user_not_found", "Assignment target user does not exist.")
+    if target_user.get('username') != 'rino' and not target_user.get('is_approved'):
+        raise CRMConflictError("user_not_approved", "Lead cannot be assigned to an unapproved user.")
+
+    # 3. Perform update and log activity in a transaction
+    previous_assigned_user_id = lead.get('assigned_user_id')
+
+    lead_query = """
+        UPDATE crm_leads
+        SET assigned_user_id = %s,
+            assigned_by_user_id = %s,
+            assigned_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """
+
+    activity_query = """
+        INSERT INTO crm_activities (
+            lead_id, user_id, user_username_snapshot, activity_type,
+            old_assigned_user_id, new_assigned_user_id
+        ) VALUES (%s, %s, %s, 'ASSIGNED', %s, %s)
+    """
+
+    operations = [
+        (lead_query, (target_user_id, current_user['id'], lead_id)),
+        (activity_query, (lead_id, current_user['id'], current_user.get('username'), previous_assigned_user_id, target_user_id))
+    ]
+
+    queries.execute_transaction(operations)
+    return True
+
+def unassign_lead(current_user, lead_id):
+    """Unassigns a lead, clearing the assignee."""
+    lead = queries.get_lead_by_id(lead_id)
+    if not lead:
+        raise CRMNotFoundError("Lead not found")
+    if lead.get('is_archived'):
+        raise CRMConflictError("lead_archived", "Archived leads cannot be assigned.")
+
+    previous_assigned_user_id = lead.get('assigned_user_id')
+
+    lead_query = """
+        UPDATE crm_leads
+        SET assigned_user_id = NULL,
+            assigned_by_user_id = %s,
+            assigned_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """
+
+    activity_query = """
+        INSERT INTO crm_activities (
+            lead_id, user_id, user_username_snapshot, activity_type,
+            old_assigned_user_id, new_assigned_user_id
+        ) VALUES (%s, %s, %s, 'ASSIGNED', %s, %s)
+    """
+
+    operations = [
+        (lead_query, (current_user['id'], lead_id)),
+        (activity_query, (lead_id, current_user['id'], current_user.get('username'), previous_assigned_user_id, None))
+    ]
+
+    queries.execute_transaction(operations)
+    return True
+
+def bulk_assign_leads(current_user, lead_ids_raw, target_user_id):
+    """Bulk assigns multiple leads to a user inside a single database transaction."""
+    from system_app.crm.validators import validate_integer_list
+
+    lead_ids = validate_integer_list(lead_ids_raw, 'lead_ids')
+    # Remove duplicates
+    lead_ids = list(dict.fromkeys(lead_ids))
+
+    # 1. Validate target user
+    target_user = queries.get_user_by_id(target_user_id)
+    if not target_user:
+        raise CRMNotFoundError("user_not_found", "Assignment target user does not exist.")
+    if target_user.get('username') != 'rino' and not target_user.get('is_approved'):
+        raise CRMConflictError("user_not_approved", "Lead cannot be assigned to an unapproved user.")
+
+    # 2. Fetch and validate all leads before updating
+    invalid_lead_ids = []
+    leads_to_assign = []
+
+    for lid in lead_ids:
+        lead = queries.get_lead_by_id(lid)
+        if not lead or lead.get('is_archived'):
+            invalid_lead_ids.append(lid)
+        else:
+            leads_to_assign.append(lead)
+
+    if invalid_lead_ids:
+        raise CRMConflictError(
+            "bulk_assignment_failed",
+            "One or more leads do not exist or are archived.",
+            {"invalid_lead_ids": sorted(invalid_lead_ids)}
+        )
+
+    # 3. Build transactional operations list
+    operations = []
+    for lead in leads_to_assign:
+        # Update lead operations
+        lead_query = """
+            UPDATE crm_leads
+            SET assigned_user_id = %s,
+                assigned_by_user_id = %s,
+                assigned_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """
+        operations.append((lead_query, (target_user_id, current_user['id'], lead['id'])))
+
+        # Insert activity operations
+        username_snapshot = current_user.get('username')
+        activity_query = """
+            INSERT INTO crm_activities (
+                lead_id, user_id, user_username_snapshot, activity_type,
+                old_assigned_user_id, new_assigned_user_id
+            ) VALUES (%s, %s, %s, 'ASSIGNED', %s, %s)
+        """
+        operations.append((activity_query, (lead['id'], current_user['id'], username_snapshot, lead.get('assigned_user_id'), target_user_id)))
+
+    if operations:
+        queries.execute_transaction(operations)
+    return True

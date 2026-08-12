@@ -94,3 +94,21 @@ def validate_member_status_filter(status):
     if status_lower not in ['member', 'prospect']:
         raise ValueError("member_status must be 'member' or 'prospect'")
     return status_lower
+
+def validate_integer_list(val, name):
+    if val is None:
+        raise ValueError(f"'{name}' is required")
+    if not isinstance(val, list):
+        raise ValueError(f"'{name}' must be a list")
+    if not val:
+        raise ValueError(f"'{name}' cannot be empty")
+    if len(val) > 200:
+        raise ValueError(f"'{name}' cannot exceed 200 items")
+    try:
+        cleaned = []
+        for x in val:
+            x_int = int(x)
+            cleaned.append(x_int)
+        return cleaned
+    except (ValueError, TypeError):
+        raise ValueError(f"'{name}' must contain integers only")

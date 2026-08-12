@@ -11,11 +11,12 @@ class TestCRMPhase1C(unittest.TestCase):
         self.client = app.test_client()
 
         # Setup standard users in DB
-        query_db("DELETE FROM users WHERE username IN ('test_rino', 'crm_agent_all', 'crm_agent_regular', 'crm_agent_other')", commit=True)
+        query_db("DELETE FROM users WHERE username IN ('rino', 'test_rino', 'crm_agent_all', 'crm_agent_regular', 'crm_agent_other')", commit=True)
         query_db("""
             INSERT INTO users (id, username, email, password, is_approved, permissions)
             VALUES
-            (20001, 'test_rino', 'rino@test.com', 'pwd', TRUE, '{}'),
+            (2, 'rino', 'rino@test.com', 'pwd', TRUE, '{}'),
+            (20001, 'test_rino', 'test_rino@test.com', 'pwd', TRUE, '{}'),
             (20002, 'crm_agent_all', 'agent_all@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_edit": true, "crm_all_leads": true}'),
             (20003, 'crm_agent_regular', 'agent_reg@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_edit": true}'),
             (20004, 'crm_agent_other', 'agent_oth@test.com', 'pwd', TRUE, '{"crm_view": true}')
@@ -33,7 +34,7 @@ class TestCRMPhase1C(unittest.TestCase):
         query_db("DELETE FROM crm_leads", commit=True)
         query_db("DELETE FROM crm_campaigns", commit=True)
         query_db("DELETE FROM members WHERE name LIKE 'Test%%'", commit=True)
-        query_db("DELETE FROM users WHERE id IN (20001, 20002, 20003, 20004)", commit=True)
+        query_db("DELETE FROM users WHERE id IN (2, 20001, 20002, 20003, 20004)", commit=True)
 
     def login_as(self, username, user_id):
         with self.client.session_transaction() as sess:
