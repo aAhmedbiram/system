@@ -6253,6 +6253,10 @@ def debug_test():
             'error_type': type(e).__name__
         }), 500
 
+# === Register Blueprints ===
+from system_app.crm import crm_bp
+app.register_blueprint(crm_bp, url_prefix='/crm')
+
 # === Run application ===
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
