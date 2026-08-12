@@ -332,7 +332,12 @@
     <div class="content-wrapper">
         <header>
             <h1>📞 CRM Leads Dashboard</h1>
-            <a href="{{ url_for('index') }}" class="index-btn">🏠 Home</a>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                {% if user_permissions.get('super_admin') or user_permissions.get('crm_create') %}
+                <button id="openCreateModalBtn" class="index-btn" style="background: linear-gradient(135deg, #2196F3, #42a5f5); border-color: rgba(33, 150, 243, 0.3);">➕ Create Lead</button>
+                {% endif %}
+                <a href="{{ url_for('index') }}" class="index-btn">🏠 Home</a>
+            </div>
         </header>
 
         <!-- Pipeline Stats Grid -->
@@ -457,7 +462,87 @@
         </div>
     </div>
 
+    <!-- Create Lead Modal (Dormant Foundation) -->
+    {% if user_permissions.get('super_admin') or user_permissions.get('crm_create') %}
+    <div id="createLeadModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px);">
+        <div class="modal-content" style="background-color: rgba(30, 30, 40, 0.95); margin: 5% auto; padding: 30px; border: 1px solid rgba(76, 175, 80, 0.4); width: 85%; max-width: 600px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(76, 175, 80, 0.2); padding-bottom: 10px;">
+                <h2 style="color: #4caf50; font-size: 20px;">➕ Create New Lead</h2>
+                <span id="closeCreateModal" style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+            </div>
+
+            <!-- Mode Switcher -->
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <button id="modeProspectBtn" class="index-btn" style="flex: 1; background: #4caf50;">New Prospect</button>
+                <button id="modeMemberBtn" class="index-btn" style="flex: 1; background: rgba(30,30,40,0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: #4caf50;">Existing Member</button>
+            </div>
+
+            <form id="createLeadForm" onsubmit="event.preventDefault();">
+                <!-- Existing Member Selector -->
+                <div id="memberSelectorSection" style="display: none; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px dashed rgba(76,175,80,0.3);">
+                    <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                        <label for="memberSearchInput" style="font-size: 12px; color: #4caf50; font-weight: 600;">Search Existing Member</label>
+                        <input type="text" id="memberSearchInput" placeholder="Type member name, phone or ID..." style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                    </div>
+
+                    <!-- Search Results Box -->
+                    <div id="memberSearchResults" style="max-height: 150px; overflow-y: auto; background: rgba(20,20,30,0.9); border: 1px solid rgba(76,175,80,0.2); border-radius: 6px; display: none; margin-bottom: 15px; padding: 5px;">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <!-- Selected Member Summary -->
+                    <div id="selectedMemberSummary" style="display: none; background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76,175,80,0.3); padding: 12px; border-radius: 6px;">
+                        <h4 style="font-size: 14px; color: #4caf50; margin-bottom: 8px;">Selected Member Summary (Read-Only)</h4>
+                        <div style="font-size: 13px; line-height: 1.6; color: #eee;">
+                           <div><strong>ID:</strong> <span id="selMemberId">—</span></div>
+                           <div><strong>Name:</strong> <span id="selMemberName">—</span></div>
+                           <div><strong>Phone:</strong> <span id="selMemberPhone">—</span></div>
+                           <div><strong>Email:</strong> <span id="selMemberEmail">—</span></div>
+                           <div><strong>Status:</strong> <span id="selMemberStatus">—</span></div>
+                        </div>
+                        <button id="clearMemberSelection" type="button" class="index-btn" style="margin-top: 10px; padding: 6px 12px; font-size: 12px; background: rgba(244,67,54,0.2); border-color: rgba(244,67,54,0.4); color: #f44336;">Clear Selection</button>
+                    </div>
+                </div>
+
+                <!-- Prospect identity inputs (hidden in existing member mode) -->
+                <div id="prospectFields">
+                    <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                        <label for="prospectName" style="font-size: 12px; color: #4caf50; font-weight: 600;">Name</label>
+                        <input type="text" id="prospectName" placeholder="Prospect name..." style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                    </div>
+                    <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                        <label for="prospectPhone" style="font-size: 12px; color: #4caf50; font-weight: 600;">Phone</label>
+                        <input type="text" id="prospectPhone" placeholder="Phone number..." style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                    </div>
+                    <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                        <label for="prospectEmail" style="font-size: 12px; color: #4caf50; font-weight: 600;">Email</label>
+                        <input type="email" id="prospectEmail" placeholder="Email address..." style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <!-- Common fields -->
+                <div class="filter-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px;">
+                    <label for="leadSourceInput" style="font-size: 12px; color: #4caf50; font-weight: 600;">Source</label>
+                    <input type="text" id="leadSourceInput" placeholder="WALK_IN, INSTAGRAM, etc..." style="width: 100%; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px;">
+                </div>
+                <div class="filter-group" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 5px;">
+                    <label for="leadNotesInput" style="font-size: 12px; color: #4caf50; font-weight: 600;">Notes</label>
+                    <textarea id="leadNotesInput" placeholder="Additional details..." style="width: 100%; height: 80px; background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button id="cancelCreateLead" type="button" class="index-btn" style="background: rgba(120,120,120,0.2); border-color: rgba(120,120,120,0.4); color: #aaa;">Cancel</button>
+                    <button id="submitCreateLeadPlaceholder" type="button" class="index-btn" disabled style="opacity: 0.6; cursor: not-allowed;">Save Lead (Placeholder)</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Frontend logic script -->
     <script src="/static/js/crm_leads.js"></script>
+    {% if user_permissions.get('super_admin') or user_permissions.get('crm_create') %}
+    <script src="/static/js/crm_lead_form.js"></script>
+    {% endif %}
 </body>
 </html>

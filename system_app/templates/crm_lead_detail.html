@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Details - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -20px) scale(1.1); }
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+            padding: 1.5em 2em;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            margin-bottom: 30px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .index-btn {
+            background: rgba(30, 30, 40, 0.8);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .index-btn:hover {
+            background: #4caf50;
+            color: white;
+        }
+
+        .detail-card {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            margin-bottom: 25px;
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid rgba(76, 175, 80, 0.2);
+            padding-bottom: 20px;
+        }
+
+        .lead-title-section h2 {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .lead-id-sub {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .badge-container {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge.prospect {
+            background: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+            border: 1px solid rgba(33, 150, 243, 0.4);
+        }
+
+        .badge.member {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.4);
+        }
+
+        .badge.stage {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.4);
+        }
+
+        .badge.stage-won {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.4);
+        }
+
+        .badge.stage-lost {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.4);
+        }
+
+        .badge.archived {
+            background: rgba(120, 120, 120, 0.2);
+            color: #aaa;
+            border: 1px solid rgba(120, 120, 120, 0.4);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #4caf50;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-val {
+            font-size: 16px;
+            color: #eee;
+            background: rgba(10, 10, 15, 0.5);
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid rgba(76, 175, 80, 0.1);
+            min-height: 42px;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 80px;
+            font-size: 18px;
+            color: #4caf50;
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 80px;
+            color: #f44336;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="content-wrapper">
+        <header>
+            <h1 id="pageHeaderTitle">📞 Lead Details</h1>
+            <a href="/crm/" class="index-btn">🔙 CRM Dashboard</a>
+        </header>
+
+        <!-- Spinner -->
+        <div id="loadingDetails" class="loading-spinner">Fetching lead parameters...</div>
+
+        <!-- Error State -->
+        <div id="errorDetails" class="error-state" style="display: none;">Failed to load lead details.</div>
+
+        <!-- Details Container -->
+        <div id="detailsContainer" style="display: none;">
+            <div class="detail-card">
+                <div class="detail-header">
+                    <div class="lead-title-section">
+                        <h2 id="leadName">Loading...</h2>
+                        <div class="lead-id-sub">CRM Lead ID: <span id="leadIdDisplay">—</span></div>
+                    </div>
+                    <div class="badge-container">
+                        <span id="archivedBadge" class="badge archived" style="display: none;">Archived</span>
+                        <span id="typeBadge" class="badge prospect">—</span>
+                        <span id="stageBadge" class="badge stage">—</span>
+                    </div>
+                </div>
+
+                <h3 style="color: #4caf50; margin-bottom: 15px; font-size: 16px; border-left: 3px solid #4caf50; padding-left: 10px;">Contact Information</h3>
+                <div class="info-grid" style="margin-bottom: 30px;">
+                    <div class="info-item">
+                        <div class="info-label">Phone</div>
+                        <div id="leadPhone" class="info-val">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Email</div>
+                        <div id="leadEmail" class="info-val">—</div>
+                    </div>
+                </div>
+
+                <h3 style="color: #4caf50; margin-bottom: 15px; font-size: 16px; border-left: 3px solid #4caf50; padding-left: 10px;">CRM Information</h3>
+                <div class="info-grid" style="margin-bottom: 30px;">
+                    <div class="info-item">
+                        <div class="info-label">Source</div>
+                        <div id="leadSource" class="info-val">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Assigned Representative</div>
+                        <div id="leadAssignee" class="info-val">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Next Follow-Up Time</div>
+                        <div id="leadFollowUp" class="info-val">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Created At</div>
+                        <div id="leadCreated" class="info-val">—</div>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <div class="info-label">Notes</div>
+                        <div id="leadNotes" class="info-val" style="min-height: 80px; white-space: pre-wrap;">—</div>
+                    </div>
+                </div>
+
+                <!-- Member Summary Card (conditional) -->
+                <div id="memberSummaryCard" style="display: none;">
+                    <h3 style="color: #4caf50; margin-bottom: 15px; font-size: 16px; border-left: 3px solid #4caf50; padding-left: 10px;">Linked Member Summary</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Member ID</div>
+                            <div id="memberId" class="info-val">—</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Member Name</div>
+                            <div id="memberName" class="info-val">—</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Membership Status</div>
+                            <div id="memberStatus" class="info-val">—</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Membership End Date</div>
+                            <div id="memberEndDate" class="info-val">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden variable for JS -->
+    <script>
+        window.CRM_LEAD_ID = {{ lead_id }};
+    </script>
+    <script src="/static/js/crm_lead_detail.js"></script>
+</body>
+</html>

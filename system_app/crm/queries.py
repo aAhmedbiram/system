@@ -12,8 +12,14 @@ def create_lead(member_id, name, phone, email, source, notes, created_by_user_id
     return res['id'] if res else None
 
 def get_lead_by_id(lead_id):
-    """Retrieves a single CRM Lead by its database ID."""
-    return query_db("SELECT * FROM crm_leads WHERE id = %s", (lead_id,), one=True)
+    """Retrieves a single CRM Lead by its database ID including assigned username."""
+    query = """
+        SELECT l.*, u.username AS assigned_username
+        FROM crm_leads l
+        LEFT JOIN users u ON u.id = l.assigned_user_id
+        WHERE l.id = %s
+    """
+    return query_db(query, (lead_id,), one=True)
 
 def update_lead(lead_id, **kwargs):
     """Updates selected whitelist fields on a CRM Lead."""

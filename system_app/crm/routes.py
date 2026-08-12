@@ -85,6 +85,15 @@ def get_lead_route(lead_id):
     except CRMForbiddenError as e:
         return jsonify({"error": "forbidden", "message": str(e)}), 403
 
+@crm_routes.route('/leads/<int:lead_id>/view', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+def view_lead_route(lead_id):
+    """Renders the HTML Lead Details page shell."""
+    from system_app.app import get_common_template_context
+    common_context = get_common_template_context()
+    return render_template("crm_lead_detail.html", lead_id=lead_id, **common_context)
+
 @crm_routes.route('/leads/<int:lead_id>', methods=['PATCH'])
 @login_required
 @crm_permission_required(CRM_EDIT)

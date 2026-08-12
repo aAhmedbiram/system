@@ -175,7 +175,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     // Name
                     const tdName = document.createElement("td");
-                    tdName.textContent = lead.name || "—";
+                    const nameLink = document.createElement("a");
+                    nameLink.href = `/crm/leads/${lead.id}/view`;
+                    nameLink.textContent = lead.name || "—";
+                    nameLink.style.color = "#4caf50";
+                    nameLink.style.textDecoration = "none";
+                    nameLink.style.fontWeight = "600";
+                    tdName.appendChild(nameLink);
                     row.appendChild(tdName);
 
                     // Phone
