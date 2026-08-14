@@ -349,11 +349,18 @@ class TestCRMPhase1E(unittest.TestCase):
         r_b = self.client.post('/crm/leads', json={"name": "Today Lead", "phone": "1017", "source": "WALK_IN"})
         id_b = r_b.get_json()['id']
         tz_cairo = datetime.timezone(datetime.timedelta(hours=3))
-        today_dt = datetime.datetime.now(tz_cairo) + datetime.timedelta(hours=1)
-        self.client.post(f'/crm/leads/{id_b}/activities', json={
-            "activity_type": "CALL",
-            "next_follow_up_at": today_dt.isoformat()
-        })
+        now_cairo = datetime.datetime.now(tz_cairo)
+        tomorrow_start = (
+            now_cairo.replace(hour=0, minute=0, second=0, microsecond=0)
+            + datetime.timedelta(days=1)
+        )
+        # Pick a future timestamp guaranteed to remain inside today's Cairo calendar day.
+        today_dt = now_cairo + ((tomorrow_start - now_cairo) / 2)
+        query_db(
+            "UPDATE crm_leads SET next_follow_up_at = %s WHERE id = %s",
+            (today_dt, id_b),
+            commit=True,
+        )
 
         # Lead C: Upcoming (scheduled in 3 days)
         r_c = self.client.post('/crm/leads', json={"name": "Upcoming Lead", "phone": "1018", "source": "WALK_IN"})

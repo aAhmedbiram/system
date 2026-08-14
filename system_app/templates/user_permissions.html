@@ -291,13 +291,20 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>User</th>
-                            <th>Email</th>
-                            <th>Approved</th>
-                            {% for key, label in all_permissions %}
+                            <th rowspan="2">User</th>
+                            <th rowspan="2">Email</th>
+                            <th rowspan="2">Approved</th>
+                            <th colspan="{{ general_permissions|length }}">General</th>
+                            <th colspan="{{ crm_permissions|length }}">CRM</th>
+                            <th rowspan="2" class="actions-col">Save</th>
+                        </tr>
+                        <tr>
+                            {% for key, label in general_permissions %}
                             <th class="perm-col">{{ label }}</th>
                             {% endfor %}
-                            <th class="actions-col">Save</th>
+                            {% for key, label in crm_permissions %}
+                            <th class="perm-col">{{ label }}</th>
+                            {% endfor %}
                         </tr>
                     </thead>
                     <tbody>
@@ -375,5 +382,4 @@
     </div>
 </body>
 </html>
-
 

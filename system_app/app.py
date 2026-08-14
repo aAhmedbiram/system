@@ -936,7 +936,7 @@ def user_permissions():
     Rino-only page to manage user approvals and fine-grained permissions.
     """
     # Define all known permission keys (keep in sync with get_default_permissions_for_username)
-    all_permissions = [
+    general_permissions = [
         ('index', 'Dashboard / Home'),
         ('attendance', 'Attendance Table'),
         ('delete_attendance', 'Delete Attendance Records'),
@@ -954,6 +954,17 @@ def user_permissions():
         ('invitations_view', 'Invitations - View History'),
         ('invitations_use', 'Invitations - Use Invitation'),
     ]
+    crm_permissions = [
+        ('crm_view', 'CRM - View CRM'),
+        ('crm_create', 'CRM - Create Leads'),
+        ('crm_edit', 'CRM - Edit Leads / Add Activities'),
+        ('crm_update_stage', 'CRM - Update Lead Stage'),
+        ('crm_assign', 'CRM - Assign / Reassign Leads'),
+        ('crm_convert', 'CRM - Convert / Reactivate Leads'),
+        ('crm_all_leads', 'CRM - View All CRM Leads'),
+        ('crm_campaigns', 'CRM - Manage CRM Campaigns'),
+    ]
+    all_permissions = general_permissions + crm_permissions
 
     if request.method == 'POST':
         user_id = request.form.get('user_id')
@@ -999,7 +1010,9 @@ def user_permissions():
     return render_template(
         'user_permissions.html',
         users=normalized_users,
-        all_permissions=all_permissions
+        all_permissions=all_permissions,
+        general_permissions=general_permissions,
+        crm_permissions=crm_permissions
     )
 
 
