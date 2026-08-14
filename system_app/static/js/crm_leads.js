@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const perPage = 25;
     let searchTimeout = null;
     let sourceTimeout = null;
+    const canBulkAssign = !!window.CRM_USER_CAN_ASSIGN;
+    const selectedLeadIds = new Set();
 
     // Elements
     const searchInput = document.getElementById("searchQuery");
@@ -19,6 +21,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const pageIndicator = document.getElementById("pageIndicator");
+
+    const bulkAssignToolbar = document.getElementById("bulkAssignToolbar");
+    const selectVisibleLeads = document.getElementById("selectVisibleLeads");
+    const selectAllLeads = document.getElementById("selectAllLeads");
+    const selectedLeadCount = document.getElementById("selectedLeadCount");
+    const bulkAssignUserSelect = document.getElementById("bulkAssignUserSelect");
+    const bulkAssignBtn = document.getElementById("bulkAssignBtn");
+    const clearLeadSelectionBtn = document.getElementById("clearLeadSelectionBtn");
+    const bulkAssignFeedback = document.getElementById("bulkAssignFeedback");
+
+    function apiFetch(url, options) {
+        if (window.CRM && typeof window.CRM.apiFetch === "function") {
+            return window.CRM.apiFetch(url, options);
+        }
+        return fetch(url, options);
+    }
 
     // Restore state from URL
     function restoreStateFromUrl() {
@@ -66,6 +84,90 @@ document.addEventListener("DOMContentLoaded", () => {
         const newSearch = params.toString();
         const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "");
         history.replaceState(null, "", newUrl);
+    }
+
+    function showBulkFeedback(message, isError) {
+        if (!bulkAssignFeedback) return;
+        bulkAssignFeedback.style.display = "block";
+        bulkAssignFeedback.textContent = message;
+        bulkAssignFeedback.style.background = isError ? "rgba(244,67,54,0.1)" : "rgba(76,175,80,0.1)";
+        bulkAssignFeedback.style.border = isError ? "1px solid rgba(244,67,54,0.3)" : "1px solid rgba(76,175,80,0.3)";
+        bulkAssignFeedback.style.color = isError ? "#f44336" : "#4caf50";
+    }
+
+    function clearBulkFeedback() {
+        if (!bulkAssignFeedback) return;
+        bulkAssignFeedback.style.display = "none";
+        bulkAssignFeedback.textContent = "";
+    }
+
+    function updateSelectionCount() {
+        if (!selectedLeadCount) return;
+        selectedLeadCount.textContent = `${selectedLeadIds.size} selected`;
+        if (bulkAssignBtn) {
+            bulkAssignBtn.disabled = selectedLeadIds.size === 0;
+        }
+        const visibleRowCheckboxes = tableBody.querySelectorAll('input[type="checkbox"][data-lead-id]');
+        const visibleSelected = Array.from(visibleRowCheckboxes).filter(cb => cb.checked).length;
+        if (selectAllLeads) {
+            selectAllLeads.checked = visibleRowCheckboxes.length > 0 && visibleSelected === visibleRowCheckboxes.length;
+            selectAllLeads.indeterminate = visibleSelected > 0 && visibleSelected < visibleRowCheckboxes.length;
+        }
+        if (selectVisibleLeads) {
+            selectVisibleLeads.checked = visibleRowCheckboxes.length > 0 && visibleSelected === visibleRowCheckboxes.length;
+            selectVisibleLeads.indeterminate = visibleSelected > 0 && visibleSelected < visibleRowCheckboxes.length;
+        }
+    }
+
+    function clearSelection() {
+        selectedLeadIds.clear();
+        tableBody.querySelectorAll('input[type="checkbox"][data-lead-id]').forEach(cb => {
+            cb.checked = false;
+        });
+        if (selectAllLeads) {
+            selectAllLeads.checked = false;
+            selectAllLeads.indeterminate = false;
+        }
+        updateSelectionCount();
+    }
+
+    function syncSelectionFromCheckboxes() {
+        selectedLeadIds.clear();
+        tableBody.querySelectorAll('input[type="checkbox"][data-lead-id]').forEach(cb => {
+            if (cb.checked) {
+                selectedLeadIds.add(Number(cb.dataset.leadId));
+            }
+        });
+        updateSelectionCount();
+    }
+
+    function loadBulkAssignUsers() {
+        if (!canBulkAssign || !bulkAssignUserSelect) return;
+        if (bulkAssignUserSelect.dataset.loaded === "true") return;
+
+        window.CRM.getAssignableUsers()
+            .then(users => {
+                bulkAssignUserSelect.replaceChildren();
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = "Select target user";
+                bulkAssignUserSelect.appendChild(placeholder);
+
+                (users || []).forEach(user => {
+                    const option = document.createElement("option");
+                    option.value = String(user.id);
+                    option.textContent = user.username;
+                    bulkAssignUserSelect.appendChild(option);
+                });
+                bulkAssignUserSelect.dataset.loaded = "true";
+            })
+            .catch(() => {
+                bulkAssignUserSelect.replaceChildren();
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "Failed to load users";
+                bulkAssignUserSelect.appendChild(option);
+            });
     }
 
     // Fetch and render pipeline cards
@@ -167,6 +269,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 tableBody.innerHTML = "";
                 items.forEach(lead => {
                     const row = document.createElement("tr");
+                    row.dataset.leadId = lead.id;
+
+                    if (canBulkAssign) {
+                        const tdSelect = document.createElement("td");
+                        const cb = document.createElement("input");
+                        cb.type = "checkbox";
+                        cb.dataset.leadId = lead.id;
+                        cb.checked = selectedLeadIds.has(Number(lead.id));
+                        cb.addEventListener("change", () => {
+                            if (cb.checked) {
+                                selectedLeadIds.add(Number(lead.id));
+                            } else {
+                                selectedLeadIds.delete(Number(lead.id));
+                            }
+                            updateSelectionCount();
+                        });
+                        tdSelect.appendChild(cb);
+                        row.appendChild(tdSelect);
+                    }
 
                     // Lead ID
                     const tdId = document.createElement("td");
@@ -250,6 +371,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
                 prevBtn.disabled = currentPage <= 1;
                 nextBtn.disabled = currentPage >= totalPages;
+
+                if (canBulkAssign) {
+                    updateSelectionCount();
+                    loadBulkAssignUsers();
+                }
             })
             .catch(err => {
                 console.error("Error loading leads:", err);
@@ -286,18 +412,27 @@ document.addEventListener("DOMContentLoaded", () => {
     prevBtn.addEventListener("click", () => {
         if (currentPage > 1) {
             currentPage--;
+            if (canBulkAssign) {
+                clearSelection();
+            }
             fetchLeads();
         }
     });
 
     nextBtn.addEventListener("click", () => {
         currentPage++;
+        if (canBulkAssign) {
+            clearSelection();
+        }
         fetchLeads();
     });
 
     // Reset pagination on filter changes
     function onFilterChange() {
         currentPage = 1;
+        if (canBulkAssign) {
+            clearSelection();
+        }
         fetchLeads();
     }
 
@@ -318,9 +453,86 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 300); // 300ms debounce
     });
 
+    if (canBulkAssign) {
+        if (selectVisibleLeads) {
+            selectVisibleLeads.addEventListener("change", () => {
+                tableBody.querySelectorAll('input[type="checkbox"][data-lead-id]').forEach(cb => {
+                    cb.checked = selectVisibleLeads.checked;
+                    if (cb.checked) {
+                        selectedLeadIds.add(Number(cb.dataset.leadId));
+                    } else {
+                        selectedLeadIds.delete(Number(cb.dataset.leadId));
+                    }
+                });
+                updateSelectionCount();
+            });
+        }
+
+        if (selectAllLeads) {
+            selectAllLeads.addEventListener("change", () => {
+                const checked = selectAllLeads.checked;
+                tableBody.querySelectorAll('input[type="checkbox"][data-lead-id]').forEach(cb => {
+                    cb.checked = checked;
+                });
+                syncSelectionFromCheckboxes();
+            });
+        }
+
+        if (clearLeadSelectionBtn) {
+            clearLeadSelectionBtn.addEventListener("click", () => {
+                clearSelection();
+                clearBulkFeedback();
+            });
+        }
+
+        if (bulkAssignBtn) {
+            bulkAssignBtn.addEventListener("click", () => {
+                if (selectedLeadIds.size === 0) {
+                    showBulkFeedback("Select at least one lead first.", true);
+                    return;
+                }
+                const targetUserId = bulkAssignUserSelect ? bulkAssignUserSelect.value : "";
+                if (!targetUserId) {
+                    showBulkFeedback("Choose a target user first.", true);
+                    return;
+                }
+
+                bulkAssignBtn.disabled = true;
+                showBulkFeedback("Saving bulk assignment...", false);
+
+                apiFetch("/crm/leads/bulk-assign", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        lead_ids: Array.from(selectedLeadIds),
+                        user_id: Number(targetUserId)
+                    })
+                })
+                    .then(res => res.json().then(data => ({ status: res.status, data })))
+                    .then(r => {
+                        if (r.status === 200) {
+                            clearSelection();
+                            clearBulkFeedback();
+                            fetchLeads();
+                            return;
+                        }
+                        showBulkFeedback((r.data && r.data.message) ? r.data.message : "Failed to bulk assign leads.", true);
+                    })
+                    .catch(() => {
+                        showBulkFeedback("Network error while bulk assigning leads.", true);
+                    })
+                    .finally(() => {
+                        bulkAssignBtn.disabled = selectedLeadIds.size === 0;
+                    });
+            });
+        }
+    }
+
     // Initial setup and load
     restoreStateFromUrl();
     loadPipelineSummary();
     loadFollowUpSummary();
+    if (canBulkAssign) {
+        loadBulkAssignUsers();
+    }
     fetchLeads();
 });

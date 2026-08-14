@@ -264,6 +264,16 @@ def list_follow_ups_route():
     except ValueError as e:
         return jsonify({"error": "invalid_input", "message": str(e)}), 400
 
+@crm_routes.route('/follow-ups/view', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+def view_follow_ups_route():
+    """Renders the operational follow-up queue page."""
+    from system_app.app import get_common_template_context
+    common_context = get_common_template_context()
+    initial_status = request.args.get('status', '')
+    return render_template("crm_follow_up_queue.html", initial_status=initial_status, **common_context)
+
 @crm_routes.route('/leads/<int:lead_id>/stage', methods=['POST'])
 @login_required
 @crm_permission_required(CRM_UPDATE_STAGE)
@@ -329,6 +339,15 @@ def convert_lead_route(lead_id):
         return jsonify({"error": "forbidden", "message": str(e)}), 403
     except CRMConflictError as e:
         return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/leads/<int:lead_id>/convert/view', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_CONVERT)
+def view_convert_lead_route(lead_id):
+    """Renders the conversion / reactivation workspace."""
+    from system_app.app import get_common_template_context
+    common_context = get_common_template_context()
+    return render_template("crm_lead_convert.html", lead_id=lead_id, **common_context)
 
 @crm_routes.route('/follow-ups/summary', methods=['GET'])
 @login_required

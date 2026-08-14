@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Follow-Up Queue - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 22px;
+            border-radius: 12px;
+            background: rgba(20, 20, 30, 0.85);
+            border-bottom: 2px solid rgba(76,175,80,0.3);
+            margin-bottom: 20px;
+        }
+        .index-btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .tab-btn {
+            border: 1px solid rgba(76,175,80,0.25);
+            background: rgba(30,30,40,0.75);
+            color: #4caf50;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .tab-btn.active {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+        }
+        .panel {
+            background: rgba(30,30,40,0.7);
+            border: 1px solid rgba(76,175,80,0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .loading, .error, .empty {
+            padding: 36px;
+            text-align: center;
+            color: #4caf50;
+        }
+        .error { color: #f44336; display:none; }
+        .empty { color: #888; display:none; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1000px;
+        }
+        th, td {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(76,175,80,0.12);
+            text-align: center;
+            font-size: 14px;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            background: rgba(20,20,30,0.95);
+            color: #4caf50;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+        }
+        .page-btn {
+            border: 1px solid rgba(76,175,80,0.25);
+            background: rgba(30,30,40,0.85);
+            color: #4caf50;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .page-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge.member { background: rgba(76,175,80,0.2); color: #4caf50; }
+        .badge.prospect { background: rgba(33,150,243,0.2); color: #2196f3; }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 0 0 14px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1 style="margin:0; font-size:24px; background: linear-gradient(135deg, #4caf50, #66d66a); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">📅 Follow-Up Queue</h1>
+                <div style="color:#aaa; margin-top:4px;">Operational queue for overdue, today, and upcoming follow-ups</div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <a href="/crm/" class="index-btn">CRM Dashboard</a>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn" data-status="overdue">Overdue</button>
+            <button class="tab-btn" data-status="today">Today</button>
+            <button class="tab-btn" data-status="upcoming">Upcoming</button>
+        </div>
+
+        <div class="toolbar">
+            <div id="queueSummary" style="color:#4caf50; font-weight:600;">Loading queue...</div>
+        </div>
+
+        <div class="panel">
+            <div id="queueLoading" class="loading">Loading follow-up queue...</div>
+            <div id="queueError" class="error"></div>
+            <div id="queueEmpty" class="empty">No follow-up leads in this queue.</div>
+            <table id="queueTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>Type</th>
+                        <th>Phone</th>
+                        <th>Stage</th>
+                        <th>Assigned To</th>
+                        <th>Follow-Up</th>
+                        <th>Source</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="queueBody"></tbody>
+            </table>
+            <div class="pagination">
+                <button id="queuePrevBtn" class="page-btn" disabled>Previous</button>
+                <span id="queuePageIndicator">Page 1 of 1</span>
+                <button id="queueNextBtn" class="page-btn" disabled>Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.CRM_FOLLOW_UP_INITIAL_STATUS = {{ initial_status|tojson }};
+    </script>
+    <script src="/static/js/crm_shared.js"></script>
+    <script src="/static/js/crm_follow_up_queue.js"></script>
+</body>
+</html>

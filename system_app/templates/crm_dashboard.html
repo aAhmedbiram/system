@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM Dashboard - Rival Gym System</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         * {
             margin: 0;
@@ -333,6 +334,7 @@
         <header>
             <h1>📞 CRM Leads Dashboard</h1>
             <div style="display: flex; gap: 10px; align-items: center;">
+                <a href="/crm/follow-ups/view" class="index-btn" style="background: linear-gradient(135deg, #ff9800, #ffb74d); border-color: rgba(255, 152, 0, 0.3);">📅 Follow-Ups</a>
                 {% if user_permissions.get('super_admin') or user_permissions.get('crm_create') %}
                 <button id="openCreateModalBtn" class="index-btn" style="background: linear-gradient(135deg, #2196F3, #42a5f5); border-color: rgba(33, 150, 243, 0.3);">➕ Create Lead</button>
                 {% endif %}
@@ -380,18 +382,24 @@
         <!-- Follow-ups Stats Grid -->
         <h2 style="color: #4caf50; margin-bottom: 15px; font-size: 18px;">📅 Follow-Ups</h2>
         <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
+            <a href="/crm/follow-ups/view?status=overdue" style="text-decoration:none; color:inherit;">
             <div class="stat-item overdue">
                 <div class="stat-item-label">Overdue</div>
                 <div id="followOverdue" class="stat-item-value">—</div>
             </div>
+            </a>
+            <a href="/crm/follow-ups/view?status=today" style="text-decoration:none; color:inherit;">
             <div class="stat-item">
                 <div class="stat-item-label">Today</div>
                 <div id="followToday" class="stat-item-value">—</div>
             </div>
+            </a>
+            <a href="/crm/follow-ups/view?status=upcoming" style="text-decoration:none; color:inherit;">
             <div class="stat-item">
                 <div class="stat-item-label">Upcoming</div>
                 <div id="followUpcoming" class="stat-item-value">—</div>
             </div>
+            </a>
         </div>
 
         <!-- Filters Section -->
@@ -427,6 +435,26 @@
             </div>
         </div>
 
+        {% if user_permissions.get('super_admin') or user_permissions.get('crm_assign') %}
+        <div id="bulkAssignToolbar" class="filters-panel" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <label style="display:flex; align-items:center; gap:8px; font-size: 14px; color: #eee;">
+                    <input type="checkbox" id="selectVisibleLeads">
+                    Select visible page
+                </label>
+                <span id="selectedLeadCount" style="color:#4caf50; font-weight:600;">0 selected</span>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <select id="bulkAssignUserSelect" style="background: rgba(10, 10, 15, 0.8); border: 1px solid rgba(76, 175, 80, 0.3); color: white; padding: 10px 15px; border-radius: 6px; font-size: 14px; min-width: 220px;">
+                    <option value="">Loading users...</option>
+                </select>
+                <button type="button" id="bulkAssignBtn" class="index-btn" style="background: linear-gradient(135deg, #ff9800, #ffb74d); border-color: rgba(255, 152, 0, 0.3);" disabled>Bulk Assign</button>
+                <button type="button" id="clearLeadSelectionBtn" class="index-btn" style="background: rgba(120,120,120,0.2); border-color: rgba(120,120,120,0.4); color: #aaa;">Clear</button>
+            </div>
+        </div>
+        <div id="bulkAssignFeedback" style="display:none; margin-bottom: 14px; padding: 12px 14px; border-radius: 8px; font-size: 14px;"></div>
+        {% endif %}
+
         <!-- Leads Table Container -->
         <div class="table-container">
             <div id="loadingState" class="loading-spinner">Loading leads data...</div>
@@ -436,6 +464,9 @@
             <table id="leadsTable" style="display: none;">
                 <thead>
                     <tr>
+                        {% if user_permissions.get('super_admin') or user_permissions.get('crm_assign') %}
+                        <th><input type="checkbox" id="selectAllLeads"></th>
+                        {% endif %}
                         <th>Lead ID</th>
                         <th>Name</th>
                         <th>Phone</th>
@@ -543,6 +574,11 @@
     {% endif %}
 
     <!-- Frontend logic script -->
+    <script>
+        window.CRM_USER_CAN_ASSIGN = {{ 'true' if (user_permissions.get('super_admin') or user_permissions.get('crm_assign')) else 'false' }};
+        window.CRM_USER_CAN_CREATE = {{ 'true' if (user_permissions.get('super_admin') or user_permissions.get('crm_create')) else 'false' }};
+    </script>
+    <script src="/static/js/crm_shared.js"></script>
     <script src="/static/js/crm_leads.js"></script>
     {% if user_permissions.get('super_admin') or user_permissions.get('crm_create') %}
     <script src="/static/js/crm_lead_form.js"></script>

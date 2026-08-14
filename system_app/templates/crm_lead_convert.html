@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Conversion Workspace - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 22px;
+            border-radius: 12px;
+            background: rgba(20, 20, 30, 0.85);
+            border-bottom: 2px solid rgba(76,175,80,0.3);
+            margin-bottom: 20px;
+        }
+        .index-btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-block;
+            border: none;
+            cursor: pointer;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 18px;
+        }
+        @media (max-width: 960px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .card {
+            background: rgba(30,30,40,0.75);
+            border: 1px solid rgba(76,175,80,0.2);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+        }
+        .card h2, .card h3 {
+            color: #4caf50;
+            margin-top: 0;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 720px) {
+            .info-grid { grid-template-columns: 1fr; }
+        }
+        .info-item {
+            background: rgba(10,10,15,0.5);
+            border: 1px solid rgba(76,175,80,0.12);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #4caf50;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .value {
+            color: #eee;
+            word-break: break-word;
+        }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .field input, .field textarea, .field select {
+            background: rgba(10,10,15,0.8);
+            border: 1px solid rgba(76,175,80,0.28);
+            color: #eee;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .field textarea { min-height: 72px; resize: vertical; }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .primary {
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .secondary {
+            background: rgba(30,30,40,0.8);
+            color: #4caf50;
+            border: 1px solid rgba(76,175,80,0.25);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .primary:disabled, .secondary:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .feedback {
+            display: none;
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .feedback.error {
+            display: none;
+            background: rgba(244,67,54,0.1);
+            border: 1px solid rgba(244,67,54,0.3);
+            color: #f44336;
+        }
+        .feedback.success {
+            display: none;
+            background: rgba(76,175,80,0.1);
+            border: 1px solid rgba(76,175,80,0.3);
+            color: #4caf50;
+        }
+        .hidden { display:none; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1 style="margin:0; font-size:24px; background: linear-gradient(135deg, #4caf50, #66d66a); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">🔁 Conversion Workspace</h1>
+                <div style="color:#aaa; margin-top:4px;">Complete prospect conversion or existing-member reactivation</div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <a href="/crm/leads/{{ lead_id }}/view" class="index-btn" style="background: rgba(30,30,40,0.8); color:#4caf50; border:1px solid rgba(76,175,80,0.25);">Back to Lead</a>
+                <a href="/crm/" class="index-btn">CRM Dashboard</a>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Lead Context</h2>
+                <div id="leadLoading" style="color:#4caf50;">Loading lead...</div>
+                <div id="leadError" style="display:none; color:#f44336;"></div>
+                <div id="leadContext" style="display:none;">
+                    <div class="info-grid">
+                        <div class="info-item"><span class="label">Lead Name</span><span id="leadName" class="value">—</span></div>
+                        <div class="info-item"><span class="label">Lead Type</span><span id="leadType" class="value">—</span></div>
+                        <div class="info-item"><span class="label">Phone</span><span id="leadPhone" class="value">—</span></div>
+                        <div class="info-item"><span class="label">Email</span><span id="leadEmail" class="value">—</span></div>
+                        <div class="info-item"><span class="label">Stage</span><span id="leadStage" class="value">—</span></div>
+                        <div class="info-item"><span class="label">Assigned To</span><span id="leadAssignee" class="value">—</span></div>
+                    </div>
+
+                    <div id="memberSummaryCard" style="display:none; margin-top: 16px;">
+                        <h3>Linked Member Summary</h3>
+                        <div class="info-grid">
+                            <div class="info-item"><span class="label">Member ID</span><span id="memberId" class="value">—</span></div>
+                            <div class="info-item"><span class="label">Member Name</span><span id="memberName" class="value">—</span></div>
+                            <div class="info-item"><span class="label">Membership Status</span><span id="memberStatus" class="value">—</span></div>
+                            <div class="info-item"><span class="label">Membership End</span><span id="memberEndDate" class="value">—</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 id="workspaceTitle">Conversion Details</h2>
+                <div id="workspaceNote" style="color:#aaa; margin-bottom: 12px;">Enter the member data required for conversion. Backend validation remains authoritative.</div>
+
+                <form id="convertForm">
+                    <div id="prospectFields">
+                        <h3>Prospect Details</h3>
+                        <div class="field">
+                            <label for="gender">Gender</label>
+                            <input id="gender" name="gender" list="genderOptions" placeholder="Male / Female">
+                            <datalist id="genderOptions">
+                                <option value="Male"></option>
+                                <option value="Female"></option>
+                            </datalist>
+                        </div>
+                        <div class="field">
+                            <label for="birthdate">Birthdate</label>
+                            <input id="birthdate" name="birthdate" type="date">
+                        </div>
+                        <div class="field">
+                            <label for="nationalId">National ID</label>
+                            <input id="nationalId" name="national_id" type="text" maxlength="14" placeholder="14 digits">
+                        </div>
+                        <div class="field">
+                            <label for="comment">Comment</label>
+                            <textarea id="comment" name="comment" placeholder="Optional notes for member creation"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="startingDate">Starting Date</label>
+                        <input id="startingDate" name="starting_date" type="date" required>
+                    </div>
+                    <div class="field">
+                        <label for="actualStartingDate">Actual Starting Date</label>
+                        <input id="actualStartingDate" name="actual_starting_date" type="date">
+                    </div>
+                    <div class="field">
+                        <label for="membershipPackages">Membership Package</label>
+                        <input id="membershipPackages" name="membership_packages" list="packageOptions" placeholder="1 Month, 3 Months, 1 Year" required>
+                        <datalist id="packageOptions">
+                            <option value="1 Month"></option>
+                            <option value="3 Months"></option>
+                            <option value="6 Months"></option>
+                            <option value="1 Year"></option>
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label for="membershipFees">Membership Fees</label>
+                        <input id="membershipFees" name="membership_fees" type="number" step="0.01" min="0" placeholder="Optional - backend can calculate">
+                    </div>
+
+                    <div class="actions">
+                        <button id="convertBtn" type="submit" class="primary">Submit Conversion</button>
+                        <a href="/crm/leads/{{ lead_id }}/view" class="secondary" style="text-decoration:none; display:inline-flex; align-items:center;">Cancel</a>
+                    </div>
+                    <div id="convertFeedback" class="feedback"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.CRM_LEAD_ID = {{ lead_id }};
+    </script>
+    <script src="/static/js/crm_shared.js"></script>
+    <script src="/static/js/crm_lead_convert.js"></script>
+</body>
+</html>

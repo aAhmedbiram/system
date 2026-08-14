@@ -1,4 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
+    function apiFetch(url, options) {
+        if (window.CRM && typeof window.CRM.apiFetch === "function") {
+            return window.CRM.apiFetch(url, options);
+        }
+        return fetch(url, options);
+    }
+
     // Elements
     const openModalBtn = document.getElementById("openCreateModalBtn");
     const modal = document.getElementById("createLeadModal");
@@ -106,11 +113,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         searchTimeout = setTimeout(() => {
-            fetch(`/crm/members/search?q=${encodeURIComponent(query)}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("HTTP " + res.status);
-                    return res.json();
-                })
+        apiFetch(`/crm/members/search?q=${encodeURIComponent(query)}`)
+            .then(res => {
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                return res.json();
+            })
                 .then(members => {
                     renderSearchResults(members);
                 })
@@ -356,11 +363,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         disableSubmitBtn();
 
-        fetch("/crm/leads", {
+        apiFetch("/crm/leads", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
             body: JSON.stringify(payload)
         })
         .then(res => {

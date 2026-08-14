@@ -16,11 +16,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const cancelEditBtn = document.getElementById("cancelEditLead");
     const editForm = document.getElementById("editLeadForm");
     const editMemberWarning = document.getElementById("editMemberWarning");
+    const openConvertWorkspaceBtn = document.getElementById("openConvertWorkspaceBtn");
 
     const editFeedback = document.getElementById("editLeadFeedback");
     const submitEditBtn = document.getElementById("submitEditLeadBtn");
 
     let currentLead = null;
+
+    function apiFetch(url, options) {
+        if (window.CRM && typeof window.CRM.apiFetch === "function") {
+            return window.CRM.apiFetch(url, options);
+        }
+        return fetch(url, options);
+    }
 
     function showError(message) {
         loader.style.display = "none";
@@ -79,6 +87,18 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("memberSummaryCard").style.display = "block";
         } else {
             document.getElementById("memberSummaryCard").style.display = "none";
+        }
+
+        if (openConvertWorkspaceBtn) {
+            const canConvert = !!window.CRM_USER_CAN_CONVERT && !lead.is_archived && lead.stage !== "WON" && lead.stage !== "LOST";
+            if (canConvert) {
+                openConvertWorkspaceBtn.style.display = "inline-block";
+                openConvertWorkspaceBtn.href = `/crm/leads/${lead.id}/convert/view`;
+                openConvertWorkspaceBtn.textContent = lead.member_id ? "🔁 Reactivate" : "🔁 Convert";
+            } else {
+                openConvertWorkspaceBtn.style.display = "none";
+                openConvertWorkspaceBtn.href = "#";
+            }
         }
     }
 
@@ -211,11 +231,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             disableSaveBtn();
 
-            fetch(`/crm/leads/${leadId}`, {
+            apiFetch(`/crm/leads/${leadId}`, {
                 method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json"
-                },
                 body: JSON.stringify({ name, phone, email, source, notes })
             })
             .then(res => {
@@ -494,9 +511,8 @@ document.addEventListener("DOMContentLoaded", () => {
             isSubmitting = true;
             disableSubmit();
 
-            fetch("/crm/leads/" + leadId + "/activities", {
+            apiFetch("/crm/leads/" + leadId + "/activities", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             })
             .then(function (res) {
@@ -544,6 +560,372 @@ document.addEventListener("DOMContentLoaded", () => {
 
     }); // end DOMContentLoaded
 
+}());
+
+// ============================================================
+// Operational Controls — stage management and assignment
+// ============================================================
+(function () {
+    "use strict";
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const leadId = window.CRM_LEAD_ID;
+        const canStage = !!window.CRM_USER_CAN_STAGE;
+        const canAssign = !!window.CRM_USER_CAN_ASSIGN;
+
+        const stagePanel = document.getElementById("stageControlPanel");
+        const stageSelect = document.getElementById("stageSelect");
+        const lostReasonWrap = document.getElementById("lostReasonWrap");
+        const lostReasonSelect = document.getElementById("lostReasonSelect");
+        const reopenStageWrap = document.getElementById("reopenStageWrap");
+        const reopenStageSelect = document.getElementById("reopenStageSelect");
+        const changeStageBtn = document.getElementById("changeStageBtn");
+        const reopenLeadBtn = document.getElementById("reopenLeadBtn");
+        const stageFeedback = document.getElementById("stageFeedback");
+
+        const assignmentPanel = document.getElementById("assignmentControlPanel");
+        const currentAssigneeDisplay = document.getElementById("currentAssigneeDisplay");
+        const assignUserSelect = document.getElementById("assignUserSelect");
+        const assignLeadBtn = document.getElementById("assignLeadBtn");
+        const unassignLeadBtn = document.getElementById("unassignLeadBtn");
+        const assignmentFeedback = document.getElementById("assignmentFeedback");
+
+        let currentLead = null;
+        let assignUsersLoaded = false;
+        let stageBusy = false;
+        let assignmentBusy = false;
+
+        function apiFetch(url, options) {
+            if (window.CRM && typeof window.CRM.apiFetch === "function") {
+                return window.CRM.apiFetch(url, options);
+            }
+            return fetch(url, options);
+        }
+
+        function showFeedback(el, text, isError) {
+            if (!el) return;
+            el.textContent = text;
+            el.className = "control-feedback " + (isError ? "error" : "success");
+            el.style.display = "block";
+        }
+
+        function clearFeedback(el) {
+            if (!el) return;
+            el.textContent = "";
+            el.className = "control-feedback";
+            el.style.display = "none";
+        }
+
+        function syncStageUi(lead) {
+            if (!stagePanel || !stageSelect) return;
+
+            if (lead.stage === "WON") {
+                stagePanel.style.display = "none";
+                return;
+            }
+
+            stagePanel.style.display = "block";
+            if (lead.stage === "LOST") {
+                stageSelect.value = "FOLLOW_UP";
+                if (lostReasonWrap) lostReasonWrap.style.display = "none";
+                if (reopenStageWrap) reopenStageWrap.style.display = "block";
+                if (changeStageBtn) changeStageBtn.style.display = "none";
+                if (reopenLeadBtn) reopenLeadBtn.style.display = "inline-block";
+                if (reopenStageSelect && !reopenStageSelect.value) {
+                    reopenStageSelect.value = "FOLLOW_UP";
+                }
+                return;
+            }
+
+            stageSelect.value = lead.stage || "NEW";
+            if (changeStageBtn) changeStageBtn.style.display = "inline-block";
+            if (reopenLeadBtn) reopenLeadBtn.style.display = "none";
+            if (reopenStageWrap) reopenStageWrap.style.display = "none";
+            if (lostReasonWrap) {
+                lostReasonWrap.style.display = stageSelect.value === "LOST" ? "block" : "none";
+            }
+        }
+
+        function syncAssignmentUi(lead) {
+            if (!assignmentPanel) return;
+
+            if (currentAssigneeDisplay) {
+                currentAssigneeDisplay.textContent = lead.assigned_username || "Unassigned";
+            }
+
+            if (assignLeadBtn) {
+                assignLeadBtn.textContent = lead.assigned_user_id ? "Reassign" : "Assign";
+            }
+
+            if (unassignLeadBtn) {
+                unassignLeadBtn.style.display = lead.assigned_user_id ? "inline-block" : "none";
+            }
+
+            if (assignUserSelect && lead.assigned_user_id) {
+                assignUserSelect.value = String(lead.assigned_user_id);
+            }
+        }
+
+        function populateAssignUsers(users) {
+            if (!assignUserSelect) return;
+            assignUserSelect.replaceChildren();
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "Select user";
+            assignUserSelect.appendChild(placeholder);
+
+            users.forEach(function (user) {
+                const option = document.createElement("option");
+                option.value = String(user.id);
+                option.textContent = user.username + (user.is_approved ? "" : " (unapproved)");
+                assignUserSelect.appendChild(option);
+            });
+
+            assignUsersLoaded = true;
+            if (currentLead && currentLead.assigned_user_id) {
+                assignUserSelect.value = String(currentLead.assigned_user_id);
+            }
+        }
+
+        function ensureUsersLoaded() {
+            if (!canAssign || !assignUserSelect || assignUsersLoaded) {
+                return Promise.resolve();
+            }
+            assignUserSelect.disabled = true;
+            assignUserSelect.replaceChildren();
+            const loadingOption = document.createElement("option");
+            loadingOption.value = "";
+            loadingOption.textContent = "Loading users...";
+            assignUserSelect.appendChild(loadingOption);
+            return window.CRM.getAssignableUsers()
+                .then(function (users) {
+                    populateAssignUsers(users || []);
+                })
+                .catch(function () {
+                    if (assignUserSelect) {
+                        assignUserSelect.replaceChildren();
+                        const failedOption = document.createElement("option");
+                        failedOption.value = "";
+                        failedOption.textContent = "Failed to load users";
+                        assignUserSelect.appendChild(failedOption);
+                    }
+                })
+                .finally(function () {
+                    if (assignUserSelect) assignUserSelect.disabled = false;
+                });
+        }
+
+        function refreshAfterMutation() {
+            if (typeof window.reloadTimeline === "function") {
+                window.reloadTimeline();
+            }
+            if (typeof window.reloadLead === "function") {
+                window.reloadLead();
+            }
+        }
+
+        function handleLeadLoaded(lead) {
+            currentLead = lead;
+            if (canStage) {
+                syncStageUi(lead);
+                clearFeedback(stageFeedback);
+            }
+            if (canAssign) {
+                syncAssignmentUi(lead);
+                clearFeedback(assignmentFeedback);
+                ensureUsersLoaded().then(function () {
+                    if (lead.assigned_user_id && assignUserSelect) {
+                        assignUserSelect.value = String(lead.assigned_user_id);
+                    }
+                });
+            }
+        }
+
+        if (canStage && stageSelect) {
+            stageSelect.addEventListener("change", function () {
+                if (stageSelect.value === "LOST") {
+                    if (lostReasonWrap) lostReasonWrap.style.display = "block";
+                } else {
+                    if (lostReasonWrap) lostReasonWrap.style.display = "none";
+                    if (lostReasonSelect) lostReasonSelect.value = "";
+                }
+            });
+        }
+
+        if (canStage && changeStageBtn) {
+            changeStageBtn.addEventListener("click", function () {
+                if (stageBusy || !currentLead) return;
+
+                const targetStage = stageSelect ? stageSelect.value : "";
+                const payload = { stage: targetStage };
+                const lostReason = lostReasonSelect ? lostReasonSelect.value : "";
+
+                if (!targetStage) {
+                    showFeedback(stageFeedback, "Please choose a stage.", true);
+                    return;
+                }
+                if (targetStage === "LOST" && !lostReason) {
+                    showFeedback(stageFeedback, "Lost reason is required when marking a lead as LOST.", true);
+                    return;
+                }
+                if (lostReason) {
+                    payload.lost_reason = lostReason;
+                }
+
+                stageBusy = true;
+                changeStageBtn.disabled = true;
+                showFeedback(stageFeedback, "Saving stage...", false);
+
+                apiFetch(`/crm/leads/${leadId}/stage`, {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                })
+                    .then(function (res) {
+                        return res.json().then(function (data) {
+                            return { status: res.status, data: data };
+                        });
+                    })
+                    .then(function (r) {
+                        if (r.status === 200) {
+                            clearFeedback(stageFeedback);
+                            refreshAfterMutation();
+                            return;
+                        }
+                        showFeedback(stageFeedback, (r.data && r.data.message) ? r.data.message : "Failed to update stage.", true);
+                    })
+                    .catch(function () {
+                        showFeedback(stageFeedback, "Network error while updating stage.", true);
+                    })
+                    .finally(function () {
+                        stageBusy = false;
+                        changeStageBtn.disabled = false;
+                    });
+            });
+        }
+
+        if (canStage && reopenLeadBtn) {
+            reopenLeadBtn.addEventListener("click", function () {
+                if (stageBusy || !currentLead) return;
+
+                const reopenStage = reopenStageSelect ? reopenStageSelect.value : "FOLLOW_UP";
+                stageBusy = true;
+                reopenLeadBtn.disabled = true;
+                showFeedback(stageFeedback, "Reopening lead...", false);
+
+                apiFetch(`/crm/leads/${leadId}/reopen`, {
+                    method: "POST",
+                    body: JSON.stringify({ stage: reopenStage })
+                })
+                    .then(function (res) {
+                        return res.json().then(function (data) {
+                            return { status: res.status, data: data };
+                        });
+                    })
+                    .then(function (r) {
+                        if (r.status === 200) {
+                            clearFeedback(stageFeedback);
+                            refreshAfterMutation();
+                            return;
+                        }
+                        showFeedback(stageFeedback, (r.data && r.data.message) ? r.data.message : "Failed to reopen lead.", true);
+                    })
+                    .catch(function () {
+                        showFeedback(stageFeedback, "Network error while reopening lead.", true);
+                    })
+                    .finally(function () {
+                        stageBusy = false;
+                        reopenLeadBtn.disabled = false;
+                    });
+            });
+        }
+
+        if (canAssign && assignLeadBtn) {
+            assignLeadBtn.addEventListener("click", function () {
+                if (assignmentBusy || !currentLead) return;
+                const userId = assignUserSelect ? assignUserSelect.value : "";
+                if (!userId) {
+                    showFeedback(assignmentFeedback, "Choose a target user first.", true);
+                    return;
+                }
+
+                assignmentBusy = true;
+                assignLeadBtn.disabled = true;
+                if (unassignLeadBtn) unassignLeadBtn.disabled = true;
+                showFeedback(assignmentFeedback, "Saving assignment...", false);
+
+                apiFetch(`/crm/leads/${leadId}/assign`, {
+                    method: "POST",
+                    body: JSON.stringify({ user_id: Number(userId) })
+                })
+                    .then(function (res) {
+                        return res.json().then(function (data) {
+                            return { status: res.status, data: data };
+                        });
+                    })
+                    .then(function (r) {
+                        if (r.status === 200) {
+                            clearFeedback(assignmentFeedback);
+                            refreshAfterMutation();
+                            return;
+                        }
+                        showFeedback(assignmentFeedback, (r.data && r.data.message) ? r.data.message : "Failed to save assignment.", true);
+                    })
+                    .catch(function () {
+                        showFeedback(assignmentFeedback, "Network error while saving assignment.", true);
+                    })
+                    .finally(function () {
+                        assignmentBusy = false;
+                        assignLeadBtn.disabled = false;
+                        if (unassignLeadBtn) unassignLeadBtn.disabled = false;
+                    });
+            });
+        }
+
+        if (canAssign && unassignLeadBtn) {
+            unassignLeadBtn.addEventListener("click", function () {
+                if (assignmentBusy || !currentLead) return;
+
+                assignmentBusy = true;
+                assignLeadBtn.disabled = true;
+                unassignLeadBtn.disabled = true;
+                showFeedback(assignmentFeedback, "Clearing assignment...", false);
+
+                apiFetch(`/crm/leads/${leadId}/unassign`, {
+                    method: "POST",
+                    body: JSON.stringify({})
+                })
+                    .then(function (res) {
+                        return res.json().then(function (data) {
+                            return { status: res.status, data: data };
+                        });
+                    })
+                    .then(function (r) {
+                        if (r.status === 200) {
+                            clearFeedback(assignmentFeedback);
+                            refreshAfterMutation();
+                            return;
+                        }
+                        showFeedback(assignmentFeedback, (r.data && r.data.message) ? r.data.message : "Failed to clear assignment.", true);
+                    })
+                    .catch(function () {
+                        showFeedback(assignmentFeedback, "Network error while clearing assignment.", true);
+                    })
+                    .finally(function () {
+                        assignmentBusy = false;
+                        assignLeadBtn.disabled = false;
+                        unassignLeadBtn.disabled = false;
+                    });
+            });
+        }
+
+        document.addEventListener("crm:leadLoaded", function (event) {
+            handleLeadLoaded(event.detail || {});
+        });
+
+        if (currentLead) {
+            handleLeadLoaded(currentLead);
+        }
+    });
 }());
 
 // ============================================================
