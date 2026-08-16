@@ -804,6 +804,18 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         }
 
+        a.alert-item {
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        a.alert-item:focus-visible {
+            outline: 2px solid rgba(255, 152, 0, 0.8);
+            outline-offset: 3px;
+            border-radius: 12px;
+        }
+
         .alert-icon {
             font-size: 40px;
         }
@@ -1308,34 +1320,34 @@
                 <h3>⚠️ Expiring Memberships Alert</h3>
                 <div class="alert-grid">
                     {% if expiring_7_days > 0 %}
-                    <div class="alert-item urgent">
+                    <a href="{{ url_for('filtered_members', expires_within=7) }}" class="alert-item urgent">
                         <div class="alert-icon">🔴</div>
                         <div class="alert-content">
                             <div class="alert-title">Urgent</div>
                             <div class="alert-count">{{ expiring_7_days }}</div>
-                            <div class="alert-subtitle">Expiring in 7 days</div>
+                            <div class="alert-subtitle">Expiring within 7 days</div>
                         </div>
-                    </div>
+                    </a>
                     {% endif %}
                     {% if expiring_14_days > 0 %}
-                    <div class="alert-item warning">
+                    <a href="{{ url_for('filtered_members', expires_within=14) }}" class="alert-item warning">
                         <div class="alert-icon">🟡</div>
                         <div class="alert-content">
                             <div class="alert-title">Warning</div>
                             <div class="alert-count">{{ expiring_14_days }}</div>
-                            <div class="alert-subtitle">Expiring in 14 days</div>
+                            <div class="alert-subtitle">Expiring in 8–14 days</div>
                         </div>
-                    </div>
+                    </a>
                     {% endif %}
                     {% if expiring_30_days > 0 %}
-                    <div class="alert-item info">
+                    <a href="{{ url_for('filtered_members', expires_within=30) }}" class="alert-item info">
                         <div class="alert-icon">🔵</div>
                         <div class="alert-content">
                             <div class="alert-title">Upcoming</div>
                             <div class="alert-count">{{ expiring_30_days }}</div>
-                            <div class="alert-subtitle">Expiring in 30 days</div>
+                            <div class="alert-subtitle">Expiring in 15–30 days</div>
                         </div>
-                    </div>
+                    </a>
                     {% endif %}
                 </div>
             </div>

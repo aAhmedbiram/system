@@ -808,6 +808,7 @@ def get_common_template_context():
                     prev_date_14 = (today + timedelta(days=14)).strftime('%Y-%m-%d')
                     
                     if days == 7:
+                        # Urgent: today <= end_date <= today+7
                         query = """
                             SELECT COUNT(*) as count FROM members 
                             WHERE end_date IS NOT NULL AND end_date != ''
@@ -815,9 +816,8 @@ def get_common_template_context():
                             AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
                             AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
                             AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
-                            AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
                         """
-                        params = (future_date, today.strftime('%Y-%m-%d'))
+                        params = (future_date,)
                     elif days == 14:
                         query = """
                             SELECT COUNT(*) as count FROM members 
@@ -2263,6 +2263,10 @@ def filtered_members():
         search_fees = request.args.get('search_fees', '').strip()
         search_invitations = request.args.get('search_invitations', '').strip()
         search_comment = request.args.get('search_comment', '').strip()
+
+        # Expiry bucket filter: 7 = Urgent, 14 = Warning, 30 = Upcoming
+        expires_within_raw = request.args.get('expires_within', '').strip()
+        expires_within = expires_within_raw if expires_within_raw in ('7', '14', '30') else ''
         
         # Pagination: 50 items per page
         page = request.args.get('page', 1, type=int)
@@ -2377,6 +2381,46 @@ def filtered_members():
                  END)
             """)
         # If view == 'all', don't add any status filter
+
+        # expires_within filter: disjoint day-range buckets matching dashboard counts
+        if expires_within:
+            from datetime import timedelta as _td
+            _today = get_cairo_date()
+            _ew = int(expires_within)
+            _upper = (_today + _td(days=_ew)).strftime('%Y-%m-%d')
+            if _ew == 7:
+                # Urgent: today <= end_date <= today+7
+                where_conditions.append("""
+                    end_date IS NOT NULL AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE)
+                        >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                """)
+                params.append(_upper)
+            elif _ew == 14:
+                # Warning: today+7 < end_date <= today+14
+                _lower = (_today + _td(days=7)).strftime('%Y-%m-%d')
+                where_conditions.append("""
+                    end_date IS NOT NULL AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                """)
+                params.extend([_lower, _upper])
+            else:  # 30
+                # Upcoming: today+14 < end_date <= today+30
+                _lower = (_today + _td(days=14)).strftime('%Y-%m-%d')
+                where_conditions.append("""
+                    end_date IS NOT NULL AND end_date != ''
+                    AND LENGTH(TRIM(end_date)) >= 10
+                    AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                    AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+                """)
+                params.extend([_lower, _upper])
         
         if search_invitations:
             where_conditions.append("CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s")
@@ -2499,6 +2543,7 @@ def filtered_members():
                             view=view,
                             active_count=active_count,
                             expired_count=expired_count,
+                            expires_within=expires_within,
                             search_id=search_id,
                             search_name=search_name,
                             search_national_id=search_national_id,

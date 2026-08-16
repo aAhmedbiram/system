@@ -752,6 +752,10 @@
         // Preserve view parameter
         const currentView = url.searchParams.get('view') || 'all';
         if (currentView) params.set('view', currentView);
+
+        // Preserve expires_within bucket filter
+        const expiresWithin = url.searchParams.get('expires_within');
+        if (expiresWithin) params.set('expires_within', expiresWithin);
         
         const searchFields = ['search_id', 'search_name', 'search_national_id', 'search_phone', 'search_age', 
                             'search_gender', 'search_actual_start', 'search_start_date', 'search_end_date',
