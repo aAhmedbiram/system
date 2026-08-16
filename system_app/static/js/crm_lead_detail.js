@@ -511,7 +511,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isSubmitting = true;
             disableSubmit();
 
-            apiFetch("/crm/leads/" + leadId + "/activities", {
+            window.CRM.apiFetch("/crm/leads/" + leadId + "/activities", {
                 method: "POST",
                 body: JSON.stringify(payload)
             })
