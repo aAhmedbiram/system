@@ -212,8 +212,13 @@ class TestCRMPhase1E(unittest.TestCase):
         res = self.client.post('/crm/leads', json={"name": "P10", "phone": "1010", "source": "WALK_IN"})
         lead_id = res.get_json()['id']
 
-        # 1. Set follow-up
-        time_str = "2026-08-15T18:00:00+03:00"
+        # 1. Set follow-up using future timestamps so the test does not expire.
+        now_cairo = datetime.datetime.now(
+            datetime.timezone(datetime.timedelta(hours=3))
+        )
+        first_follow_up = now_cairo + datetime.timedelta(days=1)
+        later_follow_up = now_cairo + datetime.timedelta(days=3)
+        time_str = first_follow_up.isoformat()
         self.client.post(f'/crm/leads/{lead_id}/activities', json={
             "activity_type": "CALL",
             "note": "Scheduled first",
@@ -224,7 +229,7 @@ class TestCRMPhase1E(unittest.TestCase):
         self.assertIsNotNone(lead['next_follow_up_at'])
 
         # 2. Set new later follow-up
-        later_time_str = "2026-08-20T10:00:00+03:00"
+        later_time_str = later_follow_up.isoformat()
         self.client.post(f'/crm/leads/{lead_id}/activities', json={
             "activity_type": "WHATSAPP",
             "note": "Rescheduled",
@@ -233,13 +238,22 @@ class TestCRMPhase1E(unittest.TestCase):
 
         lead_after = query_db("SELECT next_follow_up_at FROM crm_leads WHERE id = %s", (lead_id,), one=True)
         # Verify crm_leads current next_follow_up_at updated to later one
-        self.assertEqual(lead_after['next_follow_up_at'].strftime('%Y-%m-%d %H:%M'), "2026-08-20 10:00")
+        self.assertEqual(
+            lead_after['next_follow_up_at'].strftime('%Y-%m-%d %H:%M'),
+            later_follow_up.strftime('%Y-%m-%d %H:%M')
+        )
 
         # Verify first activity follow_up_at remains unchanged
         acts = query_db("SELECT follow_up_at FROM crm_activities WHERE lead_id = %s ORDER BY id ASC", (lead_id,))
         self.assertEqual(len(acts), 2)
-        self.assertEqual(acts[0]['follow_up_at'].strftime('%Y-%m-%d %H:%M'), "2026-08-15 18:00")
-        self.assertEqual(acts[1]['follow_up_at'].strftime('%Y-%m-%d %H:%M'), "2026-08-20 10:00")
+        self.assertEqual(
+            acts[0]['follow_up_at'].strftime('%Y-%m-%d %H:%M'),
+            first_follow_up.strftime('%Y-%m-%d %H:%M')
+        )
+        self.assertEqual(
+            acts[1]['follow_up_at'].strftime('%Y-%m-%d %H:%M'),
+            later_follow_up.strftime('%Y-%m-%d %H:%M')
+        )
 
     # ==========================================
     # F. FOLLOW-UP OMIT / NULL
@@ -251,10 +265,16 @@ class TestCRMPhase1E(unittest.TestCase):
         res = self.client.post('/crm/leads', json={"name": "P11", "phone": "1011", "source": "WALK_IN"})
         lead_id = res.get_json()['id']
 
-        # Set follow-up first
+        # Set follow-up first using a future timestamp so the test does not expire.
+        future_follow_up = (
+            datetime.datetime.now(
+                datetime.timezone(datetime.timedelta(hours=3))
+            )
+            + datetime.timedelta(days=1)
+        )
         self.client.post(f'/crm/leads/{lead_id}/activities', json={
             "activity_type": "CALL",
-            "next_follow_up_at": "2026-08-15T18:00:00+03:00"
+            "next_follow_up_at": future_follow_up.isoformat()
         })
 
         # 1. Omit next_follow_up_at parameter - leaves current schedule intact

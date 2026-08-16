@@ -84,7 +84,7 @@ class TestMemberTransactionServices(unittest.TestCase):
             "birthdate": "1990-01-01",
             "starting_date": "2026-08-15",
             "membership_packages": "3 Months",
-            "membership_fees": 1200.00,
+            "membership_fees": 1500.00,
             "comment": "Happy customer"
         }
 
@@ -105,7 +105,7 @@ class TestMemberTransactionServices(unittest.TestCase):
         invoice = query_db("SELECT * FROM invoices WHERE member_id = %s", (member_id,), one=True)
         self.assertIsNotNone(invoice)
         self.assertEqual(invoice['invoice_type'], 'new_member')
-        self.assertEqual(invoice['amount'], 1200.00)
+        self.assertEqual(invoice['amount'], 1500.00)
         self.assertEqual(invoice['created_by'], 'crm_agent')
 
         # Assertions on action logs
