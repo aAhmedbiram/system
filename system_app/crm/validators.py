@@ -157,6 +157,131 @@ ACTIVE_LEAD_STAGES = {'NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL'}
 TERMINAL_LEAD_STAGES = {'WON', 'LOST'}
 VALID_LOST_REASONS = {'PRICE', 'NO_RESPONSE', 'NOT_INTERESTED', 'JOINED_COMPETITOR', 'TIMING', 'WRONG_NUMBER', 'DUPLICATE', 'OTHER'}
 
+ALLOWED_BULK_MEMBER_FILTER_KEYS = {
+    'view',
+    'expires_within',
+    'search_id',
+    'search_name',
+    'search_national_id',
+    'search_phone',
+    'search_age',
+    'search_gender',
+    'search_actual_start',
+    'search_start_date',
+    'search_end_date',
+    'search_package',
+    'search_fees',
+    'search_invitations',
+    'search_comment'
+}
+
+BULK_MEMBER_VIEWS = {'active', 'expired', 'all'}
+BULK_MEMBER_EXPIRES_WITHIN = {7, 14, 30}
+BULK_SELECTION_MODES = {'ids', 'filters'}
+BULK_DISTRIBUTION_MODES = {'unassigned', 'equal'}
+
+def validate_positive_int_list(val, name, max_items=None):
+    if val is None:
+        raise ValueError(f"'{name}' is required")
+    if not isinstance(val, list):
+        raise ValueError(f"'{name}' must be a list")
+    if not val:
+        raise ValueError(f"'{name}' cannot be empty")
+    cleaned = []
+    seen = set()
+    for x in val:
+        if isinstance(x, bool):
+            raise ValueError(f"'{name}' must contain positive integers only")
+        try:
+            x_int = int(x)
+        except (ValueError, TypeError):
+            raise ValueError(f"'{name}' must contain positive integers only")
+        if x_int <= 0:
+            raise ValueError(f"'{name}' must contain positive integers only")
+        if x_int in seen:
+            continue
+        seen.add(x_int)
+        cleaned.append(x_int)
+        if max_items is not None and len(cleaned) > max_items:
+            raise ValueError(f"'{name}' cannot exceed {max_items} items")
+    return cleaned
+
+def validate_bulk_member_filters(filters):
+    if filters is None:
+        return {}
+    if not isinstance(filters, dict):
+        raise ValueError("'filters' must be an object")
+
+    unknown_keys = set(filters.keys()) - ALLOWED_BULK_MEMBER_FILTER_KEYS
+    if unknown_keys:
+        raise ValueError(f"Unknown filter key(s): {', '.join(sorted(unknown_keys))}")
+
+    normalized = {}
+
+    view = validate_optional_string(filters.get('view'))
+    if view:
+        view_lower = view.lower().strip()
+        if view_lower not in BULK_MEMBER_VIEWS:
+            raise ValueError("Invalid member selection view. Allowed: active, expired, all")
+        normalized['view'] = view_lower
+    else:
+        normalized['view'] = 'all'
+
+    expires_within = validate_optional_string(filters.get('expires_within'))
+    if expires_within:
+        try:
+            expires_within_int = int(expires_within)
+        except (ValueError, TypeError):
+            raise ValueError("expires_within must be one of 7, 14, or 30")
+        if expires_within_int not in BULK_MEMBER_EXPIRES_WITHIN:
+            raise ValueError("expires_within must be one of 7, 14, or 30")
+        normalized['expires_within'] = expires_within_int
+
+    for key in [
+        'search_id',
+        'search_name',
+        'search_national_id',
+        'search_phone',
+        'search_age',
+        'search_gender',
+        'search_actual_start',
+        'search_start_date',
+        'search_end_date',
+        'search_package',
+        'search_fees',
+        'search_invitations',
+        'search_comment'
+    ]:
+        value = validate_optional_string(filters.get(key))
+        if value:
+            normalized[key] = value
+
+    return normalized
+
+def validate_bulk_selection_mode(mode):
+    if mode is None:
+        raise ValueError("'selection.mode' is required")
+    mode_str = str(mode).strip().lower()
+    if mode_str not in BULK_SELECTION_MODES:
+        raise ValueError("Invalid selection mode. Allowed: ids, filters")
+    return mode_str
+
+def validate_bulk_distribution_mode(mode):
+    if mode is None:
+        raise ValueError("'distribution.mode' is required")
+    mode_str = str(mode).strip().lower()
+    if mode_str not in BULK_DISTRIBUTION_MODES:
+        raise ValueError("Invalid distribution mode. Allowed: unassigned, equal")
+    return mode_str
+
+def validate_bulk_source(source):
+    if source is None:
+        raise ValueError("'source' is required")
+    source_str = str(source).strip().upper()
+    if source_str != 'EXISTING_MEMBER':
+        raise ValueError("Bulk member lead creation only supports EXISTING_MEMBER source.")
+    return source_str
+
 def validate_stage_transition(old_stage, new_stage):
     old_upper = str(old_stage).upper().strip()
     new_upper = str(new_stage).upper().strip()

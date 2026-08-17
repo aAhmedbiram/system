@@ -1,18 +1,28 @@
 from system_app.queries import get_member
 from system_app.crm.permissions import can_view_all_leads
+from system_app.crm.permissions import CRM_ASSIGN
 from system_app.crm.validators import (
     validate_required_string, validate_optional_string, validate_email,
     validate_positive_int, validate_pagination, validate_stage_filter,
     validate_member_status_filter, validate_user_activity_type,
     validate_iso_timestamp, validate_future_timestamp,
-    validate_stage_transition, validate_lost_reason, validate_reopen_stage
+    validate_stage_transition, validate_lost_reason, validate_reopen_stage,
+    validate_positive_int_list, validate_bulk_member_filters,
+    validate_bulk_selection_mode, validate_bulk_distribution_mode,
+    validate_bulk_source
 )
 from system_app.crm import queries
 from system_app.crm.queries import run_in_transaction
 from system_app.member_services import create_member_in_transaction, renew_member_in_transaction, DuplicateMemberError
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import secrets
+import threading
 
 CAIRO_TZ = ZoneInfo("Africa/Cairo")
+BULK_PREVIEW_TOKEN_TTL_SECONDS = 900
+_bulk_preview_store = {}
+_bulk_preview_lock = threading.Lock()
 
 class CRMConflictError(Exception):
     def __init__(self, error_code, message, details=None):
@@ -30,6 +40,61 @@ class CRMProtectedFieldError(Exception):
     def __init__(self, fields):
         super().__init__(f"Protected fields cannot be updated: {', '.join(fields)}")
         self.fields = fields
+
+class CRMValidationError(Exception):
+    def __init__(self, error_code, message, details=None):
+        super().__init__(message)
+        self.error_code = error_code
+        self.details = details or {}
+
+def _user_has_crm_permission(current_user, permission_key):
+    if not current_user:
+        return False
+    if current_user.get('username') == 'rino':
+        return True
+    perms = current_user.get('permissions') or {}
+    return bool(perms.get('super_admin') or perms.get(permission_key))
+
+def _cleanup_expired_bulk_preview_tokens(now=None):
+    now = now or datetime.now(CAIRO_TZ)
+    with _bulk_preview_lock:
+        expired = [
+            token for token, entry in _bulk_preview_store.items()
+            if entry.get('expires_at') and entry['expires_at'] <= now
+        ]
+        for token in expired:
+            _bulk_preview_store.pop(token, None)
+
+def _store_bulk_preview_snapshot(current_user, snapshot):
+    _cleanup_expired_bulk_preview_tokens()
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(CAIRO_TZ) + timedelta(seconds=BULK_PREVIEW_TOKEN_TTL_SECONDS)
+    payload = {
+        "user_id": current_user['id'],
+        "username": current_user.get('username'),
+        "expires_at": expires_at,
+        "snapshot": snapshot
+    }
+    with _bulk_preview_lock:
+        _bulk_preview_store[token] = payload
+    return token, expires_at
+
+def get_bulk_preview_snapshot(token, current_user):
+    """Returns a frozen bulk preview snapshot for the same user that requested it."""
+    if not token:
+        raise CRMNotFoundError("Bulk preview token not found")
+    _cleanup_expired_bulk_preview_tokens()
+    with _bulk_preview_lock:
+        entry = _bulk_preview_store.get(token)
+    if not entry:
+        raise CRMNotFoundError("Bulk preview token not found or expired")
+    if entry.get('user_id') != current_user.get('id'):
+        raise CRMForbiddenError("This bulk preview token does not belong to the current user.")
+    if entry.get('expires_at') and entry['expires_at'] <= datetime.now(CAIRO_TZ):
+        with _bulk_preview_lock:
+            _bulk_preview_store.pop(token, None)
+        raise CRMNotFoundError("Bulk preview token has expired")
+    return entry.get('snapshot')
 
 def create_lead(current_user, data):
     """Enforces business rules and inserts a new CRM Lead."""
@@ -97,6 +162,193 @@ def create_lead(current_user, data):
     # Write to database
     lead_id = queries.create_lead(member_id, name, phone, email, source, notes, created_by_user_id)
     return lead_id
+
+def _resolve_bulk_member_selection(selection):
+    """Resolves explicit-ID or filter-based member selection into a frozen member ID list."""
+    if not isinstance(selection, dict):
+        raise CRMValidationError("invalid_selection", "'selection' must be an object")
+
+    allowed_keys = {'mode', 'member_ids', 'filters', 'excluded_member_ids'}
+    unknown_keys = set(selection.keys()) - allowed_keys
+    if unknown_keys:
+        raise CRMValidationError("invalid_selection", f"Unknown selection key(s): {', '.join(sorted(unknown_keys))}")
+
+    try:
+        mode = validate_bulk_selection_mode(selection.get('mode'))
+    except ValueError as e:
+        raise CRMValidationError("invalid_selection_mode", str(e))
+
+    excluded_member_ids = selection.get('excluded_member_ids')
+    excluded_ids = []
+    if excluded_member_ids is not None:
+        try:
+            excluded_ids = validate_positive_int_list(excluded_member_ids, 'excluded_member_ids', max_items=5000)
+        except ValueError as e:
+            raise CRMValidationError("invalid_selection", str(e))
+
+    missing_ids = []
+    selected_ids = []
+
+    if mode == 'ids':
+        try:
+            requested_ids = validate_positive_int_list(selection.get('member_ids'), 'member_ids', max_items=5000)
+        except ValueError as e:
+            raise CRMValidationError("invalid_selection", str(e))
+        members = queries.get_members_by_ids(requested_ids)
+        found_ids = [row['id'] for row in members]
+        found_id_set = set(found_ids)
+        missing_ids = [mid for mid in requested_ids if mid not in found_id_set]
+        excluded_set = set(excluded_ids)
+        selected_ids = [mid for mid in found_ids if mid not in excluded_set]
+    else:
+        try:
+            filters = validate_bulk_member_filters(selection.get('filters'))
+        except ValueError as e:
+            raise CRMValidationError("invalid_filters", str(e))
+        resolved_ids = queries.get_member_ids_by_filters(filters)
+        excluded_set = set(excluded_ids)
+        selected_ids = [mid for mid in resolved_ids if mid not in excluded_set]
+
+    # Preserve deterministic ordering and remove any accidental duplicates.
+    selected_ids = list(dict.fromkeys(selected_ids))
+    return {
+        "mode": mode,
+        "selected_member_ids": selected_ids,
+        "excluded_member_ids": excluded_ids,
+        "missing_member_ids": missing_ids
+    }
+
+def preview_bulk_member_leads(current_user, data):
+    """Builds an authoritative bulk-lead preview without creating any records."""
+    if not isinstance(data, dict):
+        raise CRMValidationError("invalid_input", "Request body must be a JSON object")
+
+    allowed_keys = {'selection', 'distribution', 'source', 'campaign_id'}
+    unknown_keys = set(data.keys()) - allowed_keys
+    if unknown_keys:
+        raise CRMValidationError("invalid_input", f"Unknown request key(s): {', '.join(sorted(unknown_keys))}")
+
+    campaign_id = data.get('campaign_id', None)
+    if campaign_id is not None:
+        raise CRMValidationError(
+            "unsupported_campaign",
+            "Campaign selection is not supported for bulk member leads yet."
+        )
+
+    try:
+        source = validate_bulk_source(data.get('source'))
+    except ValueError as e:
+        raise CRMValidationError("invalid_source", str(e))
+    if source != 'EXISTING_MEMBER':
+        raise CRMValidationError("invalid_source", "Bulk member leads must use EXISTING_MEMBER source.")
+
+    selection = data.get('selection')
+    if not isinstance(selection, dict):
+        raise CRMValidationError("invalid_selection", "'selection' is required and must be an object")
+
+    distribution = data.get('distribution')
+    if not isinstance(distribution, dict):
+        raise CRMValidationError("invalid_distribution", "'distribution' is required and must be an object")
+
+    try:
+        selected_mode = validate_bulk_selection_mode(selection.get('mode'))
+    except ValueError as e:
+        raise CRMValidationError("invalid_selection_mode", str(e))
+    try:
+        distribution_mode = validate_bulk_distribution_mode(distribution.get('mode'))
+    except ValueError as e:
+        raise CRMValidationError("invalid_distribution", str(e))
+
+    # Equal distribution requires assignment permission. Unassigned previews do not.
+    user_ids = []
+    assignable_users = []
+    if distribution_mode == 'equal':
+        if not _user_has_crm_permission(current_user, CRM_ASSIGN):
+            raise CRMForbiddenError("Bulk previews with employee distribution require crm_assign permission.")
+        try:
+            user_ids = validate_positive_int_list(distribution.get('user_ids'), 'user_ids', max_items=1000)
+        except ValueError as e:
+            raise CRMValidationError("invalid_employee", str(e))
+        assignable_users = queries.get_assignable_users_by_ids(user_ids)
+        found_user_ids = [row['id'] for row in assignable_users]
+        found_user_id_set = set(found_user_ids)
+        invalid_user_ids = [uid for uid in user_ids if uid not in found_user_id_set]
+        if invalid_user_ids:
+            raise CRMValidationError(
+                "invalid_employee",
+                "One or more selected employees are not assignable CRM users.",
+                {"user_ids": invalid_user_ids}
+            )
+        assignable_users = sorted(assignable_users, key=lambda row: row['id'])
+    else:
+        raw_user_ids = distribution.get('user_ids')
+        if raw_user_ids not in (None, [], ()):
+            raise CRMValidationError(
+                "invalid_distribution",
+                "Unassigned distribution cannot include employee IDs."
+            )
+
+    selection_data = _resolve_bulk_member_selection(selection)
+    selected_member_ids = selection_data['selected_member_ids']
+    missing_member_ids = selection_data['missing_member_ids']
+
+    active_lead_rows = queries.get_active_leads_for_member_ids(selected_member_ids)
+    active_lead_member_ids = {row['member_id'] for row in active_lead_rows}
+    eligible_member_ids = [mid for mid in selected_member_ids if mid not in active_lead_member_ids]
+    active_lead_count = len(selected_member_ids) - len(eligible_member_ids)
+
+    distribution_preview = []
+    if distribution_mode == 'equal':
+        employee_count = len(assignable_users)
+        if employee_count == 0:
+            raise CRMValidationError("invalid_employee", "At least one assignable employee is required.")
+        base = len(eligible_member_ids) // employee_count
+        remainder = len(eligible_member_ids) % employee_count
+        for index, user in enumerate(assignable_users):
+            lead_count = base + (1 if index < remainder else 0)
+            distribution_preview.append({
+                "user_id": user['id'],
+                "username": user['username'],
+                "lead_count": lead_count
+            })
+
+    snapshot = {
+        "source": source,
+        "selection": {
+            "mode": selected_mode,
+            "selected_member_ids": selected_member_ids,
+            "missing_member_ids": missing_member_ids,
+            "excluded_member_ids": selection_data['excluded_member_ids']
+        },
+        "distribution": {
+            "mode": distribution_mode,
+            "user_ids": user_ids if distribution_mode == 'equal' else []
+        },
+        "eligible_member_ids": eligible_member_ids,
+        "selected_count": len(selected_member_ids),
+        "eligible_count": len(eligible_member_ids),
+        "skipped_count": active_lead_count,
+        "missing_count": len(missing_member_ids),
+        "active_lead_member_ids": sorted(active_lead_member_ids),
+        "assignable_users": distribution_preview,
+        "created_by_user_id": current_user.get('id')
+    }
+
+    token, expires_at = _store_bulk_preview_snapshot(current_user, snapshot)
+    return {
+        "status": "preview",
+        "selected_count": len(selected_member_ids),
+        "eligible_count": len(eligible_member_ids),
+        "skipped_count": active_lead_count,
+        "missing_count": len(missing_member_ids),
+        "skipped_reasons": {
+            "active_lead_exists": active_lead_count,
+            "member_missing": len(missing_member_ids)
+        },
+        "distribution": distribution_preview if distribution_mode == 'equal' else [],
+        "preview_token": token,
+        "expires_in_seconds": BULK_PREVIEW_TOKEN_TTL_SECONDS
+    }
 
 def check_lead_visibility(current_user, lead):
     """Enforces visibility check. True if user has rights, False otherwise."""

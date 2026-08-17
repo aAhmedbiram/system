@@ -1,4 +1,5 @@
 from system_app.queries import query_db
+from system_app.func import get_cairo_date
 
 def create_lead(member_id, name, phone, email, source, notes, created_by_user_id):
     """Inserts a new CRM Lead into the database and returns the generated ID."""
@@ -75,6 +76,173 @@ def find_member_matches(phone, email):
         WHERE phone = %s OR (email IS NOT NULL AND email <> '' AND email = %s)
     """
     return query_db(query, (phone, email)) or []
+
+def get_members_by_ids(member_ids):
+    """Fetches member rows for a set of member IDs in a single query."""
+    if not member_ids:
+        return []
+    query = """
+        SELECT id, name, phone, email, age, gender, birthdate, actual_starting_date,
+               starting_date, end_date, membership_packages, membership_fees,
+               membership_status, invitations, comment, national_id
+        FROM members
+        WHERE id = ANY(%s)
+        ORDER BY id ASC
+    """
+    return query_db(query, (member_ids,)) or []
+
+def _build_member_bulk_filter_query(filters):
+    """Builds the same member filter semantics used by the filtered members page."""
+    from datetime import timedelta
+
+    filters = filters or {}
+    where_clauses = []
+    args = []
+
+    view = filters.get('view', 'all')
+    if view == 'active':
+        where_clauses.append("""
+            (end_date IS NOT NULL AND end_date != '' AND
+             LENGTH(TRIM(end_date)) >= 10 AND
+             CASE
+                 WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                     CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                 ELSE FALSE
+             END)
+        """)
+    elif view == 'expired':
+        where_clauses.append("""
+            (end_date IS NOT NULL AND end_date != '' AND
+             LENGTH(TRIM(end_date)) >= 10 AND
+             CASE
+                 WHEN SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
+                     CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) < (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                 ELSE FALSE
+             END)
+        """)
+
+    if filters.get('search_id'):
+        where_clauses.append("CAST(id AS TEXT) ILIKE %s")
+        args.append(f"%{filters['search_id']}%")
+
+    if filters.get('search_name'):
+        where_clauses.append("name ILIKE %s")
+        args.append(f"%{filters['search_name']}%")
+
+    if filters.get('search_national_id'):
+        where_clauses.append("COALESCE(national_id, '') ILIKE %s")
+        args.append(f"%{filters['search_national_id']}%")
+
+    if filters.get('search_phone'):
+        where_clauses.append("COALESCE(phone, '') ILIKE %s")
+        args.append(f"%{filters['search_phone']}%")
+
+    if filters.get('search_age'):
+        where_clauses.append("CAST(age AS TEXT) ILIKE %s")
+        args.append(f"%{filters['search_age']}%")
+
+    if filters.get('search_gender'):
+        where_clauses.append("COALESCE(gender, '') ILIKE %s")
+        args.append(f"%{filters['search_gender']}%")
+
+    if filters.get('search_actual_start'):
+        where_clauses.append("COALESCE(actual_starting_date, '') ILIKE %s")
+        args.append(f"%{filters['search_actual_start']}%")
+
+    if filters.get('search_start_date'):
+        where_clauses.append("COALESCE(starting_date, '') ILIKE %s")
+        args.append(f"%{filters['search_start_date']}%")
+
+    if filters.get('search_end_date'):
+        where_clauses.append("COALESCE(end_date, '') ILIKE %s")
+        args.append(f"%{filters['search_end_date']}%")
+
+    if filters.get('search_package'):
+        where_clauses.append("COALESCE(membership_packages, '') ILIKE %s")
+        args.append(f"%{filters['search_package']}%")
+
+    if filters.get('search_fees'):
+        where_clauses.append("CAST(membership_fees AS TEXT) ILIKE %s")
+        args.append(f"%{filters['search_fees']}%")
+
+    expires_within = filters.get('expires_within')
+    if expires_within:
+        today = get_cairo_date()
+        upper = (today + timedelta(days=expires_within)).strftime('%Y-%m-%d')
+        if expires_within == 7:
+            where_clauses.append("""
+                end_date IS NOT NULL AND end_date != ''
+                AND LENGTH(TRIM(end_date)) >= 10
+                AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE
+                AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+            """)
+            args.append(upper)
+        elif expires_within == 14:
+            lower = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+            where_clauses.append("""
+                end_date IS NOT NULL AND end_date != ''
+                AND LENGTH(TRIM(end_date)) >= 10
+                AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+            """)
+            args.extend([lower, upper])
+        elif expires_within == 30:
+            lower = (today + timedelta(days=14)).strftime('%Y-%m-%d')
+            where_clauses.append("""
+                end_date IS NOT NULL AND end_date != ''
+                AND LENGTH(TRIM(end_date)) >= 10
+                AND SUBSTRING(TRIM(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) > %s
+                AND CAST(SUBSTRING(TRIM(end_date), 1, 10) AS DATE) <= %s
+            """)
+            args.extend([lower, upper])
+
+    if filters.get('search_invitations'):
+        where_clauses.append("CAST(COALESCE(invitations, 0) AS TEXT) ILIKE %s")
+        args.append(f"%{filters['search_invitations']}%")
+
+    if filters.get('search_comment'):
+        where_clauses.append("COALESCE(comment, '') ILIKE %s")
+        args.append(f"%{filters['search_comment']}%")
+
+    clause_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    query = f"SELECT id FROM members {clause_str} ORDER BY id ASC"
+    return query, tuple(args)
+
+def get_member_ids_by_filters(filters):
+    """Resolves member IDs for the CRM bulk selection filter semantics."""
+    query, args = _build_member_bulk_filter_query(filters)
+    rows = query_db(query, args) or []
+    return [row['id'] for row in rows]
+
+def get_active_leads_for_member_ids(member_ids):
+    """Returns active CRM leads for the given member IDs as a member_id -> lead_id mapping."""
+    if not member_ids:
+        return []
+    query = """
+        SELECT member_id, id AS lead_id
+        FROM crm_leads
+        WHERE member_id = ANY(%s)
+          AND member_id IS NOT NULL
+          AND stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')
+          AND is_archived = FALSE
+    """
+    return query_db(query, (member_ids,)) or []
+
+def get_assignable_users_by_ids(user_ids):
+    """Fetches assignable users by ID using the same assignable-user rules as the CRM user list."""
+    if not user_ids:
+        return []
+    query = """
+        SELECT id, username, email, is_approved
+        FROM users
+        WHERE id = ANY(%s)
+          AND (is_approved = TRUE OR username = 'rino')
+        ORDER BY id ASC
+    """
+    return query_db(query, (user_ids,)) or []
 
 def search_members(search_query, limit=20):
     """Searches members for linking to CRM leads."""

@@ -4,7 +4,7 @@ from system_app.crm.permissions import (
     CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN, CRM_UPDATE_STAGE, CRM_CONVERT
 )
 from system_app.crm import services
-from system_app.crm.services import CRMConflictError, CRMForbiddenError, CRMNotFoundError, CRMProtectedFieldError
+from system_app.crm.services import CRMConflictError, CRMForbiddenError, CRMNotFoundError, CRMProtectedFieldError, CRMValidationError
 
 crm_routes = Blueprint('crm_routes', __name__)
 
@@ -68,6 +68,38 @@ def create_lead_route():
         return jsonify({"id": lead_id, "status": "created"}), 201
     except ValueError as e:
         return jsonify({"error": "invalid_input", "message": str(e)}), 400
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/leads/bulk', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+@crm_permission_required(CRM_CREATE)
+def bulk_leads_route():
+    """Renders the bulk lead creation shell."""
+    from system_app.app import get_common_template_context
+    common_context = get_common_template_context()
+    return render_template("crm_bulk_leads.html", **common_context)
+
+@crm_routes.route('/leads/bulk/preview', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_CREATE)
+def bulk_leads_preview_route():
+    """Returns an authoritative bulk selection preview without creating records."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    try:
+        preview = services.preview_bulk_member_leads(current_user, data)
+        return jsonify(preview), 200
+    except CRMValidationError as e:
+        payload = {"error": e.error_code, "message": str(e)}
+        if e.details:
+            payload["details"] = e.details
+        return jsonify(payload), 400
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
     except CRMConflictError as e:
         return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
 

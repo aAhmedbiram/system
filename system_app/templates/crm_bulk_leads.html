@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk CRM Leads - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .wrap {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .card {
+            background: rgba(30,30,40,0.75);
+            border: 1px solid rgba(76,175,80,0.2);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+        }
+        h1, h2 {
+            color: #4caf50;
+            margin-top: 0;
+        }
+        .meta {
+            color: #c9d0ff;
+            line-height: 1.6;
+        }
+        .back {
+            display: inline-block;
+            margin-top: 18px;
+            text-decoration: none;
+            color: #4caf50;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="card">
+            <h1>Bulk CRM Leads</h1>
+            <h2>Phase A shell</h2>
+            <p class="meta">
+                The backend bulk selection and preview API is available.
+                The full bulk creation wizard will be added in a later phase.
+            </p>
+            <a class="back" href="/crm/">Back to CRM Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>
