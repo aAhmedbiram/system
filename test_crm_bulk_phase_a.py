@@ -125,7 +125,8 @@ class TestCRMBulkPhaseA(unittest.TestCase):
         res_rino = self.client.get('/crm/leads/bulk')
         self.assertEqual(res_rino.status_code, 200)
         self.assertIn(b'Bulk CRM Leads', res_rino.data)
-        self.assertIn(b'Phase A shell', res_rino.data)
+        self.assertIn(b'Bulk CRM Leads', res_rino.data)
+        self.assertIn(b'Confirm Execution', res_rino.data)
         self.assertIn(b'csrf-token', res_rino.data)
 
     def test_02_preview_requires_create_permission(self):

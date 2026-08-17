@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" href="/static/logo.png">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -15,45 +16,250 @@
             min-height: 100vh;
         }
         .wrap {
-            max-width: 900px;
+            max-width: 1180px;
             margin: 0 auto;
-            padding: 24px;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 22px;
+            border-radius: 12px;
+            background: rgba(20, 20, 30, 0.85);
+            border-bottom: 2px solid rgba(76,175,80,0.3);
+            margin-bottom: 18px;
+        }
+        .index-btn {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-block;
+            border: none;
+            cursor: pointer;
+        }
+        .secondary-btn {
+            background: rgba(30,30,40,0.85);
+            color: #4caf50;
+            border: 1px solid rgba(76,175,80,0.25);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        @media (max-width: 960px) {
+            .grid { grid-template-columns: 1fr; }
         }
         .card {
             background: rgba(30,30,40,0.75);
             border: 1px solid rgba(76,175,80,0.2);
             border-radius: 12px;
-            padding: 24px;
+            padding: 20px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
         }
-        h1, h2 {
+        .card h2, .card h3 {
             color: #4caf50;
             margin-top: 0;
         }
-        .meta {
-            color: #c9d0ff;
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+        .field input {
+            background: rgba(10,10,15,0.8);
+            border: 1px solid rgba(76,175,80,0.28);
+            color: #eee;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        @media (max-width: 720px) {
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+        .summary-item {
+            background: rgba(10,10,15,0.5);
+            border: 1px solid rgba(76,175,80,0.12);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .summary-label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #4caf50;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .summary-value {
+            color: #eee;
+            word-break: break-word;
+        }
+        .feedback {
+            display: none;
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .feedback.error {
+            background: rgba(244,67,54,0.1);
+            border: 1px solid rgba(244,67,54,0.3);
+            color: #f44336;
+        }
+        .feedback.success {
+            background: rgba(76,175,80,0.1);
+            border: 1px solid rgba(76,175,80,0.3);
+            color: #4caf50;
+        }
+        .muted {
+            color: #aaa;
             line-height: 1.6;
         }
-        .back {
-            display: inline-block;
-            margin-top: 18px;
-            text-decoration: none;
-            color: #4caf50;
-            font-weight: 600;
+        .list {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .list li {
+            margin-bottom: 6px;
+            color: #eee;
+        }
+        .section-note {
+            color: #aaa;
+            margin-bottom: 14px;
+        }
+        .result {
+            display: none;
+        }
+        .result pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: rgba(10,10,15,0.7);
+            border: 1px solid rgba(76,175,80,0.12);
+            color: #eee;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 0;
         }
     </style>
 </head>
 <body>
     <div class="wrap">
-        <div class="card">
-            <h1>Bulk CRM Leads</h1>
-            <h2>Phase A shell</h2>
-            <p class="meta">
-                The backend bulk selection and preview API is available.
-                The full bulk creation wizard will be added in a later phase.
-            </p>
-            <a class="back" href="/crm/">Back to CRM Dashboard</a>
+        <header>
+            <div>
+                <h1 style="margin:0; font-size:24px; background: linear-gradient(135deg, #4caf50, #66d66a); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Bulk CRM Leads</h1>
+                <div style="color:#aaa; margin-top:4px;">Preview confirmation and execution workspace</div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <a href="/crm/" class="index-btn secondary-btn">CRM Dashboard</a>
+                <a href="/crm/follow-ups/view" class="index-btn secondary-btn">Follow-Up Queue</a>
+            </div>
+        </header>
+
+        {% if preview_error %}
+        <div class="card" style="border-color: rgba(244,67,54,0.35); margin-bottom: 18px;">
+            <h2 style="color:#f44336;">Preview unavailable</h2>
+            <div class="muted">{{ preview_error }}</div>
+        </div>
+        {% endif %}
+
+        <div class="grid">
+            <div class="card">
+                <h2>Confirm Execution</h2>
+                <div class="section-note">
+                    Paste a durable preview token from the selection/preview step, then confirm execution.
+                    The server-side snapshot remains authoritative.
+                </div>
+
+                <div class="field">
+                    <label for="previewTokenInput">Preview Token</label>
+                    <input id="previewTokenInput" type="text" placeholder="Paste preview token">
+                </div>
+
+                <div class="actions">
+                    <button id="loadPreviewBtn" type="button" class="index-btn secondary-btn">Load Preview</button>
+                    <button id="executeBulkBtn" type="button" class="index-btn" disabled>Execute Bulk Leads</button>
+                </div>
+
+                <div id="executeFeedback" class="feedback"></div>
+
+                <div id="resultPanel" class="result" style="margin-top:16px;">
+                    <h3>Execution Result</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item"><span class="summary-label">Requested</span><span id="resultRequested" class="summary-value">0</span></div>
+                        <div class="summary-item"><span class="summary-label">Created</span><span id="resultCreated" class="summary-value">0</span></div>
+                        <div class="summary-item"><span class="summary-label">Skipped</span><span id="resultSkipped" class="summary-value">0</span></div>
+                        <div class="summary-item"><span class="summary-label">Failed</span><span id="resultFailed" class="summary-value">0</span></div>
+                    </div>
+                    <div class="summary-item" style="margin-bottom:12px;">
+                        <span class="summary-label">Assignment Totals</span>
+                        <ul id="resultAssignments" class="list"></ul>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Skipped Items</span>
+                        <pre id="resultSkippedItems">[]</pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Preview Summary</h2>
+                <div class="section-note">
+                    This section shows the frozen snapshot that will be executed.
+                </div>
+
+                <div id="previewSummaryEmpty" class="muted" {% if preview_summary %}style="display:none;"{% endif %}>
+                    No preview snapshot is currently loaded.
+                </div>
+
+                <div id="previewSummaryCard" {% if not preview_summary %}style="display:none;"{% endif %}>
+                    <div class="summary-grid">
+                        <div class="summary-item"><span class="summary-label">Source</span><span id="previewSource" class="summary-value">EXISTING_MEMBER</span></div>
+                        <div class="summary-item"><span class="summary-label">Selected</span><span id="previewSelected" class="summary-value">0</span></div>
+                        <div class="summary-item"><span class="summary-label">Eligible</span><span id="previewEligible" class="summary-value">0</span></div>
+                        <div class="summary-item"><span class="summary-label">Skipped</span><span id="previewSkipped" class="summary-value">0</span></div>
+                        <div class="summary-item"><span class="summary-label">Missing</span><span id="previewMissing" class="summary-value">0</span></div>
+                        <div class="summary-item"><span class="summary-label">Planned Assignments</span><span id="previewPlanCount" class="summary-value">0</span></div>
+                    </div>
+                    <div class="summary-item" style="margin-bottom:12px;">
+                        <span class="summary-label">Distribution Plan</span>
+                        <ul id="previewDistribution" class="list"></ul>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Preview Token</span>
+                        <span id="previewTokenDisplay" class="summary-value"></span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <script>
+        window.CRM_BULK_PREVIEW_SUMMARY = {{ preview_summary|tojson }};
+        window.CRM_BULK_PREVIEW_TOKEN = {{ preview_token|tojson }};
+    </script>
+    <script src="/static/js/crm_shared.js"></script>
+    <script src="/static/js/crm_bulk_leads.js"></script>
 </body>
 </html>

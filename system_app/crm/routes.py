@@ -78,8 +78,37 @@ def create_lead_route():
 def bulk_leads_route():
     """Renders the bulk lead creation shell."""
     from system_app.app import get_common_template_context
+    current_user = get_current_user()
     common_context = get_common_template_context()
-    return render_template("crm_bulk_leads.html", **common_context)
+    preview_token = request.args.get('preview_token', '').strip()
+    preview_summary = None
+    preview_error = None
+
+    if preview_token:
+        try:
+            preview_snapshot = services.get_bulk_preview_snapshot(preview_token, current_user)
+            distribution_mode = (preview_snapshot.get('distribution') or {}).get('mode')
+            preview_summary = {
+                "source": preview_snapshot.get('source'),
+                "selected_count": preview_snapshot.get('selected_count', 0),
+                "eligible_count": preview_snapshot.get('eligible_count', 0),
+                "skipped_count": preview_snapshot.get('skipped_count', 0),
+                "missing_count": preview_snapshot.get('missing_count', 0),
+                "assignment_plan_count": len(preview_snapshot.get('assignment_plan') or []),
+                "distribution": preview_snapshot.get('assignable_users', []) if distribution_mode == 'equal' else [],
+                "distribution_mode": distribution_mode,
+                "preview_token": preview_token
+            }
+        except (CRMForbiddenError, CRMNotFoundError) as e:
+            preview_error = str(e)
+
+    return render_template(
+        "crm_bulk_leads.html",
+        preview_token=preview_token,
+        preview_summary=preview_summary,
+        preview_error=preview_error,
+        **common_context
+    )
 
 @crm_routes.route('/leads/bulk/preview', methods=['POST'])
 @login_required
@@ -91,6 +120,29 @@ def bulk_leads_preview_route():
     try:
         preview = services.preview_bulk_member_leads(current_user, data)
         return jsonify(preview), 200
+    except CRMValidationError as e:
+        payload = {"error": e.error_code, "message": str(e)}
+        if e.details:
+            payload["details"] = e.details
+        return jsonify(payload), 400
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
+    except CRMConflictError as e:
+        return jsonify({"error": e.error_code, "message": str(e), "details": e.details}), 409
+
+@crm_routes.route('/leads/bulk/execute', methods=['POST'])
+@login_required
+@crm_permission_required(CRM_CREATE)
+def bulk_leads_execute_route():
+    """Executes a previously approved bulk member preview."""
+    current_user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    preview_token = data.get('preview_token')
+    try:
+        result = services.execute_bulk_member_leads(current_user, preview_token)
+        return jsonify(result), 200
     except CRMValidationError as e:
         payload = {"error": e.error_code, "message": str(e)}
         if e.details:

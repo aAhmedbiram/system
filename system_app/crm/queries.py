@@ -277,6 +277,50 @@ def claim_bulk_lead_operation(token, created_by_user_id):
     """
     return query_db(query, (token, created_by_user_id), one=True, commit=True)
 
+def finalize_bulk_lead_operation(token, created_by_user_id, status, snapshot):
+    """Stores the final bulk execution state and summary in the durable operation row."""
+    query = """
+        UPDATE crm_bulk_lead_operations
+           SET status = %s,
+               snapshot = %s,
+               completed_at = CURRENT_TIMESTAMP
+         WHERE token = %s
+           AND created_by_user_id = %s
+     RETURNING
+            id, token, created_by_user_id, status, snapshot,
+            created_at, expires_at, started_at, completed_at
+    """
+    return query_db(query, (status, Json(snapshot), token, created_by_user_id), one=True, commit=True)
+
+def create_existing_member_lead_in_transaction(cur, member_row, source, created_by_user_id, assigned_user_id=None):
+    """Inserts a CRM lead linked to an existing member inside an open transaction."""
+    query = """
+        INSERT INTO crm_leads (
+            member_id, name, phone, email, source, stage,
+            assigned_user_id, assigned_by_user_id, assigned_at,
+            created_by_user_id
+        ) VALUES (%s, %s, %s, %s, %s, 'NEW', %s, %s,
+                  CASE WHEN %s IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+                  %s)
+        RETURNING id
+    """
+    assigned_by_user_id = created_by_user_id if assigned_user_id is not None else None
+    cur.execute(
+        query,
+        (
+            member_row.get('id'),
+            member_row.get('name'),
+            member_row.get('phone'),
+            member_row.get('email'),
+            source,
+            assigned_user_id,
+            assigned_by_user_id,
+            assigned_user_id,
+            created_by_user_id
+        )
+    )
+    return cur.fetchone()['id']
+
 def get_assignable_users_by_ids(user_ids):
     """Fetches assignable users by ID using the same assignable-user rules as the CRM user list."""
     if not user_ids:

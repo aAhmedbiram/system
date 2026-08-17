@@ -121,6 +121,217 @@ def claim_bulk_preview_operation(token, current_user):
         )
     return operation
 
+def _load_bulk_operation_for_user(token, current_user):
+    operation = queries.get_bulk_lead_operation_by_token(token)
+    if not operation:
+        raise CRMNotFoundError("Bulk preview token not found or expired")
+    if operation.get('created_by_user_id') != current_user.get('id'):
+        raise CRMForbiddenError("This bulk preview token does not belong to the current user.")
+    if operation.get('expires_at') and operation['expires_at'] <= datetime.now(CAIRO_TZ):
+        raise CRMNotFoundError("Bulk preview token has expired")
+    return operation
+
+def _build_bulk_execution_response(operation):
+    snapshot = operation.get('snapshot') or {}
+    execution = snapshot.get('execution') or {}
+    response = dict(execution) if isinstance(execution, dict) else {}
+    response.setdefault("requested", 0)
+    response.setdefault("created", 0)
+    response.setdefault("skipped", 0)
+    response.setdefault("failed", 0)
+    response.setdefault("assignments", [])
+    response.setdefault("skipped_reasons", {})
+    response.setdefault("skipped_items", [])
+    response["status"] = operation.get('status') or "COMPLETED"
+    response["preview_token"] = operation.get('token')
+    return response
+
+def execute_bulk_member_leads(current_user, preview_token):
+    """Executes a frozen bulk member lead preview exactly once."""
+    if not preview_token:
+        raise CRMValidationError("invalid_input", "'preview_token' is required")
+
+    operation = _load_bulk_operation_for_user(preview_token, current_user)
+    snapshot = operation.get('snapshot') or {}
+    assignment_plan = snapshot.get('assignment_plan') or []
+
+    if snapshot.get('source') != 'EXISTING_MEMBER':
+        raise CRMConflictError(
+            "invalid_source",
+            "Bulk member execution only supports EXISTING_MEMBER source."
+        )
+
+    if operation.get('status') == 'COMPLETED':
+        return _build_bulk_execution_response(operation)
+    if operation.get('status') != 'PREVIEW':
+        raise CRMConflictError("bulk_preview_not_ready", "Bulk preview is already being executed.")
+
+    if not _user_has_crm_permission(current_user, "crm_create"):
+        raise CRMForbiddenError("Bulk execution requires crm_create permission.")
+
+    has_assigned_targets = any(row.get('user_id') is not None for row in assignment_plan)
+    if has_assigned_targets and not _user_has_crm_permission(current_user, CRM_ASSIGN):
+        raise CRMForbiddenError("Bulk execution with employee assignment requires crm_assign permission.")
+
+    claimed = claim_bulk_preview_operation(preview_token, current_user)
+    if not claimed:
+        latest = queries.get_bulk_lead_operation_by_token(preview_token)
+        if latest and latest.get('status') == 'COMPLETED':
+            return _build_bulk_execution_response(latest)
+        raise CRMConflictError(
+            "bulk_preview_not_claimed",
+            "Bulk preview token could not be claimed."
+        )
+
+    unique_member_ids = list(dict.fromkeys(row.get('member_id') for row in assignment_plan if row.get('member_id') is not None))
+    member_rows = queries.get_members_by_ids(unique_member_ids)
+    member_map = {row['id']: row for row in member_rows}
+
+    active_lead_rows = queries.get_active_leads_for_member_ids(unique_member_ids)
+    active_lead_map = {row['member_id']: row['lead_id'] for row in active_lead_rows}
+
+    unique_assignee_ids = sorted({row.get('user_id') for row in assignment_plan if row.get('user_id') is not None})
+    assignee_rows = queries.get_assignable_users_by_ids(unique_assignee_ids)
+    assignee_map = {row['id']: row for row in assignee_rows}
+
+    execution_summary = {
+        "requested": len(assignment_plan),
+        "created": 0,
+        "skipped": 0,
+        "failed": 0,
+        "assignments": [],
+        "skipped_reasons": {},
+        "skipped_items": []
+    }
+    created_by_user_id = current_user.get('id')
+    user_create_counts = {}
+    user_name_map = {}
+    for assignee in snapshot.get('assignable_users') or []:
+        if assignee.get('user_id') is not None:
+            user_name_map[assignee['user_id']] = assignee.get('username')
+
+    def _record_skip(member_id, reason, details=None):
+        execution_summary["skipped"] += 1
+        execution_summary["skipped_reasons"][reason] = execution_summary["skipped_reasons"].get(reason, 0) + 1
+        if len(execution_summary["skipped_items"]) < 50:
+            item = {"member_id": member_id, "reason": reason}
+            if details:
+                item["details"] = details
+            execution_summary["skipped_items"].append(item)
+
+    try:
+        for plan_item in assignment_plan:
+            member_id = plan_item.get('member_id')
+            assigned_user_id = plan_item.get('user_id')
+
+            member_row = member_map.get(member_id)
+            if not member_row:
+                _record_skip(member_id, "member_missing")
+                continue
+
+            if member_id in active_lead_map:
+                _record_skip(member_id, "active_lead_exists", {"existing_lead_id": active_lead_map[member_id]})
+                continue
+
+            if assigned_user_id is not None and assigned_user_id not in assignee_map:
+                _record_skip(member_id, "invalid_employee", {"user_id": assigned_user_id})
+                continue
+
+            try:
+                def callback(cur, member_snapshot, source, actor_id, target_user_id):
+                    return queries.create_existing_member_lead_in_transaction(
+                        cur,
+                        member_snapshot,
+                        source,
+                        actor_id,
+                        target_user_id
+                    )
+
+                queries.run_in_transaction(
+                    callback,
+                    member_row,
+                    snapshot.get('source'),
+                    created_by_user_id,
+                    assigned_user_id
+                )
+                execution_summary["created"] += 1
+                if assigned_user_id is not None:
+                    if assigned_user_id not in user_create_counts:
+                        user_create_counts[assigned_user_id] = 0
+                    user_create_counts[assigned_user_id] += 1
+            except Exception as exc:
+                pgcode = getattr(exc, 'pgcode', None)
+                constraint_name = getattr(getattr(exc, 'diag', None), 'constraint_name', None)
+                if pgcode == '23505' or constraint_name == 'idx_unique_active_member_lead':
+                    _record_skip(member_id, "active_lead_exists")
+                elif pgcode == '23503':
+                    if assigned_user_id is not None and assigned_user_id not in assignee_map:
+                        _record_skip(member_id, "invalid_employee", {"user_id": assigned_user_id})
+                    else:
+                        _record_skip(member_id, "member_missing")
+                else:
+                    raise
+
+        assignment_order = []
+        seen_assignees = set()
+        for plan_item in assignment_plan:
+            assignee_id = plan_item.get('user_id')
+            if assignee_id is None or assignee_id in seen_assignees:
+                continue
+            seen_assignees.add(assignee_id)
+            assignment_order.append(assignee_id)
+
+        execution_summary["assignments"] = []
+        for assignee_id in assignment_order:
+            execution_summary["assignments"].append({
+                "user_id": assignee_id,
+                "username": user_name_map.get(assignee_id),
+                "created": user_create_counts.get(assignee_id, 0)
+            })
+
+        finalized_snapshot = dict(snapshot)
+        finalized_snapshot["execution"] = execution_summary
+        finalized_snapshot["execution"]["preview_token"] = preview_token
+        execution_summary["status"] = "COMPLETED"
+        execution_summary["preview_token"] = preview_token
+
+        final_operation = queries.finalize_bulk_lead_operation(
+            preview_token,
+            created_by_user_id,
+            "COMPLETED",
+            finalized_snapshot
+        )
+        if not final_operation:
+            raise CRMConflictError(
+                "bulk_preview_not_finalized",
+                "Bulk preview execution could not be finalized."
+            )
+        return execution_summary
+
+    except Exception as exc:
+        try:
+            failed_snapshot = dict(snapshot)
+            failed_snapshot["execution"] = {
+                "requested": len(assignment_plan),
+                "created": execution_summary["created"],
+                "skipped": execution_summary["skipped"],
+                "failed": 1,
+                "assignments": execution_summary.get("assignments", []),
+                "skipped_reasons": execution_summary.get("skipped_reasons", {}),
+                "skipped_items": execution_summary.get("skipped_items", []),
+                "status": "FAILED",
+                "preview_token": preview_token
+            }
+            queries.finalize_bulk_lead_operation(
+                preview_token,
+                created_by_user_id,
+                "FAILED",
+                failed_snapshot
+            )
+        except Exception:
+            pass
+        raise
+
 def create_lead(current_user, data):
     """Enforces business rules and inserts a new CRM Lead."""
     created_by_user_id = current_user['id']
