@@ -22,6 +22,7 @@ class TestCRMBulkPhaseA(unittest.TestCase):
 
         query_db("DELETE FROM crm_activities", commit=True)
         query_db("DELETE FROM crm_leads", commit=True)
+        query_db("DELETE FROM crm_bulk_lead_operations", commit=True)
         query_db("DELETE FROM members WHERE name LIKE %s", ("PBA %",), commit=True)
         query_db(
     "DELETE FROM users WHERE username LIKE %s OR username = %s",
@@ -38,18 +39,16 @@ class TestCRMBulkPhaseA(unittest.TestCase):
             (45011, 'pba_user_b',  'userb@test.com', 'pwd', TRUE, '{}'),
             (45003, 'pba_none',    'none@test.com', 'pwd', TRUE, '{}')
         """, commit=True)
-        services._bulk_preview_store.clear()
-
     def tearDown(self):
         query_db("DELETE FROM crm_activities", commit=True)
         query_db("DELETE FROM crm_leads", commit=True)
+        query_db("DELETE FROM crm_bulk_lead_operations", commit=True)
         query_db("DELETE FROM members WHERE name LIKE %s", ("PBA %",), commit=True)
         query_db(
     "DELETE FROM users WHERE username LIKE %s OR username = %s",
     ("pba_%", "rino"),
     commit=True
 )
-        services._bulk_preview_store.clear()
         app.config['TESTING'] = self._old_testing
         app.config['SECRET_KEY'] = self._old_secret_key
         app.config['WTF_CSRF_ENABLED'] = self._old_csrf_enabled
@@ -349,7 +348,11 @@ class TestCRMBulkPhaseA(unittest.TestCase):
         with self.assertRaises(CRMNotFoundError):
             services.get_bulk_preview_snapshot(token + 'tamper', {"id": 45002, "username": "pba_assign"})
 
-        services._bulk_preview_store[token]['expires_at'] = datetime.now(CAIRO_TZ) - timedelta(seconds=1)
+        query_db(
+            "UPDATE crm_bulk_lead_operations SET expires_at = %s WHERE token = %s",
+            (datetime.now(CAIRO_TZ) - timedelta(seconds=1), token),
+            commit=True
+        )
         self.login_as('pba_assign', 45002)
         with self.assertRaises(CRMNotFoundError):
             services.get_bulk_preview_snapshot(

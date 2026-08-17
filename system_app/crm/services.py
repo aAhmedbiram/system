@@ -17,12 +17,9 @@ from system_app.member_services import create_member_in_transaction, renew_membe
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import secrets
-import threading
 
 CAIRO_TZ = ZoneInfo("Africa/Cairo")
 BULK_PREVIEW_TOKEN_TTL_SECONDS = 900
-_bulk_preview_store = {}
-_bulk_preview_lock = threading.Lock()
 
 class CRMConflictError(Exception):
     def __init__(self, error_code, message, details=None):
@@ -55,46 +52,74 @@ def _user_has_crm_permission(current_user, permission_key):
     perms = current_user.get('permissions') or {}
     return bool(perms.get('super_admin') or perms.get(permission_key))
 
-def _cleanup_expired_bulk_preview_tokens(now=None):
-    now = now or datetime.now(CAIRO_TZ)
-    with _bulk_preview_lock:
-        expired = [
-            token for token, entry in _bulk_preview_store.items()
-            if entry.get('expires_at') and entry['expires_at'] <= now
+def _build_assignment_plan(eligible_member_ids, distribution_mode, assignable_users):
+    """Builds a deterministic member -> user assignment plan for preview and later execution."""
+    assignment_plan = []
+
+    if distribution_mode == 'unassigned':
+        return [
+            {"member_id": member_id, "user_id": None}
+            for member_id in eligible_member_ids
         ]
-        for token in expired:
-            _bulk_preview_store.pop(token, None)
+
+    employee_count = len(assignable_users)
+    if employee_count == 0:
+        return []
+
+    base = len(eligible_member_ids) // employee_count
+    remainder = len(eligible_member_ids) % employee_count
+    offset = 0
+
+    for index, user in enumerate(assignable_users):
+        lead_count = base + (1 if index < remainder else 0)
+        if lead_count <= 0:
+            continue
+        chunk = eligible_member_ids[offset:offset + lead_count]
+        for member_id in chunk:
+            assignment_plan.append({
+                "member_id": member_id,
+                "user_id": user["id"]
+            })
+        offset += lead_count
+
+    return assignment_plan
 
 def _store_bulk_preview_snapshot(current_user, snapshot):
-    _cleanup_expired_bulk_preview_tokens()
+    """Persists a bulk preview snapshot durably and returns its token and expiry."""
     token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(CAIRO_TZ) + timedelta(seconds=BULK_PREVIEW_TOKEN_TTL_SECONDS)
-    payload = {
-        "user_id": current_user['id'],
-        "username": current_user.get('username'),
-        "expires_at": expires_at,
-        "snapshot": snapshot
-    }
-    with _bulk_preview_lock:
-        _bulk_preview_store[token] = payload
+    now = datetime.now(CAIRO_TZ)
+    expires_at = now + timedelta(seconds=BULK_PREVIEW_TOKEN_TTL_SECONDS)
+    queries.create_bulk_lead_operation(
+        token=token,
+        created_by_user_id=current_user.get('id'),
+        snapshot=snapshot,
+        expires_at=expires_at,
+        status='PREVIEW'
+    )
     return token, expires_at
 
 def get_bulk_preview_snapshot(token, current_user):
     """Returns a frozen bulk preview snapshot for the same user that requested it."""
     if not token:
         raise CRMNotFoundError("Bulk preview token not found")
-    _cleanup_expired_bulk_preview_tokens()
-    with _bulk_preview_lock:
-        entry = _bulk_preview_store.get(token)
-    if not entry:
+    operation = queries.get_bulk_lead_operation_by_token(token)
+    if not operation:
         raise CRMNotFoundError("Bulk preview token not found or expired")
-    if entry.get('user_id') != current_user.get('id'):
+    if operation.get('created_by_user_id') != current_user.get('id'):
         raise CRMForbiddenError("This bulk preview token does not belong to the current user.")
-    if entry.get('expires_at') and entry['expires_at'] <= datetime.now(CAIRO_TZ):
-        with _bulk_preview_lock:
-            _bulk_preview_store.pop(token, None)
+    if operation.get('expires_at') and operation['expires_at'] <= datetime.now(CAIRO_TZ):
         raise CRMNotFoundError("Bulk preview token has expired")
-    return entry.get('snapshot')
+    return operation.get('snapshot') or {}
+
+def claim_bulk_preview_operation(token, current_user):
+    """Atomically claims a bulk preview operation for execution."""
+    operation = queries.claim_bulk_lead_operation(token, current_user.get('id'))
+    if not operation:
+        raise CRMConflictError(
+            "bulk_preview_not_claimed",
+            "Bulk preview token could not be claimed."
+        )
+    return operation
 
 def create_lead(current_user, data):
     """Enforces business rules and inserts a new CRM Lead."""
@@ -312,6 +337,12 @@ def preview_bulk_member_leads(current_user, data):
                 "lead_count": lead_count
             })
 
+    assignment_plan = _build_assignment_plan(
+        eligible_member_ids,
+        distribution_mode,
+        assignable_users
+    )
+
     snapshot = {
         "source": source,
         "selection": {
@@ -331,6 +362,7 @@ def preview_bulk_member_leads(current_user, data):
         "missing_count": len(missing_member_ids),
         "active_lead_member_ids": sorted(active_lead_member_ids),
         "assignable_users": distribution_preview,
+        "assignment_plan": assignment_plan,
         "created_by_user_id": current_user.get('id')
     }
 

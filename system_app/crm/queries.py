@@ -1,3 +1,5 @@
+from psycopg2.extras import Json
+
 from system_app.queries import query_db
 from system_app.func import get_cairo_date
 
@@ -230,6 +232,50 @@ def get_active_leads_for_member_ids(member_ids):
           AND is_archived = FALSE
     """
     return query_db(query, (member_ids,)) or []
+
+def create_bulk_lead_operation(token, created_by_user_id, snapshot, expires_at, status='PREVIEW'):
+    """Persists a bulk lead preview/execution operation durably."""
+    query = """
+        INSERT INTO crm_bulk_lead_operations (
+            token, created_by_user_id, status, snapshot, created_at, expires_at
+        ) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, %s)
+        RETURNING id
+    """
+    res = query_db(
+        query,
+        (token, created_by_user_id, status, Json(snapshot), expires_at),
+        one=True,
+        commit=True
+    )
+    return res['id'] if res else None
+
+def get_bulk_lead_operation_by_token(token):
+    """Loads a bulk lead operation by its token, including the frozen snapshot."""
+    query = """
+        SELECT
+            id, token, created_by_user_id, status, snapshot,
+            created_at, expires_at, started_at, completed_at
+        FROM crm_bulk_lead_operations
+        WHERE token = %s
+        LIMIT 1
+    """
+    return query_db(query, (token,), one=True)
+
+def claim_bulk_lead_operation(token, created_by_user_id):
+    """Atomically claims a PREVIEW bulk operation for execution."""
+    query = """
+        UPDATE crm_bulk_lead_operations
+           SET status = 'EXECUTING',
+               started_at = CURRENT_TIMESTAMP
+         WHERE token = %s
+           AND created_by_user_id = %s
+           AND status = 'PREVIEW'
+           AND expires_at > CURRENT_TIMESTAMP
+     RETURNING
+            id, token, created_by_user_id, status, snapshot,
+            created_at, expires_at, started_at, completed_at
+    """
+    return query_db(query, (token, created_by_user_id), one=True, commit=True)
 
 def get_assignable_users_by_ids(user_ids):
     """Fetches assignable users by ID using the same assignable-user rules as the CRM user list."""
