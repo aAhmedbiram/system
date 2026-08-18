@@ -328,6 +328,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     tdMemberId.textContent = lead.member_id || "—";
                     row.appendChild(tdMemberId);
 
+                    // End Date
+                    const tdEndDate = document.createElement("td");
+                    const memberEndDate = lead.member_end_date == null ? "" : String(lead.member_end_date).trim();
+                    tdEndDate.textContent = memberEndDate || "—";
+                    row.appendChild(tdEndDate);
+
                     // Stage
                     const tdStage = document.createElement("td");
                     const stageSpan = document.createElement("span");
@@ -355,6 +361,39 @@ document.addEventListener("DOMContentLoaded", () => {
                     const tdFollow = document.createElement("td");
                     tdFollow.textContent = formatDatetime(lead.next_follow_up_at);
                     row.appendChild(tdFollow);
+
+                    // Latest Activity
+                    const tdLatestActivity = document.createElement("td");
+                    const latestNote = lead.latest_activity_note == null ? "" : String(lead.latest_activity_note).trim();
+                    const latestAt = lead.latest_activity_at ? formatDatetime(lead.latest_activity_at) : "";
+                    if (!latestNote && !latestAt) {
+                        tdLatestActivity.textContent = "—";
+                    } else {
+                        const activityWrap = document.createElement("div");
+                        activityWrap.className = "lead-activity-cell";
+
+                        if (latestNote) {
+                            const noteLine = document.createElement("span");
+                            noteLine.className = "lead-activity-note";
+                            noteLine.textContent = truncateText(latestNote, 56);
+                            noteLine.title = latestNote;
+                            activityWrap.appendChild(noteLine);
+                        } else {
+                            const dashLine = document.createElement("span");
+                            dashLine.textContent = "—";
+                            activityWrap.appendChild(dashLine);
+                        }
+
+                        if (latestAt) {
+                            const timeLine = document.createElement("span");
+                            timeLine.className = "lead-activity-time";
+                            timeLine.textContent = latestAt;
+                            activityWrap.appendChild(timeLine);
+                        }
+
+                        tdLatestActivity.appendChild(activityWrap);
+                    }
+                    row.appendChild(tdLatestActivity);
 
                     // Created At
                     const tdCreated = document.createElement("td");
@@ -406,6 +445,14 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             return dtString;
         }
+    }
+
+    function truncateText(text, maxLength) {
+        const value = text == null ? "" : String(text);
+        if (value.length <= maxLength) {
+            return value;
+        }
+        return value.slice(0, Math.max(0, maxLength - 1)).trimEnd() + "…";
     }
 
     // Event listeners

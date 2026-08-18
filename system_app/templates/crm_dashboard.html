@@ -166,7 +166,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1100px;
+            min-width: 1320px;
         }
 
         th, td {
@@ -327,6 +327,30 @@
         .stat-item.overdue .stat-item-value {
             color: #f44336;
         }
+
+        .lead-activity-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 220px;
+        }
+
+        .lead-activity-note {
+            display: block;
+            max-width: 320px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #eee;
+            font-weight: 600;
+        }
+
+        .lead-activity-time {
+            display: block;
+            color: #aaa;
+            font-size: 12px;
+            line-height: 1.35;
+        }
     </style>
 </head>
 <body>
@@ -473,10 +497,12 @@
                         <th>Phone</th>
                         <th>Type</th>
                         <th>Member ID</th>
+                        <th>End Date</th>
                         <th>Stage</th>
                         <th>Source</th>
                         <th>Assigned To</th>
                         <th>Next Follow-Up</th>
+                        <th>Latest Activity</th>
                         <th>Created At</th>
                     </tr>
                 </thead>

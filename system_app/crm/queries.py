@@ -398,9 +398,26 @@ def get_leads(where_clauses, args, limit, offset):
     """Fetches a paginated, filtered list of leads including assigned username."""
     clause_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     query = f"""
-        SELECT l.*, u.username AS assigned_username
+        SELECT
+            l.*,
+            u.username AS assigned_username,
+            NULLIF(TRIM(m.end_date), '') AS member_end_date,
+            latest_activity.latest_activity_note,
+            latest_activity.latest_activity_at,
+            latest_activity.latest_activity_type
         FROM crm_leads l
         LEFT JOIN users u ON u.id = l.assigned_user_id
+        LEFT JOIN members m ON m.id = l.member_id
+        LEFT JOIN LATERAL (
+            SELECT
+                a.note AS latest_activity_note,
+                a.created_at AS latest_activity_at,
+                a.activity_type AS latest_activity_type
+            FROM crm_activities a
+            WHERE a.lead_id = l.id
+            ORDER BY a.created_at DESC, a.id DESC
+            LIMIT 1
+        ) latest_activity ON TRUE
         {clause_str}
         ORDER BY l.created_at DESC, l.id DESC
         LIMIT %s OFFSET %s
