@@ -445,8 +445,8 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
 
         res = self.client.get('/crm/leads/bulk', query_string={'preview_token': token})
         self.assertEqual(res.status_code, 200)
-        self.assertIn(b'Preview Summary', res.data)
-        self.assertIn(b'Execute Bulk Leads', res.data)
+        self.assertIn(b'Preview Ready', res.data)
+        self.assertIn(b'Confirm &amp; Create Leads', res.data)
 
 
 if __name__ == '__main__':

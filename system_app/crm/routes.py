@@ -73,20 +73,21 @@ def create_lead_route():
 
 @crm_routes.route('/leads/bulk', methods=['GET'])
 @login_required
-@crm_permission_required(CRM_VIEW)
 @crm_permission_required(CRM_CREATE)
 def bulk_leads_route():
-    """Renders the bulk lead creation shell."""
+    """Renders the bulk lead creation workspace."""
     from system_app.app import get_common_template_context
     current_user = get_current_user()
     common_context = get_common_template_context()
     preview_token = request.args.get('preview_token', '').strip()
     preview_summary = None
     preview_error = None
+    bulk_state = None
 
     if preview_token:
         try:
-            preview_snapshot = services.get_bulk_preview_snapshot(preview_token, current_user)
+            operation_state = services.get_bulk_preview_operation_state(preview_token, current_user)
+            preview_snapshot = operation_state.get('snapshot') or {}
             distribution_mode = (preview_snapshot.get('distribution') or {}).get('mode')
             preview_summary = {
                 "source": preview_snapshot.get('source'),
@@ -97,7 +98,15 @@ def bulk_leads_route():
                 "assignment_plan_count": len(preview_snapshot.get('assignment_plan') or []),
                 "distribution": preview_snapshot.get('assignable_users', []) if distribution_mode == 'equal' else [],
                 "distribution_mode": distribution_mode,
-                "preview_token": preview_token
+                "preview_token": preview_token,
+                "status": operation_state.get('status')
+            }
+            bulk_state = {
+                "preview_token": preview_token,
+                "status": operation_state.get('status'),
+                "snapshot": preview_snapshot,
+                "execution": operation_state.get('execution'),
+                "summary": preview_summary
             }
         except (CRMForbiddenError, CRMNotFoundError) as e:
             preview_error = str(e)
@@ -106,9 +115,47 @@ def bulk_leads_route():
         "crm_bulk_leads.html",
         preview_token=preview_token,
         preview_summary=preview_summary,
+        bulk_state=bulk_state,
         preview_error=preview_error,
         **common_context
     )
+
+@crm_routes.route('/leads/bulk/members', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_CREATE)
+def bulk_leads_members_route():
+    """Returns paginated CRM members for the bulk selection workspace."""
+    current_user = get_current_user()
+    page = request.args.get('page')
+    per_page = request.args.get('per_page')
+    allowed_filter_keys = [
+        'view',
+        'expires_within',
+        'search_id',
+        'search_name',
+        'search_national_id',
+        'search_phone',
+        'search_age',
+        'search_gender',
+        'search_actual_start',
+        'search_start_date',
+        'search_end_date',
+        'search_package',
+        'search_fees',
+        'search_invitations',
+        'search_comment'
+    ]
+    filters = {}
+    for key in allowed_filter_keys:
+        value = request.args.get(key)
+        if value is not None and str(value).strip() != "":
+            filters[key] = value
+
+    try:
+        listing = services.list_bulk_members(current_user, page, per_page, filters)
+        return jsonify(listing), 200
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
 
 @crm_routes.route('/leads/bulk/preview', methods=['POST'])
 @login_required

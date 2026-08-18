@@ -111,6 +111,21 @@ def get_bulk_preview_snapshot(token, current_user):
         raise CRMNotFoundError("Bulk preview token has expired")
     return operation.get('snapshot') or {}
 
+def get_bulk_preview_operation_state(token, current_user):
+    """Returns the durable bulk preview operation and snapshot for the owning user."""
+    operation = _load_bulk_operation_for_user(token, current_user)
+    snapshot = operation.get('snapshot') or {}
+    return {
+        "token": operation.get('token'),
+        "status": operation.get('status'),
+        "created_at": operation.get('created_at'),
+        "expires_at": operation.get('expires_at'),
+        "started_at": operation.get('started_at'),
+        "completed_at": operation.get('completed_at'),
+        "snapshot": snapshot,
+        "execution": snapshot.get('execution') or None,
+    }
+
 def claim_bulk_preview_operation(token, current_user):
     """Atomically claims a bulk preview operation for execution."""
     operation = queries.claim_bulk_lead_operation(token, current_user.get('id'))
@@ -120,6 +135,21 @@ def claim_bulk_preview_operation(token, current_user):
             "Bulk preview token could not be claimed."
         )
     return operation
+
+def list_bulk_members(current_user, page_param, per_page_param, filters):
+    """Returns a paginated member list for the CRM bulk selection workspace."""
+    page, per_page = validate_pagination(page_param, per_page_param)
+    normalized_filters = validate_bulk_member_filters(filters or {})
+    listing = queries.get_bulk_member_listing(normalized_filters, page, per_page)
+    return {
+        "items": listing.get("items") or [],
+        "page": page,
+        "per_page": per_page,
+        "total_count": listing.get("total_count", 0),
+        "total_pages": listing.get("total_pages", 1),
+        "filters": normalized_filters,
+        "has_more": page < listing.get("total_pages", 1)
+    }
 
 def _load_bulk_operation_for_user(token, current_user):
     operation = queries.get_bulk_lead_operation_by_token(token)

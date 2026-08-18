@@ -93,7 +93,7 @@ def get_members_by_ids(member_ids):
     """
     return query_db(query, (member_ids,)) or []
 
-def _build_member_bulk_filter_query(filters):
+def _build_member_bulk_filter_components(filters):
     """Builds the same member filter semantics used by the filtered members page."""
     from datetime import timedelta
 
@@ -124,7 +124,7 @@ def _build_member_bulk_filter_query(filters):
         """)
 
     if filters.get('search_id'):
-        where_clauses.append("CAST(id AS TEXT) ILIKE %s")
+        where_clauses.append("CAST(m.id AS TEXT) ILIKE %s")
         args.append(f"%{filters['search_id']}%")
 
     if filters.get('search_name'):
@@ -210,14 +210,59 @@ def _build_member_bulk_filter_query(filters):
         args.append(f"%{filters['search_comment']}%")
 
     clause_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-    query = f"SELECT id FROM members {clause_str} ORDER BY id ASC"
-    return query, tuple(args)
+    return clause_str, tuple(args)
+
+def _build_member_bulk_filter_query(filters):
+    """Builds the same member filter semantics used by the filtered members page."""
+    clause_str, args = _build_member_bulk_filter_components(filters)
+    query = f"SELECT m.id FROM members m {clause_str} ORDER BY m.id ASC"
+    return query, args
 
 def get_member_ids_by_filters(filters):
     """Resolves member IDs for the CRM bulk selection filter semantics."""
     query, args = _build_member_bulk_filter_query(filters)
     rows = query_db(query, args) or []
     return [row['id'] for row in rows]
+
+def get_bulk_member_listing(filters, page, per_page):
+    """Returns a paginated CRM bulk-selection member listing with active lead markers."""
+    clause_str, args = _build_member_bulk_filter_components(filters)
+    offset = (page - 1) * per_page
+    count_query = f"SELECT COUNT(*) AS count FROM members m {clause_str}"
+    count_row = query_db(count_query, args, one=True)
+    total_count = count_row['count'] if count_row else 0
+
+    query = f"""
+        SELECT
+            m.id,
+            m.name,
+            m.phone,
+            m.membership_packages,
+            m.end_date,
+            m.membership_status,
+            COALESCE(active_lead.id, NULL) AS active_crm_lead_id,
+            CASE WHEN active_lead.id IS NULL THEN FALSE ELSE TRUE END AS has_active_crm_lead
+        FROM members m
+        LEFT JOIN LATERAL (
+            SELECT l.id
+            FROM crm_leads l
+            WHERE l.member_id = m.id
+              AND l.member_id IS NOT NULL
+              AND l.stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')
+              AND l.is_archived = FALSE
+            ORDER BY l.id ASC
+            LIMIT 1
+        ) active_lead ON TRUE
+        {clause_str}
+        ORDER BY m.id ASC
+        LIMIT %s OFFSET %s
+    """
+    rows = query_db(query, args + (per_page, offset)) or []
+    return {
+        "items": rows,
+        "total_count": total_count,
+        "total_pages": (total_count + per_page - 1) // per_page if total_count else 1
+    }
 
 def get_active_leads_for_member_ids(member_ids):
     """Returns active CRM leads for the given member IDs as a member_id -> lead_id mapping."""

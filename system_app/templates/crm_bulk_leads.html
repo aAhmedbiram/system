@@ -16,7 +16,7 @@
             min-height: 100vh;
         }
         .wrap {
-            max-width: 1180px;
+            max-width: 1480px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -27,115 +27,233 @@
             gap: 12px;
             padding: 18px 22px;
             border-radius: 12px;
-            background: rgba(20, 20, 30, 0.85);
-            border-bottom: 2px solid rgba(76,175,80,0.3);
+            background: rgba(20, 20, 30, 0.88);
+            border: 1px solid rgba(76, 175, 80, 0.25);
             margin-bottom: 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
         }
-        .index-btn {
+        .title {
+            margin: 0;
+            font-size: 24px;
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            color: #aaa;
+            margin-top: 4px;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            appearance: none;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 10px 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+        .btn-primary {
             background: linear-gradient(135deg, #4caf50, #66d66a);
             color: white;
-            padding: 10px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            display: inline-block;
-            border: none;
-            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.28);
         }
-        .secondary-btn {
+        .btn-secondary {
             background: rgba(30,30,40,0.85);
             color: #4caf50;
             border: 1px solid rgba(76,175,80,0.25);
         }
-        .grid {
+        .btn-warning {
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.22);
+        }
+        .btn-danger {
+            background: rgba(244,67,54,0.15);
+            color: #f44336;
+            border: 1px solid rgba(244,67,54,0.35);
+        }
+        .workspace {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.45fr 1fr;
             gap: 18px;
         }
-        @media (max-width: 960px) {
-            .grid { grid-template-columns: 1fr; }
+        @media (max-width: 1180px) {
+            .workspace { grid-template-columns: 1fr; }
         }
         .card {
-            background: rgba(30,30,40,0.75);
-            border: 1px solid rgba(76,175,80,0.2);
-            border-radius: 12px;
+            background: rgba(30,30,40,0.76);
+            border: 1px solid rgba(76,175,80,0.18);
+            border-radius: 14px;
             padding: 20px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
         }
         .card h2, .card h3 {
-            color: #4caf50;
             margin-top: 0;
+            color: #4caf50;
+        }
+        .stack {
+            display: grid;
+            gap: 16px;
+        }
+        .subgrid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        @media (max-width: 860px) {
+            .subgrid { grid-template-columns: 1fr; }
         }
         .field {
             display: flex;
             flex-direction: column;
             gap: 6px;
-            margin-bottom: 14px;
         }
-        .field input {
-            background: rgba(10,10,15,0.8);
-            border: 1px solid rgba(76,175,80,0.28);
+        .field label {
+            font-size: 12px;
+            color: #4caf50;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
+        }
+        .field input, .field select {
+            background: rgba(10,10,15,0.82);
+            border: 1px solid rgba(76,175,80,0.25);
             color: #eee;
             padding: 10px 12px;
             border-radius: 6px;
             font-size: 14px;
             font-family: inherit;
         }
-        .actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 12px;
-        }
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 14px;
-        }
-        @media (max-width: 720px) {
-            .summary-grid { grid-template-columns: 1fr; }
-        }
-        .summary-item {
-            background: rgba(10,10,15,0.5);
-            border: 1px solid rgba(76,175,80,0.12);
-            border-radius: 8px;
-            padding: 12px;
-        }
-        .summary-label {
-            display: block;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            color: #4caf50;
-            margin-bottom: 6px;
-            font-weight: 700;
-        }
-        .summary-value {
-            color: #eee;
-            word-break: break-word;
-        }
-        .feedback {
-            display: none;
-            margin-top: 14px;
-            padding: 12px 14px;
-            border-radius: 8px;
-            line-height: 1.5;
-            font-size: 14px;
-        }
-        .feedback.error {
-            background: rgba(244,67,54,0.1);
-            border: 1px solid rgba(244,67,54,0.3);
-            color: #f44336;
-        }
-        .feedback.success {
-            background: rgba(76,175,80,0.1);
-            border: 1px solid rgba(76,175,80,0.3);
-            color: #4caf50;
+        .field input:focus, .field select:focus {
+            outline: none;
+            border-color: #4caf50;
         }
         .muted {
             color: #aaa;
             line-height: 1.6;
+        }
+        .notice {
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(76,175,80,0.18);
+            background: rgba(10,10,15,0.45);
+            color: #ddd;
+            line-height: 1.6;
+        }
+        .notice.warning {
+            border-color: rgba(255, 193, 7, 0.3);
+            color: #ffe082;
+        }
+        .notice.error {
+            border-color: rgba(244,67,54,0.35);
+            color: #ff8a80;
+        }
+        .notice.success {
+            border-color: rgba(76,175,80,0.35);
+            color: #a5d6a7;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 12px;
+        }
+        .toolbar-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .count-pill {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(10,10,15,0.55);
+            border: 1px solid rgba(76,175,80,0.18);
+            color: #d7ffd9;
+            font-weight: 700;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid rgba(76,175,80,0.16);
+            background: rgba(10,10,15,0.32);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1100px;
+        }
+        th, td {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(76,175,80,0.10);
+            text-align: left;
+            font-size: 14px;
+            vertical-align: top;
+        }
+        th {
+            color: #4caf50;
+            background: rgba(20,20,30,0.95);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
+            font-size: 12px;
+        }
+        tr:hover td { background: rgba(76,175,80,0.04); }
+        .row-muted {
+            color: #aaa;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            font-size: 12px;
+            padding: 4px 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .badge-ok {
+            background: rgba(76,175,80,0.15);
+            color: #a5d6a7;
+            border: 1px solid rgba(76,175,80,0.25);
+        }
+        .badge-warn {
+            background: rgba(255, 193, 7, 0.15);
+            color: #ffe082;
+            border: 1px solid rgba(255, 193, 7, 0.25);
+        }
+        .badge-danger {
+            background: rgba(244,67,54,0.15);
+            color: #ff8a80;
+            border: 1px solid rgba(244,67,54,0.25);
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+        .pagination .btn {
+            min-width: 120px;
         }
         .list {
             margin: 0;
@@ -143,121 +261,439 @@
         }
         .list li {
             margin-bottom: 6px;
-            color: #eee;
         }
-        .section-note {
-            color: #aaa;
-            margin-bottom: 14px;
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
         }
-        .result {
-            display: none;
+        @media (max-width: 700px) {
+            .summary-grid { grid-template-columns: 1fr; }
         }
-        .result pre {
-            white-space: pre-wrap;
-            word-break: break-word;
-            background: rgba(10,10,15,0.7);
-            border: 1px solid rgba(76,175,80,0.12);
-            color: #eee;
-            border-radius: 8px;
+        .summary-box {
+            background: rgba(10,10,15,0.45);
+            border: 1px solid rgba(76,175,80,0.14);
+            border-radius: 10px;
             padding: 12px;
-            margin: 0;
+        }
+        .summary-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #4caf50;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
+        }
+        .summary-value {
+            color: #eee;
+            word-break: break-word;
+        }
+        .summary-list {
+            margin-top: 10px;
+            display: grid;
+            gap: 8px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            background: rgba(10,10,15,0.42);
+            border: 1px solid rgba(76,175,80,0.12);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+        .summary-row strong {
+            color: #d7ffd9;
+        }
+        .feedback {
+            display: none;
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .feedback.success {
+            background: rgba(76,175,80,0.10);
+            border: 1px solid rgba(76,175,80,0.25);
+            color: #a5d6a7;
+        }
+        .feedback.error {
+            background: rgba(244,67,54,0.10);
+            border: 1px solid rgba(244,67,54,0.28);
+            color: #ff8a80;
+        }
+        .feedback.warning {
+            background: rgba(255,193,7,0.10);
+            border: 1px solid rgba(255,193,7,0.25);
+            color: #ffe082;
+        }
+        .hidden { display: none !important; }
+        .debug-details summary {
+            cursor: pointer;
+            color: #4caf50;
+            font-weight: 700;
+        }
+        .debug-details {
+            margin-top: 14px;
+            background: rgba(10,10,15,0.4);
+            border: 1px dashed rgba(76,175,80,0.18);
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .checkbox-list {
+            display: grid;
+            gap: 8px;
+            max-height: 280px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: rgba(10,10,15,0.35);
+            border: 1px solid rgba(76,175,80,0.10);
+        }
+        .checkbox-row input {
+            margin-top: 2px;
+        }
+        .checkbox-row label {
+            cursor: pointer;
+            flex: 1;
+        }
+        .small-note {
+            color: #aaa;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .status-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
     </style>
 </head>
 <body>
-    <div class="wrap">
+    <div class="wrap" id="bulkLeadsWorkspace">
         <header>
             <div>
-                <h1 style="margin:0; font-size:24px; background: linear-gradient(135deg, #4caf50, #66d66a); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Bulk CRM Leads</h1>
-                <div style="color:#aaa; margin-top:4px;">Preview confirmation and execution workspace</div>
+                <h1 class="title">Bulk CRM Leads</h1>
+                <div class="subtitle">Select members, preview a frozen plan, then execute bulk lead creation safely.</div>
             </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <a href="/crm/" class="index-btn secondary-btn">CRM Dashboard</a>
-                <a href="/crm/follow-ups/view" class="index-btn secondary-btn">Follow-Up Queue</a>
+            <div class="header-actions">
+                {% if user_permissions.get('super_admin') or user_permissions.get('crm_view') %}
+                <a href="/crm/" class="btn btn-secondary">CRM Dashboard</a>
+                <a href="/crm/follow-ups/view" class="btn btn-secondary">Follow-Up Queue</a>
+                {% endif %}
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Home</a>
             </div>
         </header>
 
         {% if preview_error %}
-        <div class="card" style="border-color: rgba(244,67,54,0.35); margin-bottom: 18px;">
-            <h2 style="color:#f44336;">Preview unavailable</h2>
-            <div class="muted">{{ preview_error }}</div>
+        <div class="notice error" style="margin-bottom: 18px;">
+            {{ preview_error }}
         </div>
         {% endif %}
 
-        <div class="grid">
-            <div class="card">
-                <h2>Confirm Execution</h2>
-                <div class="section-note">
-                    Paste a durable preview token from the selection/preview step, then confirm execution.
-                    The server-side snapshot remains authoritative.
-                </div>
-
-                <div class="field">
-                    <label for="previewTokenInput">Preview Token</label>
-                    <input id="previewTokenInput" type="text" placeholder="Paste preview token">
-                </div>
-
-                <div class="actions">
-                    <button id="loadPreviewBtn" type="button" class="index-btn secondary-btn">Load Preview</button>
-                    <button id="executeBulkBtn" type="button" class="index-btn" disabled>Execute Bulk Leads</button>
-                </div>
-
-                <div id="executeFeedback" class="feedback"></div>
-
-                <div id="resultPanel" class="result" style="margin-top:16px;">
-                    <h3>Execution Result</h3>
-                    <div class="summary-grid">
-                        <div class="summary-item"><span class="summary-label">Requested</span><span id="resultRequested" class="summary-value">0</span></div>
-                        <div class="summary-item"><span class="summary-label">Created</span><span id="resultCreated" class="summary-value">0</span></div>
-                        <div class="summary-item"><span class="summary-label">Skipped</span><span id="resultSkipped" class="summary-value">0</span></div>
-                        <div class="summary-item"><span class="summary-label">Failed</span><span id="resultFailed" class="summary-value">0</span></div>
-                    </div>
-                    <div class="summary-item" style="margin-bottom:12px;">
-                        <span class="summary-label">Assignment Totals</span>
-                        <ul id="resultAssignments" class="list"></ul>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Skipped Items</span>
-                        <pre id="resultSkippedItems">[]</pre>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>Preview Summary</h2>
-                <div class="section-note">
-                    This section shows the frozen snapshot that will be executed.
-                </div>
-
-                <div id="previewSummaryEmpty" class="muted" {% if preview_summary %}style="display:none;"{% endif %}>
-                    No preview snapshot is currently loaded.
-                </div>
-
-                <div id="previewSummaryCard" {% if not preview_summary %}style="display:none;"{% endif %}>
-                    <div class="summary-grid">
-                        <div class="summary-item"><span class="summary-label">Source</span><span id="previewSource" class="summary-value">EXISTING_MEMBER</span></div>
-                        <div class="summary-item"><span class="summary-label">Selected</span><span id="previewSelected" class="summary-value">0</span></div>
-                        <div class="summary-item"><span class="summary-label">Eligible</span><span id="previewEligible" class="summary-value">0</span></div>
-                        <div class="summary-item"><span class="summary-label">Skipped</span><span id="previewSkipped" class="summary-value">0</span></div>
-                        <div class="summary-item"><span class="summary-label">Missing</span><span id="previewMissing" class="summary-value">0</span></div>
-                        <div class="summary-item"><span class="summary-label">Planned Assignments</span><span id="previewPlanCount" class="summary-value">0</span></div>
-                    </div>
-                    <div class="summary-item" style="margin-bottom:12px;">
-                        <span class="summary-label">Distribution Plan</span>
-                        <ul id="previewDistribution" class="list"></ul>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Preview Token</span>
-                        <span id="previewTokenDisplay" class="summary-value"></span>
-                    </div>
-                </div>
-            </div>
+        <div id="bulkNotice" class="notice" style="margin-bottom: 18px;">
+            Build your selection below. Preview freezes the current member and employee plan until you execute or create a new preview.
         </div>
+
+        <div class="workspace">
+            <section class="card" style="grid-column: 1 / -1;">
+                <div class="section-head">
+                    <div>
+                        <h2 style="margin-bottom: 4px;">Member Selection</h2>
+                        <div class="small-note">Use filters or pick members manually. Select-all-filtered uses the current filters and remains authoritative on preview.</div>
+                    </div>
+                    <div class="status-line">
+                        <span class="count-pill">Selected: <span id="selectedCount">0</span></span>
+                        <span class="count-pill">Matching: <span id="matchingCount">0</span></span>
+                        <span class="count-pill">Mode: <span id="selectionModeLabel">Explicit IDs</span></span>
+                    </div>
+                </div>
+
+                <div class="subgrid" style="margin-bottom: 14px;">
+                    <div class="field">
+                        <label for="bulkSearchId">Member ID</label>
+                        <input id="bulkSearchId" type="text" placeholder="Search by member ID">
+                    </div>
+                    <div class="field">
+                        <label for="bulkSearchName">Name</label>
+                        <input id="bulkSearchName" type="text" placeholder="Search by member name">
+                    </div>
+                    <div class="field">
+                        <label for="bulkSearchPhone">Phone</label>
+                        <input id="bulkSearchPhone" type="text" placeholder="Search by phone">
+                    </div>
+                    <div class="field">
+                        <label for="bulkViewFilter">Membership View</label>
+                        <select id="bulkViewFilter">
+                            <option value="all">All</option>
+                            <option value="active">Active</option>
+                            <option value="expired">Expired</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="bulkExpiresWithin">Expiry Bucket</label>
+                        <select id="bulkExpiresWithin">
+                            <option value="">Any</option>
+                            <option value="7">Within 7 days</option>
+                            <option value="14">8-14 days</option>
+                            <option value="30">15-30 days</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <div class="toolbar-group">
+                        <button type="button" id="bulkReloadMembersBtn" class="btn btn-secondary">Refresh Members</button>
+                        <button type="button" id="selectVisibleBtn" class="btn btn-secondary">Select Visible Page</button>
+                        <button type="button" id="clearVisibleBtn" class="btn btn-secondary">Clear Visible Selection</button>
+                        <button type="button" id="selectFilteredBtn" class="btn btn-secondary">Select All Filtered</button>
+                        <button type="button" id="clearAllBtn" class="btn btn-secondary">Clear All</button>
+                    </div>
+                    <div class="toolbar-group">
+                        <button type="button" id="previewDistributionBtn" class="btn btn-primary">Preview Distribution</button>
+                    </div>
+                </div>
+
+                <div id="selectionInfo" class="feedback warning" style="margin-top: 12px;"></div>
+
+                <div class="table-wrap" style="margin-top: 14px;">
+                    <div id="membersLoading" class="notice" style="margin: 14px;">Loading members...</div>
+                    <div id="membersError" class="notice error hidden" style="margin: 14px;"></div>
+                    <table id="bulkMembersTable" class="hidden">
+                        <thead>
+                            <tr>
+                                <th style="width: 54px;">Sel</th>
+                                <th>Member ID</th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Package</th>
+                                <th>End Date</th>
+                                <th>Status</th>
+                                <th>CRM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulkMembersTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination">
+                    <button type="button" id="membersPrevBtn" class="btn btn-secondary" disabled>Previous</button>
+                    <span id="membersPageIndicator" class="count-pill">Page 1 of 1</span>
+                    <button type="button" id="membersNextBtn" class="btn btn-secondary" disabled>Next</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="section-head">
+                    <div>
+                        <h2 style="margin-bottom: 4px;">Distribution Mode</h2>
+                        <div class="small-note">Choose unassigned or equal distribution across one or more selected employees.</div>
+                    </div>
+                </div>
+
+                <div class="stack">
+                    <label class="checkbox-row" style="cursor: pointer;">
+                        <input type="radio" name="distributionMode" id="distributionUnassigned" value="unassigned" checked>
+                        <span>
+                            <strong>Unassigned</strong>
+                            <div class="small-note">Create leads without assigning employees.</div>
+                        </span>
+                    </label>
+                    {% if user_permissions.get('super_admin') or user_permissions.get('crm_assign') %}
+                    <label class="checkbox-row" style="cursor: pointer;">
+                        <input type="radio" name="distributionMode" id="distributionEqual" value="equal">
+                        <span>
+                            <strong>Equal Distribution</strong>
+                            <div class="small-note">Split the frozen eligible members evenly across selected employees.</div>
+                        </span>
+                    </label>
+                    {% else %}
+                    <div class="notice warning">
+                        Equal distribution requires <strong>crm_assign</strong>. Unassigned bulk creation remains available.
+                    </div>
+                    {% endif %}
+
+                    <div id="employeePanel" class="hidden">
+                        <div class="section-head">
+                            <h3 style="margin-bottom: 0;">Assignable Employees</h3>
+                            <span id="employeeCountLabel" class="count-pill">0 selected</span>
+                        </div>
+                        <div id="employeeLoading" class="notice" style="margin-bottom: 12px;">Loading employees...</div>
+                        <div id="employeeError" class="notice error hidden" style="margin-bottom: 12px;"></div>
+                        <div id="employeeList" class="checkbox-list"></div>
+                        <div id="distributionEstimate" class="notice" style="margin-top: 14px;">
+                            Select employees to see the estimated split.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="section-head">
+                    <div>
+                        <h2 style="margin-bottom: 4px;">Preview and Execution</h2>
+                        <div class="small-note">Preview freezes the current plan. Confirm executes the frozen durable snapshot.</div>
+                    </div>
+                <span id="operationStatusBadge" class="badge badge-warn">
+                    {% if bulk_state and bulk_state.status == 'PREVIEW' %}Preview Ready{% elif bulk_state and bulk_state.status == 'COMPLETED' %}Completed{% elif bulk_state and bulk_state.status == 'FAILED' %}Failed{% else %}No Preview Yet{% endif %}
+                </span>
+            </div>
+
+                <div id="previewLockedNotice" class="notice {% if bulk_state %}{% else %}hidden{% endif %}" style="margin-bottom: 12px;">
+                    {% if bulk_state and bulk_state.status == 'PREVIEW' %}
+                        Preview loaded. The configuration is frozen until you confirm execution or create a new preview.
+                    {% elif bulk_state and bulk_state.status == 'COMPLETED' %}
+                        This preview was executed successfully. Create a new preview to start another bulk operation.
+                    {% elif bulk_state and bulk_state.status == 'FAILED' %}
+                        This bulk execution failed. Create a new preview to try again.
+                    {% endif %}
+                </div>
+
+                <div id="previewResultNotice" class="notice hidden" style="margin-bottom: 12px;"></div>
+
+                <div class="summary-grid">
+                        <div class="summary-box">
+                            <span class="summary-label">Source</span>
+                        <span id="previewSource" class="summary-value">{% if preview_summary %}{{ preview_summary.source or 'EXISTING_MEMBER' }}{% else %}EXISTING_MEMBER{% endif %}</span>
+                        </div>
+                        <div class="summary-box">
+                            <span class="summary-label">Selected</span>
+                        <span id="previewSelected" class="summary-value">{% if preview_summary %}{{ preview_summary.selected_count or 0 }}{% else %}0{% endif %}</span>
+                        </div>
+                        <div class="summary-box">
+                            <span class="summary-label">Eligible</span>
+                        <span id="previewEligible" class="summary-value">{% if preview_summary %}{{ preview_summary.eligible_count or 0 }}{% else %}0{% endif %}</span>
+                        </div>
+                        <div class="summary-box">
+                            <span class="summary-label">Skipped</span>
+                        <span id="previewSkipped" class="summary-value">{% if preview_summary %}{{ preview_summary.skipped_count or 0 }}{% else %}0{% endif %}</span>
+                        </div>
+                        <div class="summary-box">
+                            <span class="summary-label">Missing</span>
+                        <span id="previewMissing" class="summary-value">{% if preview_summary %}{{ preview_summary.missing_count or 0 }}{% else %}0{% endif %}</span>
+                        </div>
+                        <div class="summary-box">
+                            <span class="summary-label">Planned Assignments</span>
+                        <span id="previewPlanCount" class="summary-value">{% if preview_summary %}{{ preview_summary.assignment_plan_count or 0 }}{% else %}0{% endif %}</span>
+                        </div>
+                    </div>
+
+                <div style="margin-top: 14px;" class="summary-box">
+                    <span class="summary-label">Distribution Summary</span>
+                    {% if preview_summary and preview_summary.distribution %}
+                    <div id="previewDistributionEmpty" class="small-note hidden">No preview loaded yet.</div>
+                    <div id="previewDistributionList" class="summary-list">
+                        {% for row in preview_summary.distribution %}
+                        <div class="summary-row">
+                            <strong>{{ row.username or ('User ' ~ row.user_id) }} (#{{ row.user_id }})</strong>
+                            <span>{{ row.lead_count or 0 }} planned</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div id="previewDistributionEmpty" class="small-note">No preview loaded yet.</div>
+                    <div id="previewDistributionList" class="summary-list hidden"></div>
+                    {% endif %}
+                </div>
+
+                <div style="margin-top: 14px;" class="summary-box">
+                    <span class="summary-label">Skipped Reasons</span>
+                    {% if preview_summary and preview_summary.skipped_reasons %}
+                    <div id="previewSkippedReasonsEmpty" class="small-note hidden">No skipped reasons yet.</div>
+                    <div id="previewSkippedReasonsList" class="summary-list">
+                        {% for reason, count in preview_summary.skipped_reasons.items() %}
+                        <div class="summary-row">
+                            <strong>{{ reason }}</strong>
+                            <span>{{ count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div id="previewSkippedReasonsEmpty" class="small-note">No skipped reasons yet.</div>
+                    <div id="previewSkippedReasonsList" class="summary-list hidden"></div>
+                    {% endif %}
+                </div>
+
+                <div style="margin-top: 14px;" class="summary-box">
+                    <span class="summary-label">Execution Result</span>
+                    <div class="summary-grid">
+                        <div class="summary-box"><span class="summary-label">Requested</span><span id="resultRequested" class="summary-value">{% if bulk_state and bulk_state.execution %}{{ bulk_state.execution.requested or 0 }}{% else %}0{% endif %}</span></div>
+                        <div class="summary-box"><span class="summary-label">Created</span><span id="resultCreated" class="summary-value">{% if bulk_state and bulk_state.execution %}{{ bulk_state.execution.created or 0 }}{% else %}0{% endif %}</span></div>
+                        <div class="summary-box"><span class="summary-label">Skipped</span><span id="resultSkipped" class="summary-value">{% if bulk_state and bulk_state.execution %}{{ bulk_state.execution.skipped or 0 }}{% else %}0{% endif %}</span></div>
+                        <div class="summary-box"><span class="summary-label">Failed</span><span id="resultFailed" class="summary-value">{% if bulk_state and bulk_state.execution %}{{ bulk_state.execution.failed or 0 }}{% else %}0{% endif %}</span></div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <span class="summary-label">Per Employee</span>
+                        {% if bulk_state and bulk_state.execution and bulk_state.execution.assignments %}
+                        <div id="resultAssignmentsEmpty" class="small-note hidden">No execution result yet.</div>
+                        <div id="resultAssignmentsList" class="summary-list">
+                            {% for row in bulk_state.execution.assignments %}
+                            <div class="summary-row">
+                                <strong>{{ row.username or ('User ' ~ row.user_id) }} (#{{ row.user_id }})</strong>
+                                <span>{{ row.created or 0 }} created</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div id="resultAssignmentsEmpty" class="small-note">No execution result yet.</div>
+                        <div id="resultAssignmentsList" class="summary-list hidden"></div>
+                        {% endif %}
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <span class="summary-label">Skipped Items</span>
+                        <pre id="resultSkippedItems" style="white-space: pre-wrap; word-break: break-word; background: rgba(10,10,15,0.65); border: 1px solid rgba(76,175,80,0.12); border-radius: 8px; padding: 12px; margin: 0;">{% if bulk_state and bulk_state.execution and bulk_state.execution.skipped_items is not none %}{{ bulk_state.execution.skipped_items | tojson }}{% else %}[]{% endif %}</pre>
+                    </div>
+                </div>
+
+                <div class="toolbar" style="margin-top: 16px;">
+                    <div class="toolbar-group">
+                        <button type="button" id="confirmBulkBtn" class="btn btn-warning" disabled>Confirm &amp; Create Leads</button>
+                        <button type="button" id="newPreviewBtn" class="btn btn-secondary" disabled>Create New Preview</button>
+                    </div>
+                    <div class="toolbar-group">
+                        <a href="/crm/" class="btn btn-secondary">Back to CRM Dashboard</a>
+                        <a href="/crm/leads" class="btn btn-secondary">View CRM Leads</a>
+                    </div>
+                </div>
+
+                <div id="executionFeedback" class="feedback" style="margin-top: 12px;"></div>
+            </section>
+        </div>
+
+        <details class="debug-details">
+            <summary>Debug / Recovery State</summary>
+            <div style="margin-top: 10px;" class="small-note">
+                Durable preview token is kept internally for recovery. Normal users do not need to paste tokens manually.
+            </div>
+            <div style="margin-top: 10px;">
+                <span class="summary-label">Preview Token</span>
+                <span id="previewTokenDebug" class="summary-value"></span>
+            </div>
+        </details>
     </div>
 
     <script>
-        window.CRM_BULK_PREVIEW_SUMMARY = {{ preview_summary|tojson }};
-        window.CRM_BULK_PREVIEW_TOKEN = {{ preview_token|tojson }};
+        window.CRM_BULK_CAN_CREATE = {{ 'true' if (user_permissions.get('super_admin') or user_permissions.get('crm_create')) else 'false' }};
+        window.CRM_BULK_CAN_ASSIGN = {{ 'true' if (user_permissions.get('super_admin') or user_permissions.get('crm_assign')) else 'false' }};
+        window.CRM_BULK_INITIAL_STATE = {{ bulk_state|tojson }};
+        window.CRM_BULK_PAGE_SIZE = 50;
     </script>
     <script src="/static/js/crm_shared.js"></script>
     <script src="/static/js/crm_bulk_leads.js"></script>

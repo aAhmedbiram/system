@@ -336,6 +336,7 @@
             <div style="display: flex; gap: 10px; align-items: center;">
                 <a href="/crm/follow-ups/view" class="index-btn" style="background: linear-gradient(135deg, #ff9800, #ffb74d); border-color: rgba(255, 152, 0, 0.3);">📅 Follow-Ups</a>
                 {% if user_permissions.get('super_admin') or user_permissions.get('crm_create') %}
+                <a href="/crm/leads/bulk" class="index-btn" style="background: linear-gradient(135deg, #9c27b0, #ba68c8); border-color: rgba(156, 39, 176, 0.3);">📦 Bulk Leads</a>
                 <button id="openCreateModalBtn" class="index-btn" style="background: linear-gradient(135deg, #2196F3, #42a5f5); border-color: rgba(33, 150, 243, 0.3);">➕ Create Lead</button>
                 {% endif %}
                 <a href="{{ url_for('index') }}" class="index-btn">🏠 Home</a>
