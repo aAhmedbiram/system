@@ -45,8 +45,8 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
             INSERT INTO users (id, username, email, password, is_approved, permissions)
             VALUES
             (2,     'rino',        'rino@test.com', 'pwd', TRUE, '{}'),
-            (47001, 'pb2_exec',    'exec@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_assign": true}'),
-            (47002, 'pb2_create',  'create@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true}'),
+            (47001, 'pb2_exec',    'exec@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_assign": true, "crm_bulk_leads": true}'),
+            (47002, 'pb2_create',  'create@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_bulk_leads": true}'),
             (47003, 'pb2_none',    'none@test.com', 'pwd', TRUE, '{}'),
             (47011, 'pb2_user_a',  'a@test.com', 'pwd', TRUE, '{}'),
             (47012, 'pb2_user_b',  'b@test.com', 'pwd', TRUE, '{}'),
@@ -308,7 +308,7 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
         token = self._preview_equal(member_ids, [47011, 47012, 47013]).get_json()['preview_token']
         query_db(
             "UPDATE users SET permissions = %s WHERE id = %s",
-            (Json({"crm_view": True, "crm_create": True}), 47001),
+            (Json({"crm_view": True, "crm_create": True, "crm_bulk_leads": True}), 47001),
             commit=True
         )
         result = self._execute(token)

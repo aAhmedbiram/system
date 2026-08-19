@@ -33,9 +33,9 @@ class TestCRMBulkPhaseC(unittest.TestCase):
             VALUES
             (2,     'rino',            'rino@test.com',    'pwd', TRUE, '{}'),
             (48001, 'pbc_view',        'view@test.com',    'pwd', TRUE, '{"crm_view": true}'),
-            (48002, 'pbc_create',      'create@test.com',  'pwd', TRUE, '{"crm_view": true, "crm_create": true}'),
+            (48002, 'pbc_create',      'create@test.com',  'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_bulk_leads": true}'),
             (48003, 'pbc_create_only', 'create2@test.com', 'pwd', TRUE, '{"crm_create": true}'),
-            (48004, 'pbc_assign',      'assign@test.com',  'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_assign": true}'),
+            (48004, 'pbc_assign',      'assign@test.com',  'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_assign": true, "crm_bulk_leads": true}'),
             (48005, 'pbc_none',        'none@test.com',    'pwd', TRUE, '{}'),
             (48011, 'pbc_emp_a',       'a@test.com',       'pwd', TRUE, '{}'),
             (48012, 'pbc_emp_b',       'b@test.com',       'pwd', TRUE, '{}'),
@@ -119,8 +119,12 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertIn(b'/crm/leads/bulk', res_create.data)
         self.assertIn(b'Bulk Leads', res_create.data)
 
-    def test_02_bulk_page_accessible_with_create_only(self):
-        self.login_as('pbc_create_only', 48003)
+    def test_02_bulk_page_requires_bulk_permission(self):
+        self.login_as('pbc_view', 48001)
+        denied = self._page()
+        self.assertIn(denied.status_code, [302, 403])
+
+        self.login_as('pbc_create', 48002)
         res = self._page()
         self.assertEqual(res.status_code, 200)
         self.assertIn(b'Bulk CRM Leads', res.data)
@@ -133,7 +137,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         denied = self.client.get('/crm/leads/bulk/members')
         self.assertIn(denied.status_code, [302, 403])
 
-        self.login_as('pbc_create_only', 48003)
+        self.login_as('pbc_create', 48002)
         for member_id in range(6001, 6056):
             self._member(member_id, f'PBC Member {member_id}')
 
@@ -160,7 +164,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertEqual(len(data2['items']), 5)
 
     def test_04_member_search_and_expiry_buckets(self):
-        self.login_as('pbc_create_only', 48003)
+        self.login_as('pbc_create', 48002)
         today = get_cairo_date()
         self._member(6101, 'PBC Search Alpha', (today + timedelta(days=3)).isoformat(), phone='0100006101')
         self._member(6102, 'PBC Search Beta', (today + timedelta(days=10)).isoformat(), phone='0100006102')
@@ -231,7 +235,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertEqual(preview.status_code, 200)
         snapshot = services.get_bulk_preview_snapshot(
             preview.get_json()['preview_token'],
-            {"id": 48003, "username": "pbc_create_only"}
+            {"id": 48002, "username": "pbc_create"}
         )
         self.assertEqual(snapshot['selection']['selected_member_ids'], ids_list)
         self.assertEqual(snapshot['eligible_member_ids'], ids_list)
@@ -270,7 +274,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         ])
 
     def test_06_ui_hooks_rendered_without_manual_token_input(self):
-        self.login_as('pbc_create_only', 48003)
+        self.login_as('pbc_create', 48002)
         res = self._page()
         self.assertEqual(res.status_code, 200)
         self.assertIn(b'bulkLeadsWorkspace', res.data)
@@ -293,7 +297,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertIn('wireFilterChangeHandlers()', js_text)
 
     def test_07_explicit_ids_preview_from_ui_payload(self):
-        self.login_as('pbc_create_only', 48003)
+        self.login_as('pbc_create', 48002)
         self._member(6301, 'PBC Explicit 1', '2099-01-01')
         self._member(6302, 'PBC Explicit 2', '2099-01-01')
         self._member(6303, 'PBC Explicit 3', '2099-01-01')
@@ -311,7 +315,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertTrue(data['preview_token'])
 
     def test_08_filtered_preview_freezes_member_ids(self):
-        self.login_as('pbc_create_only', 48003)
+        self.login_as('pbc_create', 48002)
         self._member(6401, 'PBC Filter Freeze A', '2099-01-01')
         self._member(6402, 'PBC Filter Freeze B', '2099-01-01')
         self._member(6403, 'PBC Filter Freeze C', '2099-01-01')
@@ -327,14 +331,14 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         })
         self.assertEqual(res.status_code, 200)
         token = res.get_json()['preview_token']
-        snapshot = services.get_bulk_preview_snapshot(token, {"id": 48003, "username": "pbc_create_only"})
+        snapshot = services.get_bulk_preview_snapshot(token, {"id": 48002, "username": "pbc_create"})
         self.assertEqual(snapshot['selection']['mode'], 'filters')
         self.assertEqual(snapshot['selection']['selected_member_ids'], [6401, 6402, 6403])
         self.assertEqual(snapshot['eligible_member_ids'], [6401, 6403])
         self.assertEqual(snapshot['skipped_count'], 1)
 
     def test_09_equal_and_unassigned_preview_permissions(self):
-        self.login_as('pbc_create_only', 48003)
+        self.login_as('pbc_create', 48002)
         self._member(6501, 'PBC Equal Gate A', '2099-01-01')
         self._member(6502, 'PBC Equal Gate B', '2099-01-01')
         unassigned = self._preview({
@@ -376,7 +380,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertIn(b'Preview Ready', same_user_page.data)
         self.assertIn(b'Confirm &amp; Create Leads', same_user_page.data)
 
-        self.login_as('pbc_create_only', 48003)
+        self.login_as('pbc_create', 48002)
         wrong_owner_page = self._page(token)
         self.assertEqual(wrong_owner_page.status_code, 200)
         self.assertIn(b'does not belong to the current user', wrong_owner_page.data)
@@ -487,7 +491,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertEqual(data['skipped_reasons']['active_lead_exists'], 1)
 
     def test_16_page_has_server_rendered_preview_hooks(self):
-        self.login_as('pbc_assign', 48004)
+        self.login_as('pbc_create', 48002)
         self._member(6961, 'PBC Rendered A', '2099-01-01')
         preview = self._preview({
             "selection": {"mode": "ids", "member_ids": [6961]},

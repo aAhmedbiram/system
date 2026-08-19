@@ -11,6 +11,7 @@ CRM_CONVERT = 'crm_convert'
 CRM_ASSIGN = 'crm_assign'
 CRM_ALL_LEADS = 'crm_all_leads'
 CRM_CAMPAIGNS = 'crm_campaigns'
+CRM_BULK_LEADS = 'crm_bulk_leads'
 
 CRM_PERMISSIONS = {
     CRM_VIEW: "View CRM Dashboard and Assigned Leads",
@@ -20,7 +21,8 @@ CRM_PERMISSIONS = {
     CRM_CONVERT: "Convert Leads to Gym Members",
     CRM_ASSIGN: "Assign and Reassign CRM Leads",
     CRM_ALL_LEADS: "View and Edit All Leads (Unrestricted)",
-    CRM_CAMPAIGNS: "Manage Marketing Outreach Campaigns"
+    CRM_CAMPAIGNS: "Manage Marketing Outreach Campaigns",
+    CRM_BULK_LEADS: "Bulk Leads"
 }
 
 def _load_permissions(permissions_val):

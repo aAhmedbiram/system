@@ -33,8 +33,8 @@ class TestCRMBulkPhaseB1(unittest.TestCase):
             INSERT INTO users (id, username, email, password, is_approved, permissions)
             VALUES
             (2,     'rino',      'rino@test.com', 'pwd', TRUE, '{}'),
-            (46001, 'pbb1_create', 'create@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true}'),
-            (46002, 'pbb1_assign', 'assign@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_assign": true}'),
+            (46001, 'pbb1_create', 'create@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_bulk_leads": true}'),
+            (46002, 'pbb1_assign', 'assign@test.com', 'pwd', TRUE, '{"crm_view": true, "crm_create": true, "crm_assign": true, "crm_bulk_leads": true}'),
             (46005, 'pbb1_user_a', 'usera@test.com', 'pwd', TRUE, '{}'),
             (46011, 'pbb1_user_b', 'userb@test.com', 'pwd', TRUE, '{}'),
             (46003, 'pbb1_none', 'none@test.com', 'pwd', TRUE, '{}')

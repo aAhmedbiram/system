@@ -963,6 +963,7 @@ def user_permissions():
         ('crm_convert', 'CRM - Convert / Reactivate Leads'),
         ('crm_all_leads', 'CRM - View All CRM Leads'),
         ('crm_campaigns', 'CRM - Manage CRM Campaigns'),
+        ('crm_bulk_leads', 'CRM - Bulk Leads'),
     ]
     all_permissions = general_permissions + crm_permissions
 
@@ -6324,4 +6325,3 @@ if __name__ == '__main__':
     print(f"Port: {port}")
     print(f"{'='*80}\n")
     app.run(host='0.0.0.0', port=port, debug=True)
-

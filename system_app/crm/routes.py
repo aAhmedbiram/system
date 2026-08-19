@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request, render_template
 from system_app.crm.permissions import (
     login_required, crm_permission_required, get_current_user,
-    CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN, CRM_UPDATE_STAGE, CRM_CONVERT
+    CRM_VIEW, CRM_CREATE, CRM_EDIT, CRM_ASSIGN, CRM_UPDATE_STAGE, CRM_CONVERT,
+    CRM_BULK_LEADS
 )
 from system_app.crm import services
 from system_app.crm.services import CRMConflictError, CRMForbiddenError, CRMNotFoundError, CRMProtectedFieldError, CRMValidationError
@@ -73,7 +74,7 @@ def create_lead_route():
 
 @crm_routes.route('/leads/bulk', methods=['GET'])
 @login_required
-@crm_permission_required(CRM_CREATE)
+@crm_permission_required(CRM_BULK_LEADS)
 def bulk_leads_route():
     """Renders the bulk lead creation workspace."""
     from system_app.app import get_common_template_context
@@ -122,7 +123,7 @@ def bulk_leads_route():
 
 @crm_routes.route('/leads/bulk/members', methods=['GET'])
 @login_required
-@crm_permission_required(CRM_CREATE)
+@crm_permission_required(CRM_BULK_LEADS)
 def bulk_leads_members_route():
     """Returns paginated CRM members for the bulk selection workspace."""
     current_user = get_current_user()
@@ -161,7 +162,7 @@ def bulk_leads_members_route():
 
 @crm_routes.route('/leads/bulk/preview', methods=['POST'])
 @login_required
-@crm_permission_required(CRM_CREATE)
+@crm_permission_required(CRM_BULK_LEADS)
 def bulk_leads_preview_route():
     """Returns an authoritative bulk selection preview without creating records."""
     current_user = get_current_user()
@@ -183,7 +184,7 @@ def bulk_leads_preview_route():
 
 @crm_routes.route('/leads/bulk/execute', methods=['POST'])
 @login_required
-@crm_permission_required(CRM_CREATE)
+@crm_permission_required(CRM_BULK_LEADS)
 def bulk_leads_execute_route():
     """Executes a previously approved bulk member preview."""
     current_user = get_current_user()
