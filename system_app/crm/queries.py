@@ -623,12 +623,23 @@ def count_activities(lead_id):
     return res['count'] if res else 0
 
 def get_follow_up_leads(where_clauses, args, limit, offset, order_by_clause):
-    """Retrieves lead records that have pending follow-up schedules."""
+    """Retrieves lead records that have pending follow-up schedules including assigned username."""
     where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     query = f"""
-        SELECT id, member_id, name, phone, email, source, stage,
-               assigned_user_id, next_follow_up_at, is_archived
-        FROM crm_leads
+        SELECT
+            l.id,
+            l.member_id,
+            l.name,
+            l.phone,
+            l.email,
+            l.source,
+            l.stage,
+            l.assigned_user_id,
+            u.username AS assigned_username,
+            l.next_follow_up_at,
+            l.is_archived
+        FROM crm_leads l
+        LEFT JOIN users u ON u.id = l.assigned_user_id
         {where_str}
         ORDER BY {order_by_clause}
         LIMIT %s OFFSET %s
