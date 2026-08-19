@@ -460,6 +460,13 @@
                 <label for="sourceFilter">Source</label>
                 <input type="text" id="sourceFilter" placeholder="Filter by source...">
             </div>
+            <div class="filter-group">
+                <label for="assignedUserFilter">Assigned To</label>
+                <select id="assignedUserFilter">
+                    <option value="">All Employees</option>
+                    <option value="unassigned">Unassigned</option>
+                </select>
+            </div>
         </div>
 
         {% if user_permissions.get('super_admin') or user_permissions.get('crm_assign') %}

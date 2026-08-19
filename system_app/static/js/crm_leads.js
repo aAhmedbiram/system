@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const perPage = 25;
     let searchTimeout = null;
     let sourceTimeout = null;
+    let assignedUserFilterValue = "";
     const canBulkAssign = !!window.CRM_USER_CAN_ASSIGN;
     const selectedLeadIds = new Set();
 
@@ -11,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const stageSelect = document.getElementById("stageFilter");
     const typeSelect = document.getElementById("typeFilter");
     const sourceInput = document.getElementById("sourceFilter");
+    const assignedUserSelect = document.getElementById("assignedUserFilter");
 
     const loadingState = document.getElementById("loadingState");
     const errorState = document.getElementById("errorState");
@@ -56,6 +58,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (urlParams.has("source")) {
             sourceInput.value = urlParams.get("source");
         }
+        if (urlParams.has("assigned_user_id")) {
+            assignedUserFilterValue = urlParams.get("assigned_user_id");
+        }
     }
 
     // Update URL state
@@ -80,6 +85,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (source) {
             params.append("source", source);
         }
+        if (assignedUserFilterValue) {
+            params.append("assigned_user_id", assignedUserFilterValue);
+        }
 
         const newSearch = params.toString();
         const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "");
@@ -99,6 +107,66 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!bulkAssignFeedback) return;
         bulkAssignFeedback.style.display = "none";
         bulkAssignFeedback.textContent = "";
+    }
+
+    function syncAssignedUserSelect() {
+        if (!assignedUserSelect) return;
+        assignedUserSelect.value = assignedUserFilterValue || "";
+    }
+
+    function loadAssignedUserOptions() {
+        if (!assignedUserSelect) return Promise.resolve();
+
+        const loadingOption = document.createElement("option");
+        loadingOption.value = "";
+        loadingOption.textContent = "Loading employees...";
+        assignedUserSelect.replaceChildren(loadingOption);
+
+        return apiFetch("/crm/filter-users", { method: "GET" })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error("Status " + res.status);
+                }
+                return res.json();
+            })
+            .then(users => {
+                assignedUserSelect.replaceChildren();
+
+                const allOption = document.createElement("option");
+                allOption.value = "";
+                allOption.textContent = "All Employees";
+                assignedUserSelect.appendChild(allOption);
+
+                const unassignedOption = document.createElement("option");
+                unassignedOption.value = "unassigned";
+                unassignedOption.textContent = "Unassigned";
+                assignedUserSelect.appendChild(unassignedOption);
+
+                (users || []).forEach(user => {
+                    const option = document.createElement("option");
+                    option.value = String(user.id);
+                    option.textContent = user.username;
+                    assignedUserSelect.appendChild(option);
+                });
+
+                syncAssignedUserSelect();
+            })
+            .catch(err => {
+                console.error("Failed to load assigned-to filter users:", err);
+                assignedUserSelect.replaceChildren();
+
+                const allOption = document.createElement("option");
+                allOption.value = "";
+                allOption.textContent = "All Employees";
+                assignedUserSelect.appendChild(allOption);
+
+                const unassignedOption = document.createElement("option");
+                unassignedOption.value = "unassigned";
+                unassignedOption.textContent = "Unassigned";
+                assignedUserSelect.appendChild(unassignedOption);
+
+                syncAssignedUserSelect();
+            });
     }
 
     function updateSelectionCount() {
@@ -245,6 +313,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const source = sourceInput.value.trim();
         if (source) {
             params.append("source", source);
+        }
+        if (assignedUserFilterValue) {
+            params.append("assigned_user_id", assignedUserFilterValue);
         }
 
         updateUrlState();
@@ -500,6 +571,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 300); // 300ms debounce
     });
 
+    if (assignedUserSelect) {
+        assignedUserSelect.addEventListener("change", () => {
+            assignedUserFilterValue = assignedUserSelect.value;
+            onFilterChange();
+        });
+    }
+
     if (canBulkAssign) {
         if (selectVisibleLeads) {
             selectVisibleLeads.addEventListener("change", () => {
@@ -578,6 +656,7 @@ document.addEventListener("DOMContentLoaded", () => {
     restoreStateFromUrl();
     loadPipelineSummary();
     loadFollowUpSummary();
+    loadAssignedUserOptions();
     if (canBulkAssign) {
         loadBulkAssignUsers();
     }

@@ -98,6 +98,24 @@ def validate_member_status_filter(status):
         raise ValueError("member_status must be 'member' or 'prospect'")
     return status_lower
 
+def validate_assigned_user_filter(val):
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        raise ValueError("assigned_user_id must be a positive integer or 'unassigned'")
+    value = str(val).strip()
+    if not value:
+        return None
+    if value.lower() == 'unassigned':
+        return 'unassigned'
+    try:
+        user_id = int(value)
+    except (ValueError, TypeError):
+        raise ValueError("assigned_user_id must be a positive integer or 'unassigned'")
+    if user_id <= 0:
+        raise ValueError("assigned_user_id must be a positive integer or 'unassigned'")
+    return user_id
+
 def validate_integer_list(val, name):
     if val is None:
         raise ValueError(f"'{name}' is required")

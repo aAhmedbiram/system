@@ -9,7 +9,7 @@ from system_app.crm.validators import (
     validate_stage_transition, validate_lost_reason, validate_reopen_stage,
     validate_positive_int_list, validate_bulk_member_filters,
     validate_bulk_selection_mode, validate_bulk_distribution_mode,
-    validate_bulk_source
+    validate_bulk_source, validate_assigned_user_filter
 )
 from system_app.crm import queries
 from system_app.crm.queries import run_in_transaction
@@ -150,6 +150,17 @@ def list_bulk_members(current_user, page_param, per_page_param, filters):
         "filters": normalized_filters,
         "has_more": page < listing.get("total_pages", 1)
     }
+
+def list_filter_users(current_user):
+    """Returns a minimal list of eligible CRM users for read-only dashboard filters."""
+    users = queries.get_assignable_users()
+    return [
+        {
+            "id": user.get("id"),
+            "username": user.get("username")
+        }
+        for user in users
+    ]
 
 def _load_bulk_operation_for_user(token, current_user):
     operation = queries.get_bulk_lead_operation_by_token(token)
@@ -668,6 +679,13 @@ def list_leads(current_user, page_param, per_page_param, filters):
         where_clauses.append("l.member_id IS NOT NULL")
     elif m_status == 'prospect':
         where_clauses.append("l.member_id IS NULL")
+
+    assigned_user_filter = validate_assigned_user_filter(filters.get('assigned_user_id'))
+    if assigned_user_filter == 'unassigned':
+        where_clauses.append("l.assigned_user_id IS NULL")
+    elif assigned_user_filter is not None:
+        where_clauses.append("l.assigned_user_id = %s")
+        args.append(assigned_user_filter)
 
     search_q = validate_optional_string(filters.get('search'))
     if search_q:

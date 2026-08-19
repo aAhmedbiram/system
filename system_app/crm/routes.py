@@ -47,7 +47,8 @@ def list_leads_route():
         'stage': request.args.get('stage'),
         'source': request.args.get('source'),
         'member_status': request.args.get('member_status'),
-        'search': request.args.get('search')
+        'search': request.args.get('search'),
+        'assigned_user_id': request.args.get('assigned_user_id')
     }
 
     try:
@@ -55,6 +56,14 @@ def list_leads_route():
         return jsonify(leads_list), 200
     except ValueError as e:
         return jsonify({"error": "invalid_input", "message": str(e)}), 400
+
+@crm_routes.route('/filter-users', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_VIEW)
+def list_dashboard_filter_users_route():
+    """Returns minimal eligible CRM users for read-only dashboard filters."""
+    users_list = services.list_filter_users(get_current_user())
+    return jsonify(users_list), 200
 
 @crm_routes.route('/leads', methods=['POST'])
 @login_required
