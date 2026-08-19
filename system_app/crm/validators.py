@@ -160,6 +160,8 @@ VALID_LOST_REASONS = {'PRICE', 'NO_RESPONSE', 'NOT_INTERESTED', 'JOINED_COMPETIT
 ALLOWED_BULK_MEMBER_FILTER_KEYS = {
     'view',
     'expires_within',
+    'expires_month',
+    'expires_year',
     'search_id',
     'search_name',
     'search_national_id',
@@ -236,6 +238,30 @@ def validate_bulk_member_filters(filters):
         if expires_within_int not in BULK_MEMBER_EXPIRES_WITHIN:
             raise ValueError("expires_within must be one of 7, 14, or 30")
         normalized['expires_within'] = expires_within_int
+
+    expires_month = validate_optional_string(filters.get('expires_month'))
+    if expires_month:
+        if isinstance(filters.get('expires_month'), bool):
+            raise ValueError("expires_month must be an integer between 1 and 12")
+        try:
+            expires_month_int = int(expires_month)
+        except (ValueError, TypeError):
+            raise ValueError("expires_month must be an integer between 1 and 12")
+        if expires_month_int < 1 or expires_month_int > 12:
+            raise ValueError("expires_month must be an integer between 1 and 12")
+        normalized['expires_month'] = expires_month_int
+
+    expires_year = validate_optional_string(filters.get('expires_year'))
+    if expires_year:
+        if isinstance(filters.get('expires_year'), bool):
+            raise ValueError("expires_year must be a four-digit year")
+        try:
+            expires_year_int = int(expires_year)
+        except (ValueError, TypeError):
+            raise ValueError("expires_year must be a four-digit year")
+        if expires_year_int < 1000 or expires_year_int > 9999:
+            raise ValueError("expires_year must be a four-digit year")
+        normalized['expires_year'] = expires_year_int
 
     for key in [
         'search_id',

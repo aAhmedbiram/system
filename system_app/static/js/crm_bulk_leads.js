@@ -15,6 +15,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const bulkSearchPhone = document.getElementById("bulkSearchPhone");
     const bulkViewFilter = document.getElementById("bulkViewFilter");
     const bulkExpiresWithin = document.getElementById("bulkExpiresWithin");
+    const bulkExpiresMonth = document.getElementById("bulkExpiresMonth");
+    const bulkExpiresYear = document.getElementById("bulkExpiresYear");
     const bulkReloadMembersBtn = document.getElementById("bulkReloadMembersBtn");
     const selectVisibleBtn = document.getElementById("selectVisibleBtn");
     const clearVisibleBtn = document.getElementById("clearVisibleBtn");
@@ -74,6 +76,8 @@ document.addEventListener("DOMContentLoaded", () => {
         filters: {
             view: "all",
             expires_within: "",
+            expires_month: "",
+            expires_year: "",
             search_id: "",
             search_name: "",
             search_phone: ""
@@ -140,6 +144,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return {
             view: bulkViewFilter ? bulkViewFilter.value || "all" : "all",
             expires_within: bulkExpiresWithin ? bulkExpiresWithin.value || "" : "",
+            expires_month: bulkExpiresMonth ? bulkExpiresMonth.value || "" : "",
+            expires_year: bulkExpiresYear ? bulkExpiresYear.value || "" : "",
             search_id: bulkSearchId ? bulkSearchId.value.trim() : "",
             search_name: bulkSearchName ? bulkSearchName.value.trim() : "",
             search_phone: bulkSearchPhone ? bulkSearchPhone.value.trim() : ""
@@ -245,6 +251,8 @@ document.addEventListener("DOMContentLoaded", () => {
             bulkSearchPhone,
             bulkViewFilter,
             bulkExpiresWithin,
+            bulkExpiresMonth,
+            bulkExpiresYear,
             bulkReloadMembersBtn,
             selectVisibleBtn,
             clearVisibleBtn,
@@ -910,11 +918,36 @@ document.addEventListener("DOMContentLoaded", () => {
                 input.addEventListener("input", debouncedHandler);
             }
         });
-        [bulkViewFilter, bulkExpiresWithin].forEach((input) => {
+        [bulkViewFilter, bulkExpiresWithin, bulkExpiresMonth, bulkExpiresYear].forEach((input) => {
             if (input) {
                 input.addEventListener("change", handler);
             }
         });
+    }
+
+    function populateExpiryYearOptions() {
+        if (!bulkExpiresYear) return;
+        const currentYear = new Date().getFullYear();
+        const startYear = currentYear - 3;
+        const endYear = currentYear + 5;
+        const existingValue = bulkExpiresYear.value;
+        bulkExpiresYear.replaceChildren();
+
+        const anyOption = document.createElement("option");
+        anyOption.value = "";
+        anyOption.textContent = "Any";
+        bulkExpiresYear.appendChild(anyOption);
+
+        for (let year = startYear; year <= endYear; year += 1) {
+            const option = document.createElement("option");
+            option.value = String(year);
+            option.textContent = String(year);
+            bulkExpiresYear.appendChild(option);
+        }
+
+        if (existingValue) {
+            bulkExpiresYear.value = existingValue;
+        }
     }
 
     function wireDistributionHandlers() {
@@ -1122,6 +1155,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     showPermissionState();
+    populateExpiryYearOptions();
     wireFilterChangeHandlers();
     wireSelectionHandlers();
     wireDistributionHandlers();

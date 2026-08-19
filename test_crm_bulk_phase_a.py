@@ -390,3 +390,64 @@ class TestCRMBulkPhaseA(unittest.TestCase):
         after_activities = query_db("SELECT COUNT(*) as count FROM crm_activities", one=True)['count']
         self.assertEqual(before_leads, after_leads)
         self.assertEqual(before_activities, after_activities)
+
+    def test_09_expiry_month_year_filters_and_preview_alignment(self):
+        self.login_as('pba_create', 45001)
+        self._member_data(8701, 'PBA Expiry Jul 2025', '2025-07-15', membership_packages='Silver', membership_fees=700)
+        self._member_data(8702, 'PBA Expiry Jul 2026', '2026-07-15', membership_packages='Silver', membership_fees=700)
+        self._member_data(8703, 'PBA Expiry Jun 2026', '2026-06-15', membership_packages='Silver', membership_fees=700)
+        self._member_data(8704, 'PBA Expiry Jul 2026 DT', '2026-07-15 00:00:00', membership_packages='Silver', membership_fees=700)
+        self._member_data(8705, 'PBA Expiry Sep 2026', '2026-09-10', membership_packages='Silver', membership_fees=700)
+        self._member_data(8706, 'PBA Expiry Sep 2026 Late', '2026-09-25', membership_packages='Silver', membership_fees=700)
+        self._member_data(8707, 'PBA Expiry Blank', '   ', membership_packages='Silver', membership_fees=700)
+        self._member_data(8708, 'PBA Expiry Invalid', 'not-a-date', membership_packages='Silver', membership_fees=700)
+
+        month_only = self.client.get('/crm/leads/bulk/members', query_string={'expires_month': '7', 'view': 'all', 'per_page': 100})
+        self.assertEqual(month_only.status_code, 200)
+        self.assertEqual([row['id'] for row in month_only.get_json()['items']], [8701, 8702, 8704])
+
+        year_only = self.client.get('/crm/leads/bulk/members', query_string={'expires_year': '2026', 'view': 'all', 'per_page': 100})
+        self.assertEqual(year_only.status_code, 200)
+        self.assertEqual([row['id'] for row in year_only.get_json()['items']], [8702, 8703, 8704, 8705, 8706])
+
+        july_2026 = self.client.get(
+            '/crm/leads/bulk/members',
+            query_string={'expires_month': '7', 'expires_year': '2026', 'view': 'all', 'per_page': 100}
+        )
+        self.assertEqual(july_2026.status_code, 200)
+        july_2026_ids = [row['id'] for row in july_2026.get_json()['items']]
+        self.assertEqual(july_2026_ids, [8702, 8704])
+
+        september_2026_within_30 = self.client.get(
+            '/crm/leads/bulk/members',
+            query_string={
+                'expires_month': '9',
+                'expires_year': '2026',
+                'expires_within': '30',
+                'view': 'all',
+                'per_page': 100
+            }
+        )
+        self.assertEqual(september_2026_within_30.status_code, 200)
+        self.assertEqual([row['id'] for row in september_2026_within_30.get_json()['items']], [8705])
+
+        preview = self._preview({
+            "selection": {
+                "mode": "filters",
+                "filters": {"view": "all", "expires_month": "7", "expires_year": "2026"}
+            },
+            "distribution": {"mode": "unassigned"},
+            "source": "EXISTING_MEMBER"
+        })
+        self.assertEqual(preview.status_code, 200)
+        preview_data = preview.get_json()
+        self.assertEqual(preview_data['selected_count'], 2)
+        self.assertEqual(preview_data['eligible_count'], 2)
+        self.assertEqual(preview_data['distribution'], [])
+        snapshot = services.get_bulk_preview_snapshot(
+            preview_data['preview_token'],
+            {"id": 45001, "username": "pba_create"}
+        )
+        self.assertEqual(snapshot['selection']['selected_member_ids'], july_2026_ids)
+        self.assertEqual(snapshot['eligible_member_ids'], july_2026_ids)
+        self.assertEqual(snapshot['selected_count'], 2)

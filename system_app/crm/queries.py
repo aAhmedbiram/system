@@ -100,6 +100,10 @@ def _build_member_bulk_filter_components(filters):
     filters = filters or {}
     where_clauses = []
     args = []
+    end_date_text = "TRIM(end_date)"
+    end_date_prefix = f"SUBSTRING({end_date_text}, 1, 10)"
+    valid_end_date_clause = f"{end_date_prefix} ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}$'"
+    end_date_date_expr = f"CAST({end_date_prefix} AS DATE)"
 
     view = filters.get('view', 'all')
     if view == 'active':
@@ -166,6 +170,26 @@ def _build_member_bulk_filter_components(filters):
     if filters.get('search_fees'):
         where_clauses.append("CAST(membership_fees AS TEXT) ILIKE %s")
         args.append(f"%{filters['search_fees']}%")
+
+    expires_month = filters.get('expires_month')
+    if expires_month:
+        where_clauses.append(f"""
+            end_date IS NOT NULL AND end_date != ''
+            AND LENGTH({end_date_text}) >= 10
+            AND {valid_end_date_clause}
+            AND EXTRACT(MONTH FROM {end_date_date_expr}) = %s
+        """)
+        args.append(expires_month)
+
+    expires_year = filters.get('expires_year')
+    if expires_year:
+        where_clauses.append(f"""
+            end_date IS NOT NULL AND end_date != ''
+            AND LENGTH({end_date_text}) >= 10
+            AND {valid_end_date_clause}
+            AND EXTRACT(YEAR FROM {end_date_date_expr}) = %s
+        """)
+        args.append(expires_year)
 
     expires_within = filters.get('expires_within')
     if expires_within:

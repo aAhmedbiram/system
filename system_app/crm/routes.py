@@ -131,6 +131,8 @@ def bulk_leads_members_route():
     allowed_filter_keys = [
         'view',
         'expires_within',
+        'expires_month',
+        'expires_year',
         'search_id',
         'search_name',
         'search_national_id',

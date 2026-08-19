@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 import unittest
 
 from system_app.app import app
@@ -165,6 +166,13 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self._member(6102, 'PBC Search Beta', (today + timedelta(days=10)).isoformat(), phone='0100006102')
         self._member(6103, 'PBC Search Gamma', (today + timedelta(days=20)).isoformat(), phone='0100006103')
         self._member(6104, 'PBC Search Delta', (today - timedelta(days=2)).isoformat(), phone='0100006104')
+        self._member(6105, 'PBC Search July 2025', '2025-07-15', phone='0100006105')
+        self._member(6106, 'PBC Search July 2026', '2026-07-15', phone='0100006106')
+        self._member(6107, 'PBC Search July 2026 DT', '2026-07-15 00:00:00', phone='0100006107')
+        self._member(6108, 'PBC Search September 2026', '2026-09-25', phone='0100006108')
+        self._member(6109, 'PBC Search September 2026 Late', '2026-09-28', phone='0100006109')
+        self._member(6110, 'PBC Search Blank End', '   ', phone='0100006110')
+        self._member(6111, 'PBC Search Invalid End', 'not-a-date', phone='0100006111')
 
         by_name = self.client.get('/crm/leads/bulk/members', query_string={'search_name': 'Alpha'})
         self.assertEqual([row['id'] for row in by_name.get_json()['items']], [6101])
@@ -183,6 +191,50 @@ class TestCRMBulkPhaseC(unittest.TestCase):
 
         bucket_30 = self.client.get('/crm/leads/bulk/members', query_string={'expires_within': '30'})
         self.assertEqual([row['id'] for row in bucket_30.get_json()['items']], [6103])
+
+        by_month = self.client.get('/crm/leads/bulk/members', query_string={'expires_month': '7', 'view': 'all', 'per_page': 50})
+        self.assertEqual([row['id'] for row in by_month.get_json()['items']], [6105, 6106, 6107])
+
+        by_year = self.client.get('/crm/leads/bulk/members', query_string={'expires_year': '2026', 'view': 'all', 'per_page': 50})
+        self.assertEqual(
+            [row['id'] for row in by_year.get_json()['items']],
+            [6101, 6102, 6103, 6104, 6106, 6107, 6108, 6109]
+        )
+
+        by_month_year = self.client.get(
+            '/crm/leads/bulk/members',
+            query_string={'expires_month': '7', 'expires_year': '2026', 'view': 'all', 'per_page': 50}
+        )
+        self.assertEqual([row['id'] for row in by_month_year.get_json()['items']], [6106, 6107])
+
+        by_month_year_bucket = self.client.get(
+            '/crm/leads/bulk/members',
+            query_string={
+                'expires_month': '9',
+                'expires_year': '2026',
+                'expires_within': '30',
+                'view': 'all',
+                'per_page': 50
+            }
+        )
+        self.assertEqual([row['id'] for row in by_month_year_bucket.get_json()['items']], [6103])
+
+        ids_list = [row['id'] for row in by_month_year.get_json()['items']]
+        preview = self._preview({
+            "selection": {
+                "mode": "filters",
+                "filters": {"view": "all", "expires_month": "7", "expires_year": "2026"}
+            },
+            "distribution": {"mode": "unassigned"},
+            "source": "EXISTING_MEMBER"
+        })
+        self.assertEqual(preview.status_code, 200)
+        snapshot = services.get_bulk_preview_snapshot(
+            preview.get_json()['preview_token'],
+            {"id": 48003, "username": "pbc_create_only"}
+        )
+        self.assertEqual(snapshot['selection']['selected_member_ids'], ids_list)
+        self.assertEqual(snapshot['eligible_member_ids'], ids_list)
 
     def test_05_active_crm_indicator_and_preview_alignment(self):
         self.login_as('pbc_assign', 48004)
@@ -228,9 +280,17 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertIn(b'bulkSearchPhone', res.data)
         self.assertIn(b'bulkViewFilter', res.data)
         self.assertIn(b'bulkExpiresWithin', res.data)
+        self.assertIn(b'bulkExpiresMonth', res.data)
+        self.assertIn(b'bulkExpiresYear', res.data)
         self.assertIn(b'selectFilteredBtn', res.data)
         self.assertIn(b'confirmBulkBtn', res.data)
         self.assertNotIn(b'previewTokenInput', res.data)
+        js_source = Path(__file__).resolve().parent / 'system_app/static/js/crm_bulk_leads.js'
+        js_text = js_source.read_text(encoding='utf-8')
+        self.assertIn('bulkExpiresMonth', js_text)
+        self.assertIn('bulkExpiresYear', js_text)
+        self.assertIn('currentFilters()', js_text)
+        self.assertIn('wireFilterChangeHandlers()', js_text)
 
     def test_07_explicit_ids_preview_from_ui_payload(self):
         self.login_as('pbc_create_only', 48003)
