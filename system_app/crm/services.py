@@ -10,7 +10,7 @@ from system_app.crm.validators import (
     validate_positive_int_list, validate_bulk_member_filters,
     validate_bulk_selection_mode, validate_bulk_distribution_mode,
     validate_bulk_source, validate_assigned_user_filter,
-    validate_invitation_candidate_filters
+    validate_invitation_candidate_filters, validate_invitation_candidate_keys
 )
 from system_app.crm import queries
 from system_app.crm.queries import run_in_transaction
@@ -53,32 +53,32 @@ def _user_has_crm_permission(current_user, permission_key):
     perms = current_user.get('permissions') or {}
     return bool(perms.get('super_admin') or perms.get(permission_key))
 
-def _build_assignment_plan(eligible_member_ids, distribution_mode, assignable_users):
-    """Builds a deterministic member -> user assignment plan for preview and later execution."""
+def _build_assignment_plan(eligible_items, distribution_mode, assignable_users, item_key='member_id'):
+    """Builds a deterministic item -> user assignment plan for preview and later execution."""
     assignment_plan = []
 
     if distribution_mode == 'unassigned':
         return [
-            {"member_id": member_id, "user_id": None}
-            for member_id in eligible_member_ids
+            {item_key: item_id, "user_id": None}
+            for item_id in eligible_items
         ]
 
     employee_count = len(assignable_users)
     if employee_count == 0:
         return []
 
-    base = len(eligible_member_ids) // employee_count
-    remainder = len(eligible_member_ids) % employee_count
+    base = len(eligible_items) // employee_count
+    remainder = len(eligible_items) % employee_count
     offset = 0
 
     for index, user in enumerate(assignable_users):
         lead_count = base + (1 if index < remainder else 0)
         if lead_count <= 0:
             continue
-        chunk = eligible_member_ids[offset:offset + lead_count]
-        for member_id in chunk:
+        chunk = eligible_items[offset:offset + lead_count]
+        for item_id in chunk:
             assignment_plan.append({
-                "member_id": member_id,
+                item_key: item_id,
                 "user_id": user["id"]
             })
         offset += lead_count
@@ -212,6 +212,11 @@ def execute_bulk_member_leads(current_user, preview_token):
     snapshot = operation.get('snapshot') or {}
     assignment_plan = snapshot.get('assignment_plan') or []
 
+    if snapshot.get('source') == 'INVITATIONS':
+        raise CRMConflictError(
+            "invitation_bulk_execute_not_implemented",
+            "Invitation bulk execution is not implemented yet."
+        )
     if snapshot.get('source') != 'EXISTING_MEMBER':
         raise CRMConflictError(
             "invalid_source",
@@ -511,6 +516,64 @@ def _resolve_bulk_member_selection(selection):
         "missing_member_ids": missing_ids
     }
 
+def _resolve_bulk_invitation_selection(selection):
+    """Resolves invitation candidate selection into a frozen candidate-key list."""
+    if not isinstance(selection, dict):
+        raise CRMValidationError("invalid_selection", "'selection' must be an object")
+
+    allowed_keys = {'mode', 'candidate_keys', 'filters'}
+    unknown_keys = set(selection.keys()) - allowed_keys
+    if unknown_keys:
+        raise CRMValidationError("invalid_selection", f"Unknown selection key(s): {', '.join(sorted(unknown_keys))}")
+
+    try:
+        mode = validate_bulk_selection_mode(selection.get('mode'))
+    except ValueError as e:
+        raise CRMValidationError("invalid_selection_mode", str(e))
+
+    if mode == 'ids':
+        if selection.get('filters') not in (None, {}, []):
+            raise CRMValidationError("invalid_selection", "Invitation candidate selection by IDs cannot include filters.")
+        try:
+            requested_keys = validate_invitation_candidate_keys(
+                selection.get('candidate_keys'),
+                'candidate_keys',
+                max_items=5000
+            )
+        except ValueError as e:
+            raise CRMValidationError("invalid_selection", str(e))
+        candidate_rows = queries.get_invitation_candidate_rows(None, candidate_keys=requested_keys)
+        selected_keys = [row['candidate_key'] for row in candidate_rows]
+        selected_key_set = set(selected_keys)
+        missing_keys = [key for key in requested_keys if key not in selected_key_set]
+        return {
+            "mode": mode,
+            "requested_candidate_keys": requested_keys,
+            "selected_candidate_keys": selected_keys,
+            "missing_candidate_keys": missing_keys,
+            "selected_candidates": candidate_rows,
+            "filters": {},
+        }
+
+    if selection.get('candidate_keys') not in (None, [], ()):
+        raise CRMValidationError("invalid_selection", "Invitation candidate selection by filters cannot include candidate_keys.")
+
+    try:
+        filters = validate_invitation_candidate_filters(selection.get('filters'))
+    except ValueError as e:
+        raise CRMValidationError("invalid_filters", str(e))
+
+    candidate_rows = queries.get_invitation_candidate_rows(filters)
+    selected_keys = [row['candidate_key'] for row in candidate_rows]
+    return {
+        "mode": mode,
+        "requested_candidate_keys": [],
+        "selected_candidate_keys": selected_keys,
+        "missing_candidate_keys": [],
+        "selected_candidates": candidate_rows,
+        "filters": filters,
+    }
+
 def preview_bulk_member_leads(current_user, data):
     """Builds an authoritative bulk-lead preview without creating any records."""
     if not isinstance(data, dict):
@@ -532,14 +595,10 @@ def preview_bulk_member_leads(current_user, data):
         source = validate_bulk_source(data.get('source'))
     except ValueError as e:
         raise CRMValidationError("invalid_source", str(e))
-    if source != 'EXISTING_MEMBER':
-        raise CRMValidationError("invalid_source", "Bulk member leads must use EXISTING_MEMBER source.")
-
     selection = data.get('selection')
+    distribution = data.get('distribution')
     if not isinstance(selection, dict):
         raise CRMValidationError("invalid_selection", "'selection' is required and must be an object")
-
-    distribution = data.get('distribution')
     if not isinstance(distribution, dict):
         raise CRMValidationError("invalid_distribution", "'distribution' is required and must be an object")
 
@@ -551,6 +610,115 @@ def preview_bulk_member_leads(current_user, data):
         distribution_mode = validate_bulk_distribution_mode(distribution.get('mode'))
     except ValueError as e:
         raise CRMValidationError("invalid_distribution", str(e))
+
+    if source == 'EXISTING_MEMBER':
+        if not isinstance(selection, dict):
+            raise CRMValidationError("invalid_selection", "'selection' is required and must be an object")
+
+        # Equal distribution requires assignment permission. Unassigned previews do not.
+        user_ids = []
+        assignable_users = []
+        if distribution_mode == 'equal':
+            if not _user_has_crm_permission(current_user, CRM_ASSIGN):
+                raise CRMForbiddenError("Bulk previews with employee distribution require crm_assign permission.")
+            try:
+                user_ids = validate_positive_int_list(distribution.get('user_ids'), 'user_ids', max_items=1000)
+            except ValueError as e:
+                raise CRMValidationError("invalid_employee", str(e))
+            assignable_users = queries.get_assignable_users_by_ids(user_ids)
+            found_user_ids = [row['id'] for row in assignable_users]
+            found_user_id_set = set(found_user_ids)
+            invalid_user_ids = [uid for uid in user_ids if uid not in found_user_id_set]
+            if invalid_user_ids:
+                raise CRMValidationError(
+                    "invalid_employee",
+                    "One or more selected employees are not assignable CRM users.",
+                    {"user_ids": invalid_user_ids}
+                )
+            assignable_users = sorted(assignable_users, key=lambda row: row['id'])
+        else:
+            raw_user_ids = distribution.get('user_ids')
+            if raw_user_ids not in (None, [], ()):
+                raise CRMValidationError(
+                    "invalid_distribution",
+                    "Unassigned distribution cannot include employee IDs."
+                )
+
+        selection_data = _resolve_bulk_member_selection(selection)
+        selected_member_ids = selection_data['selected_member_ids']
+        missing_member_ids = selection_data['missing_member_ids']
+
+        active_lead_rows = queries.get_active_leads_for_member_ids(selected_member_ids)
+        active_lead_member_ids = {row['member_id'] for row in active_lead_rows}
+        eligible_member_ids = [mid for mid in selected_member_ids if mid not in active_lead_member_ids]
+        active_lead_count = len(selected_member_ids) - len(eligible_member_ids)
+
+        distribution_preview = []
+        if distribution_mode == 'equal':
+            employee_count = len(assignable_users)
+            if employee_count == 0:
+                raise CRMValidationError("invalid_employee", "At least one assignable employee is required.")
+            base = len(eligible_member_ids) // employee_count
+            remainder = len(eligible_member_ids) % employee_count
+            for index, user in enumerate(assignable_users):
+                lead_count = base + (1 if index < remainder else 0)
+                distribution_preview.append({
+                    "user_id": user['id'],
+                    "username": user['username'],
+                    "lead_count": lead_count
+                })
+
+        assignment_plan = _build_assignment_plan(
+            eligible_member_ids,
+            distribution_mode,
+            assignable_users,
+            item_key='member_id'
+        )
+
+        snapshot = {
+            "source": source,
+            "selection": {
+                "mode": selected_mode,
+                "selected_member_ids": selected_member_ids,
+                "missing_member_ids": missing_member_ids,
+                "excluded_member_ids": selection_data['excluded_member_ids']
+            },
+            "distribution": {
+                "mode": distribution_mode,
+                "user_ids": user_ids if distribution_mode == 'equal' else []
+            },
+            "eligible_member_ids": eligible_member_ids,
+            "selected_count": len(selected_member_ids),
+            "eligible_count": len(eligible_member_ids),
+            "skipped_count": active_lead_count,
+            "missing_count": len(missing_member_ids),
+            "active_lead_member_ids": sorted(active_lead_member_ids),
+            "assignable_users": distribution_preview,
+            "assignment_plan": assignment_plan,
+            "created_by_user_id": current_user.get('id')
+        }
+
+        token, expires_at = _store_bulk_preview_snapshot(current_user, snapshot)
+        return {
+            "status": "preview",
+            "selected_count": len(selected_member_ids),
+            "eligible_count": len(eligible_member_ids),
+            "skipped_count": active_lead_count,
+            "missing_count": len(missing_member_ids),
+            "skipped_reasons": {
+                "active_lead_exists": active_lead_count,
+                "member_missing": len(missing_member_ids)
+            },
+            "distribution": distribution_preview if distribution_mode == 'equal' else [],
+            "preview_token": token,
+            "expires_in_seconds": BULK_PREVIEW_TOKEN_TTL_SECONDS
+        }
+
+    if source != 'INVITATIONS':
+        raise CRMValidationError("invalid_source", "Bulk member leads must use EXISTING_MEMBER or INVITATIONS source.")
+
+    if not isinstance(selection, dict):
+        raise CRMValidationError("invalid_selection", "'selection' is required and must be an object")
 
     # Equal distribution requires assignment permission. Unassigned previews do not.
     user_ids = []
@@ -581,22 +749,18 @@ def preview_bulk_member_leads(current_user, data):
                 "Unassigned distribution cannot include employee IDs."
             )
 
-    selection_data = _resolve_bulk_member_selection(selection)
-    selected_member_ids = selection_data['selected_member_ids']
-    missing_member_ids = selection_data['missing_member_ids']
-
-    active_lead_rows = queries.get_active_leads_for_member_ids(selected_member_ids)
-    active_lead_member_ids = {row['member_id'] for row in active_lead_rows}
-    eligible_member_ids = [mid for mid in selected_member_ids if mid not in active_lead_member_ids]
-    active_lead_count = len(selected_member_ids) - len(eligible_member_ids)
+    selection_data = _resolve_bulk_invitation_selection(selection)
+    selected_candidate_rows = selection_data['selected_candidates']
+    selected_candidate_keys = selection_data['selected_candidate_keys']
+    missing_candidate_keys = selection_data['missing_candidate_keys']
 
     distribution_preview = []
     if distribution_mode == 'equal':
         employee_count = len(assignable_users)
         if employee_count == 0:
             raise CRMValidationError("invalid_employee", "At least one assignable employee is required.")
-        base = len(eligible_member_ids) // employee_count
-        remainder = len(eligible_member_ids) % employee_count
+        base = len(selected_candidate_keys) // employee_count
+        remainder = len(selected_candidate_keys) % employee_count
         for index, user in enumerate(assignable_users):
             lead_count = base + (1 if index < remainder else 0)
             distribution_preview.append({
@@ -606,29 +770,34 @@ def preview_bulk_member_leads(current_user, data):
             })
 
     assignment_plan = _build_assignment_plan(
-        eligible_member_ids,
+        selected_candidate_keys,
         distribution_mode,
-        assignable_users
+        assignable_users,
+        item_key='candidate_key'
     )
 
     snapshot = {
         "source": source,
         "selection": {
             "mode": selected_mode,
-            "selected_member_ids": selected_member_ids,
-            "missing_member_ids": missing_member_ids,
-            "excluded_member_ids": selection_data['excluded_member_ids']
+            "requested_candidate_keys": selection_data['requested_candidate_keys'],
+            "selected_candidate_keys": selected_candidate_keys,
+            "missing_candidate_keys": missing_candidate_keys,
+            "filters": selection_data['filters']
         },
+        "eligible_candidate_keys": selected_candidate_keys,
+        "candidates": selected_candidate_rows,
         "distribution": {
             "mode": distribution_mode,
             "user_ids": user_ids if distribution_mode == 'equal' else []
         },
-        "eligible_member_ids": eligible_member_ids,
-        "selected_count": len(selected_member_ids),
-        "eligible_count": len(eligible_member_ids),
-        "skipped_count": active_lead_count,
-        "missing_count": len(missing_member_ids),
-        "active_lead_member_ids": sorted(active_lead_member_ids),
+        "selected_count": len(selected_candidate_keys),
+        "eligible_count": len(selected_candidate_keys),
+        "skipped_count": len(missing_candidate_keys),
+        "missing_count": len(missing_candidate_keys),
+        "skipped_reasons": {
+            "candidate_missing": len(missing_candidate_keys)
+        },
         "assignable_users": distribution_preview,
         "assignment_plan": assignment_plan,
         "created_by_user_id": current_user.get('id')
@@ -637,15 +806,18 @@ def preview_bulk_member_leads(current_user, data):
     token, expires_at = _store_bulk_preview_snapshot(current_user, snapshot)
     return {
         "status": "preview",
-        "selected_count": len(selected_member_ids),
-        "eligible_count": len(eligible_member_ids),
-        "skipped_count": active_lead_count,
-        "missing_count": len(missing_member_ids),
+        "source": source,
+        "selected_count": len(selected_candidate_keys),
+        "eligible_count": len(selected_candidate_keys),
+        "skipped_count": len(missing_candidate_keys),
+        "missing_count": len(missing_candidate_keys),
         "skipped_reasons": {
-            "active_lead_exists": active_lead_count,
-            "member_missing": len(missing_member_ids)
+            "candidate_missing": len(missing_candidate_keys)
         },
         "distribution": distribution_preview if distribution_mode == 'equal' else [],
+        "candidates": selected_candidate_rows,
+        "selected_candidate_keys": selected_candidate_keys,
+        "missing_candidate_keys": missing_candidate_keys,
         "preview_token": token,
         "expires_in_seconds": BULK_PREVIEW_TOKEN_TTL_SECONDS
     }

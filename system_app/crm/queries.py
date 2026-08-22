@@ -1,3 +1,5 @@
+from datetime import date, datetime, time
+
 from psycopg2.extras import Json
 
 from system_app.queries import query_db
@@ -13,6 +15,21 @@ def create_lead(member_id, name, phone, email, source, notes, created_by_user_id
     """
     res = query_db(query, (member_id, name, phone, email, source, notes, created_by_user_id), one=True, commit=True)
     return res['id'] if res else None
+
+def _json_safe_value(value):
+    """Converts DB values into JSON-safe primitives without mutating row objects."""
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {key: _json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(item) for item in value]
+    return value
+
+def _json_safe_row(row):
+    if row is None:
+        return None
+    return {key: _json_safe_value(value) for key, value in dict(row).items()}
 
 def get_lead_by_id(lead_id):
     """Retrieves a single CRM Lead by its database ID including assigned username."""
@@ -322,13 +339,18 @@ def _build_invitation_candidate_filter_components(filters):
     clause_str = f"AND {' AND '.join(where_clauses)}" if where_clauses else ""
     return clause_str, tuple(args)
 
-def get_invitation_candidate_listing(filters, page, per_page):
-    """Returns a paginated, deduplicated list of invitation-based CRM intake candidates."""
+def _build_invitation_candidate_sql(filters, candidate_keys=None):
+    """Builds the shared invitation candidate SQL body for filtering and preview resolution."""
     clause_str, args = _build_invitation_candidate_filter_components(filters)
-    offset = (page - 1) * per_page
+    candidate_key_clause = ""
+    if candidate_keys is not None:
+        candidate_key_clause = "AND TRIM(COALESCE(i.friend_phone, '')) = ANY(%s)"
+        args = list(args)
+        args.append(candidate_keys)
+        args = tuple(args)
     active_stage_clause = "('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')"
 
-    cte_sql = f"""
+    sql = f"""
         WITH filtered_rows AS (
             SELECT
                 i.id AS invitation_id,
@@ -346,6 +368,7 @@ def get_invitation_candidate_listing(filters, page, per_page):
             FROM invitations i
             WHERE TRIM(COALESCE(i.friend_phone, '')) <> ''
               AND TRIM(COALESCE(i.friend_phone, '')) ~ '^01[0125][0-9]{{8}}$'
+              {candidate_key_clause}
               {clause_str}
         ),
         deduped_candidates AS (
@@ -374,18 +397,45 @@ def get_invitation_candidate_listing(filters, page, per_page):
                 FROM crm_leads l
                 WHERE TRIM(COALESCE(l.phone, '')) = d.phone
                   AND l.member_id IS NULL
-                  AND l.stage IN {active_stage_clause}
+                AND l.stage IN {active_stage_clause}
                   AND l.is_archived = FALSE
             )
         )
+        SELECT
+            invitation_id,
+            TRIM(COALESCE(phone, '')) AS candidate_key,
+            name,
+            phone,
+            email,
+            used_date,
+            used_by,
+            inviter_member_id,
+            inviter_name
+        FROM eligible_candidates
+        ORDER BY used_date DESC, invitation_id DESC
     """
+    return sql, args
+
+def get_invitation_candidate_rows(filters, candidate_keys=None):
+    """Returns all eligible invitation candidates matching the supplied filters/keys."""
+    sql_body, args = _build_invitation_candidate_sql(filters, candidate_keys)
+    query = f"""
+        SELECT *
+        FROM (
+            {sql_body}
+        ) AS eligible_candidate_rows
+    """
+    return [_json_safe_row(row) for row in (query_db(query, args) or [])]
+
+def get_invitation_candidate_listing(filters, page, per_page):
+    """Returns a paginated, deduplicated list of invitation-based CRM intake candidates."""
+    sql_body, args = _build_invitation_candidate_sql(filters)
+    offset = (page - 1) * per_page
 
     count_query = f"""
         SELECT COUNT(*) AS count
         FROM (
-            {cte_sql}
-            SELECT 1
-            FROM eligible_candidates
+            {sql_body}
         ) AS eligible_count_rows
     """
     count_row = query_db(count_query, args, one=True)
@@ -394,23 +444,11 @@ def get_invitation_candidate_listing(filters, page, per_page):
     list_query = f"""
         SELECT *
         FROM (
-            {cte_sql}
-            SELECT
-                invitation_id,
-                TRIM(COALESCE(phone, '')) AS candidate_key,
-                name,
-                phone,
-                email,
-                used_date,
-                used_by,
-                inviter_member_id,
-                inviter_name
-            FROM eligible_candidates
-            ORDER BY used_date DESC, invitation_id DESC
+            {sql_body}
             LIMIT %s OFFSET %s
         ) AS eligible_candidate_rows
     """
-    rows = query_db(list_query, args + (per_page, offset)) or []
+    rows = [_json_safe_row(row) for row in (query_db(list_query, args + (per_page, offset)) or [])]
     return {
         "items": rows,
         "total_count": total_count,

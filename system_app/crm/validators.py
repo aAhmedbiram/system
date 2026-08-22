@@ -207,6 +207,8 @@ ALLOWED_BULK_INVITATION_FILTER_KEYS = {
     'invitation_year'
 }
 
+INVITATION_CANDIDATE_PHONE_PATTERN = re.compile(r"^01[0125][0-9]{8}$")
+
 def validate_positive_int_list(val, name, max_items=None):
     if val is None:
         raise ValueError(f"'{name}' is required")
@@ -352,6 +354,33 @@ def validate_invitation_candidate_filters(filters):
 
     return normalized
 
+def validate_invitation_candidate_keys(val, name='candidate_keys', max_items=None):
+    if val is None:
+        raise ValueError(f"'{name}' is required")
+    if not isinstance(val, list):
+        raise ValueError(f"'{name}' must be a list")
+    if not val:
+        raise ValueError(f"'{name}' cannot be empty")
+
+    cleaned = []
+    seen = set()
+    for x in val:
+        if not isinstance(x, str):
+            raise ValueError(f"'{name}' must contain strings only")
+        key = x.strip()
+        if not key:
+            raise ValueError(f"'{name}' cannot contain blank values")
+        if not INVITATION_CANDIDATE_PHONE_PATTERN.match(key):
+            raise ValueError(f"'{name}' must contain valid Egyptian mobile numbers")
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(key)
+        if max_items is not None and len(cleaned) > max_items:
+            raise ValueError(f"'{name}' cannot exceed {max_items} items")
+
+    return cleaned
+
 def validate_bulk_selection_mode(mode):
     if mode is None:
         raise ValueError("'selection.mode' is required")
@@ -372,8 +401,8 @@ def validate_bulk_source(source):
     if source is None:
         raise ValueError("'source' is required")
     source_str = str(source).strip().upper()
-    if source_str != 'EXISTING_MEMBER':
-        raise ValueError("Bulk member lead creation only supports EXISTING_MEMBER source.")
+    if source_str not in {'EXISTING_MEMBER', 'INVITATIONS'}:
+        raise ValueError("Bulk member lead creation only supports EXISTING_MEMBER or INVITATIONS source.")
     return source_str
 
 def validate_stage_transition(old_stage, new_stage):
