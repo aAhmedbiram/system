@@ -199,6 +199,13 @@ BULK_MEMBER_VIEWS = {'active', 'expired', 'all'}
 BULK_MEMBER_EXPIRES_WITHIN = {7, 14, 30}
 BULK_SELECTION_MODES = {'ids', 'filters'}
 BULK_DISTRIBUTION_MODES = {'unassigned', 'equal'}
+ALLOWED_BULK_INVITATION_FILTER_KEYS = {
+    'search_name',
+    'search_phone',
+    'used_by',
+    'invitation_month',
+    'invitation_year'
+}
 
 def validate_positive_int_list(val, name, max_items=None):
     if val is None:
@@ -299,6 +306,49 @@ def validate_bulk_member_filters(filters):
         value = validate_optional_string(filters.get(key))
         if value:
             normalized[key] = value
+
+    return normalized
+
+def validate_invitation_candidate_filters(filters):
+    if filters is None:
+        return {}
+    if not isinstance(filters, dict):
+        raise ValueError("'filters' must be an object")
+
+    unknown_keys = set(filters.keys()) - ALLOWED_BULK_INVITATION_FILTER_KEYS
+    if unknown_keys:
+        raise ValueError(f"Unknown filter key(s): {', '.join(sorted(unknown_keys))}")
+
+    normalized = {}
+
+    for key in ['search_name', 'search_phone', 'used_by']:
+        value = validate_optional_string(filters.get(key))
+        if value:
+            normalized[key] = value
+
+    invitation_month = validate_optional_string(filters.get('invitation_month'))
+    if invitation_month:
+        if isinstance(filters.get('invitation_month'), bool):
+            raise ValueError("invitation_month must be an integer between 1 and 12")
+        try:
+            month_int = int(invitation_month)
+        except (ValueError, TypeError):
+            raise ValueError("invitation_month must be an integer between 1 and 12")
+        if month_int < 1 or month_int > 12:
+            raise ValueError("invitation_month must be an integer between 1 and 12")
+        normalized['invitation_month'] = month_int
+
+    invitation_year = validate_optional_string(filters.get('invitation_year'))
+    if invitation_year:
+        if isinstance(filters.get('invitation_year'), bool):
+            raise ValueError("invitation_year must be a four-digit year")
+        try:
+            year_int = int(invitation_year)
+        except (ValueError, TypeError):
+            raise ValueError("invitation_year must be a four-digit year")
+        if year_int < 1000 or year_int > 9999:
+            raise ValueError("invitation_year must be a four-digit year")
+        normalized['invitation_year'] = year_int
 
     return normalized
 

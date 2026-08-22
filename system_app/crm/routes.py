@@ -169,6 +169,33 @@ def bulk_leads_members_route():
     except ValueError as e:
         return jsonify({"error": "invalid_input", "message": str(e)}), 400
 
+@crm_routes.route('/leads/bulk/invitations', methods=['GET'])
+@login_required
+@crm_permission_required(CRM_BULK_LEADS)
+def bulk_leads_invitations_route():
+    """Returns paginated invitation-friend candidates for recurring CRM intake."""
+    current_user = get_current_user()
+    page = request.args.get('page')
+    per_page = request.args.get('per_page')
+    allowed_filter_keys = [
+        'search_name',
+        'search_phone',
+        'used_by',
+        'invitation_month',
+        'invitation_year'
+    ]
+    filters = {}
+    for key in allowed_filter_keys:
+        value = request.args.get(key)
+        if value is not None and str(value).strip() != "":
+            filters[key] = value
+
+    try:
+        listing = services.list_invitation_candidates(current_user, page, per_page, filters)
+        return jsonify(listing), 200
+    except ValueError as e:
+        return jsonify({"error": "invalid_input", "message": str(e)}), 400
+
 @crm_routes.route('/leads/bulk/preview', methods=['POST'])
 @login_required
 @crm_permission_required(CRM_BULK_LEADS)

@@ -9,7 +9,8 @@ from system_app.crm.validators import (
     validate_stage_transition, validate_lost_reason, validate_reopen_stage,
     validate_positive_int_list, validate_bulk_member_filters,
     validate_bulk_selection_mode, validate_bulk_distribution_mode,
-    validate_bulk_source, validate_assigned_user_filter
+    validate_bulk_source, validate_assigned_user_filter,
+    validate_invitation_candidate_filters
 )
 from system_app.crm import queries
 from system_app.crm.queries import run_in_transaction
@@ -161,6 +162,21 @@ def list_filter_users(current_user):
         }
         for user in users
     ]
+
+def list_invitation_candidates(current_user, page_param, per_page_param, filters):
+    """Returns a paginated, recurring invitation-friend intake list for CRM bulk leads."""
+    page, per_page = validate_pagination(page_param, per_page_param)
+    normalized_filters = validate_invitation_candidate_filters(filters or {})
+    listing = queries.get_invitation_candidate_listing(normalized_filters, page, per_page)
+    return {
+        "items": listing.get("items") or [],
+        "page": page,
+        "per_page": per_page,
+        "total": listing.get("total_count", 0),
+        "pages": listing.get("total_pages", 1),
+        "filters": normalized_filters,
+        "has_more": page < listing.get("total_pages", 1)
+    }
 
 def _load_bulk_operation_for_user(token, current_user):
     operation = queries.get_bulk_lead_operation_by_token(token)

@@ -288,6 +288,135 @@ def get_bulk_member_listing(filters, page, per_page):
         "total_pages": (total_count + per_page - 1) // per_page if total_count else 1
     }
 
+def _build_invitation_candidate_filter_components(filters):
+    """Builds invitation intake filters for recurring CRM bulk lead ingestion."""
+    filters = filters or {}
+    where_clauses = []
+    args = []
+
+    search_name = filters.get('search_name')
+    if search_name:
+        where_clauses.append("TRIM(COALESCE(i.friend_name, '')) ILIKE %s")
+        args.append(f"%{search_name}%")
+
+    search_phone = filters.get('search_phone')
+    if search_phone:
+        where_clauses.append("TRIM(COALESCE(i.friend_phone, '')) ILIKE %s")
+        args.append(f"%{search_phone}%")
+
+    used_by = filters.get('used_by')
+    if used_by:
+        where_clauses.append("TRIM(COALESCE(i.used_by, '')) = %s")
+        args.append(used_by)
+
+    invitation_month = filters.get('invitation_month')
+    if invitation_month is not None:
+        where_clauses.append("EXTRACT(MONTH FROM i.used_date) = %s")
+        args.append(invitation_month)
+
+    invitation_year = filters.get('invitation_year')
+    if invitation_year is not None:
+        where_clauses.append("EXTRACT(YEAR FROM i.used_date) = %s")
+        args.append(invitation_year)
+
+    clause_str = f"AND {' AND '.join(where_clauses)}" if where_clauses else ""
+    return clause_str, tuple(args)
+
+def get_invitation_candidate_listing(filters, page, per_page):
+    """Returns a paginated, deduplicated list of invitation-based CRM intake candidates."""
+    clause_str, args = _build_invitation_candidate_filter_components(filters)
+    offset = (page - 1) * per_page
+    active_stage_clause = "('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')"
+
+    cte_sql = f"""
+        WITH filtered_rows AS (
+            SELECT
+                i.id AS invitation_id,
+                i.member_id AS inviter_member_id,
+                i.member_name AS inviter_name,
+                NULLIF(TRIM(COALESCE(i.friend_name, '')), '') AS name,
+                TRIM(COALESCE(i.friend_phone, '')) AS phone,
+                NULLIF(TRIM(COALESCE(i.friend_email, '')), '') AS email,
+                i.used_date,
+                NULLIF(TRIM(COALESCE(i.used_by, '')), '') AS used_by,
+                ROW_NUMBER() OVER (
+                    PARTITION BY TRIM(COALESCE(i.friend_phone, ''))
+                    ORDER BY i.used_date DESC, i.id DESC
+                ) AS phone_rank
+            FROM invitations i
+            WHERE TRIM(COALESCE(i.friend_phone, '')) <> ''
+              AND TRIM(COALESCE(i.friend_phone, '')) ~ '^01[0125][0-9]{{8}}$'
+              {clause_str}
+        ),
+        deduped_candidates AS (
+            SELECT
+                invitation_id,
+                inviter_member_id,
+                inviter_name,
+                name,
+                phone,
+                email,
+                used_date,
+                used_by
+            FROM filtered_rows
+            WHERE phone_rank = 1
+        ),
+        eligible_candidates AS (
+            SELECT d.*
+            FROM deduped_candidates d
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM members m
+                WHERE TRIM(COALESCE(m.phone, '')) = d.phone
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM crm_leads l
+                WHERE TRIM(COALESCE(l.phone, '')) = d.phone
+                  AND l.member_id IS NULL
+                  AND l.stage IN {active_stage_clause}
+                  AND l.is_archived = FALSE
+            )
+        )
+    """
+
+    count_query = f"""
+        SELECT COUNT(*) AS count
+        FROM (
+            {cte_sql}
+            SELECT 1
+            FROM eligible_candidates
+        ) AS eligible_count_rows
+    """
+    count_row = query_db(count_query, args, one=True)
+    total_count = count_row['count'] if count_row else 0
+
+    list_query = f"""
+        SELECT *
+        FROM (
+            {cte_sql}
+            SELECT
+                invitation_id,
+                TRIM(COALESCE(phone, '')) AS candidate_key,
+                name,
+                phone,
+                email,
+                used_date,
+                used_by,
+                inviter_member_id,
+                inviter_name
+            FROM eligible_candidates
+            ORDER BY used_date DESC, invitation_id DESC
+            LIMIT %s OFFSET %s
+        ) AS eligible_candidate_rows
+    """
+    rows = query_db(list_query, args + (per_page, offset)) or []
+    return {
+        "items": rows,
+        "total_count": total_count,
+        "total_pages": (total_count + per_page - 1) // per_page if total_count else 1
+    }
+
 def get_active_leads_for_member_ids(member_ids):
     """Returns active CRM leads for the given member IDs as a member_id -> lead_id mapping."""
     if not member_ids:
