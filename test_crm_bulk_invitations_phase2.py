@@ -359,27 +359,28 @@ class TestCRMBulkInvitationsPhase2(unittest.TestCase):
         )
         self.assertEqual(member_snapshot['selection']['selected_member_ids'], [79101])
 
-    def test_08_execute_rejects_invitation_tokens_and_preserves_data(self):
-        self.login_as('pbi2_assign', 52002)
+    def test_08_execute_creates_invitation_lead_and_preserves_invitations(self):
+        self.login_as('pbi2_super', 52004)
         self._invitation(1701, 'Execute Guard', '01022223333', datetime(2026, 8, 10, 8, 0, 0))
-        before_leads = query_db("SELECT COUNT(*) AS count FROM crm_leads", one=True)['count']
-        before_activities = query_db("SELECT COUNT(*) AS count FROM crm_activities", one=True)['count']
         before_invitations = query_db("SELECT COUNT(*) AS count FROM invitations", one=True)['count']
+        before_leads = query_db("SELECT COUNT(*) AS count FROM crm_leads", one=True)['count']
 
         preview = self._invitation_preview(
             {"mode": "ids", "candidate_keys": ["01022223333"]},
             {"mode": "unassigned"},
-            username='pbi2_assign',
-            user_id=52002
+            username='pbi2_super',
+            user_id=52004
         )
         token = preview.get_json()['preview_token']
 
         execute = self.client.post('/crm/leads/bulk/execute', json={"preview_token": token})
-        self.assertEqual(execute.status_code, 409)
-        self.assertEqual(execute.get_json()['error'], 'invitation_bulk_execute_not_implemented')
+        self.assertEqual(execute.status_code, 200)
+        data = execute.get_json()
+        self.assertEqual(data['created'], 1)
+        self.assertEqual(data['skipped'], 0)
+        self.assertEqual(data['failed'], 0)
 
-        self.assertEqual(before_leads, query_db("SELECT COUNT(*) AS count FROM crm_leads", one=True)['count'])
-        self.assertEqual(before_activities, query_db("SELECT COUNT(*) AS count FROM crm_activities", one=True)['count'])
+        self.assertEqual(before_leads + 1, query_db("SELECT COUNT(*) AS count FROM crm_leads", one=True)['count'])
         self.assertEqual(before_invitations, query_db("SELECT COUNT(*) AS count FROM invitations", one=True)['count'])
 
     def test_09_repeated_preview_creates_independent_operations(self):

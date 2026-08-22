@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, time
 
 from psycopg2.extras import Json
@@ -30,6 +31,8 @@ def _json_safe_row(row):
     if row is None:
         return None
     return {key: _json_safe_value(value) for key, value in dict(row).items()}
+
+_INVITATION_PHONE_PATTERN = re.compile(r"^01[0125][0-9]{8}$")
 
 def get_lead_by_id(lead_id):
     """Retrieves a single CRM Lead by its database ID including assigned username."""
@@ -569,6 +572,110 @@ def get_assignable_users_by_ids(user_ids):
         ORDER BY id ASC
     """
     return query_db(query, (user_ids,)) or []
+
+def _normalize_invitation_phone(phone):
+    if phone is None:
+        return None
+    return str(phone).strip()
+
+def create_invitation_lead_in_transaction(cur, candidate_row, source, created_by_user_id, assigned_user_id=None):
+    """Creates a CRM lead from a frozen invitation candidate inside an open transaction."""
+    candidate_key = _normalize_invitation_phone(candidate_row.get('candidate_key'))
+    phone = _normalize_invitation_phone(candidate_row.get('phone')) or candidate_key
+    invitation_id = candidate_row.get('invitation_id')
+    if not candidate_key or not phone or not _INVITATION_PHONE_PATTERN.fullmatch(phone):
+        return {"status": "skipped", "reason": "invalid_phone"}
+    name = candidate_row.get('name')
+    if name is None or not str(name).strip():
+        return {
+            "status": "skipped",
+            "reason": "invalid_candidate_data",
+            "details": {"field": "name", "candidate_key": candidate_key}
+        }
+
+    lock_key = f"crm_invitation_bulk:{phone}"
+    cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)", (lock_key,))
+
+    cur.execute("SELECT id FROM invitations WHERE id = %s LIMIT 1", (invitation_id,))
+    if not cur.fetchone():
+        return {"status": "skipped", "reason": "invitation_missing", "details": {"invitation_id": invitation_id}}
+
+    cur.execute(
+        "SELECT id FROM members WHERE TRIM(COALESCE(phone, '')) = %s LIMIT 1",
+        (phone,)
+    )
+    if cur.fetchone():
+        return {"status": "skipped", "reason": "member_now_exists", "details": {"phone": phone}}
+
+    cur.execute(
+        """
+        SELECT id
+        FROM crm_leads
+        WHERE TRIM(COALESCE(phone, '')) = %s
+          AND member_id IS NULL
+          AND stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')
+          AND is_archived = FALSE
+        LIMIT 1
+        """,
+        (phone,)
+    )
+    existing_lead = cur.fetchone()
+    if existing_lead:
+        return {
+            "status": "skipped",
+            "reason": "crm_lead_now_exists",
+            "details": {"existing_lead_id": existing_lead['id'], "phone": phone}
+        }
+
+    if assigned_user_id is not None:
+        cur.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE id = %s
+              AND (is_approved = TRUE OR username = 'rino')
+            LIMIT 1
+            """,
+            (assigned_user_id,)
+        )
+        if not cur.fetchone():
+            return {
+                "status": "skipped",
+                "reason": "invalid_employee",
+                "details": {"user_id": assigned_user_id}
+            }
+
+    query = """
+        INSERT INTO crm_leads (
+            member_id, name, phone, email, source, stage,
+            assigned_user_id, assigned_by_user_id, assigned_at,
+            created_by_user_id
+        ) VALUES (NULL, %s, %s, %s, %s, 'NEW', %s, %s,
+                  CASE WHEN %s IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+                  %s)
+        RETURNING id
+    """
+    cur.execute(
+        query,
+        (
+            str(name).strip(),
+            phone,
+            candidate_row.get('email'),
+            source,
+            assigned_user_id,
+            created_by_user_id if assigned_user_id is not None else None,
+            assigned_user_id,
+            created_by_user_id
+        )
+    )
+    created = cur.fetchone()
+    return {
+        "status": "created",
+        "lead_id": created['id'] if created else None,
+        "invitation_id": invitation_id,
+        "candidate_key": candidate_key,
+        "phone": phone
+    }
 
 def search_members(search_query, limit=20):
     """Searches members for linking to CRM leads."""
