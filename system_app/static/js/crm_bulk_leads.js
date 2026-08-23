@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const SOURCE_EXISTING_MEMBER = "EXISTING_MEMBER";
+    const SOURCE_INVITATIONS = "INVITATIONS";
     const canCreate = String(window.CRM_BULK_CAN_CREATE) === "true";
     const canAssign = String(window.CRM_BULK_CAN_ASSIGN) === "true";
     const initialState = window.CRM_BULK_INITIAL_STATE || null;
@@ -6,9 +8,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const bulkNotice = document.getElementById("bulkNotice");
     const selectionInfo = document.getElementById("selectionInfo");
+    const selectionSectionTitle = document.getElementById("selectionSectionTitle");
+    const selectionSectionNote = document.getElementById("selectionSectionNote");
     const selectedCount = document.getElementById("selectedCount");
     const matchingCount = document.getElementById("matchingCount");
     const selectionModeLabel = document.getElementById("selectionModeLabel");
+    const bulkSourceMembersBtn = document.getElementById("bulkSourceMembersBtn");
+    const bulkSourceInvitationsBtn = document.getElementById("bulkSourceInvitationsBtn");
 
     const bulkSearchId = document.getElementById("bulkSearchId");
     const bulkSearchName = document.getElementById("bulkSearchName");
@@ -23,10 +29,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectFilteredBtn = document.getElementById("selectFilteredBtn");
     const clearAllBtn = document.getElementById("clearAllBtn");
     const previewDistributionBtn = document.getElementById("previewDistributionBtn");
+    const memberFiltersPanel = document.getElementById("memberFiltersPanel");
+    const invitationFiltersPanel = document.getElementById("invitationFiltersPanel");
+    const bulkInvitationSearchName = document.getElementById("bulkInvitationSearchName");
+    const bulkInvitationSearchPhone = document.getElementById("bulkInvitationSearchPhone");
+    const bulkInvitationUsedBy = document.getElementById("bulkInvitationUsedBy");
+    const bulkInvitationMonth = document.getElementById("bulkInvitationMonth");
+    const bulkInvitationYear = document.getElementById("bulkInvitationYear");
 
     const membersLoading = document.getElementById("membersLoading");
     const membersError = document.getElementById("membersError");
     const bulkMembersTable = document.getElementById("bulkMembersTable");
+    const bulkMembersTableHead = document.getElementById("bulkMembersTableHead");
     const bulkMembersTableBody = document.getElementById("bulkMembersTableBody");
     const membersPrevBtn = document.getElementById("membersPrevBtn");
     const membersNextBtn = document.getElementById("membersNextBtn");
@@ -69,6 +83,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultSkippedItems = document.getElementById("resultSkippedItems");
 
     const state = {
+        source: SOURCE_EXISTING_MEMBER,
+        sourceState: {
+            [SOURCE_EXISTING_MEMBER]: {
+                page: 1,
+                totalPages: 1,
+                totalCount: 0,
+                members: [],
+                selectedIds: new Set(),
+                allFilteredSelected: false,
+                selectionMode: "ids",
+                loadingMembers: false
+            },
+            [SOURCE_INVITATIONS]: {
+                page: 1,
+                totalPages: 1,
+                totalCount: 0,
+                members: [],
+                selectedIds: new Set(),
+                allFilteredSelected: false,
+                selectionMode: "ids",
+                loadingMembers: false
+            }
+        },
         page: 1,
         totalPages: 1,
         totalCount: 0,
@@ -98,6 +135,45 @@ document.addEventListener("DOMContentLoaded", () => {
         memberLoadTimer: null,
         employeeLoadTimer: null
     };
+
+    function activeSourceState() {
+        return state.sourceState[state.source] || state.sourceState[SOURCE_EXISTING_MEMBER];
+    }
+
+    Object.defineProperties(state, {
+        page: {
+            get() { return activeSourceState().page; },
+            set(value) { activeSourceState().page = Number(value) || 1; }
+        },
+        totalPages: {
+            get() { return activeSourceState().totalPages; },
+            set(value) { activeSourceState().totalPages = Number(value) || 1; }
+        },
+        totalCount: {
+            get() { return activeSourceState().totalCount; },
+            set(value) { activeSourceState().totalCount = Number(value) || 0; }
+        },
+        members: {
+            get() { return activeSourceState().members; },
+            set(value) { activeSourceState().members = Array.isArray(value) ? value : []; }
+        },
+        selectedIds: {
+            get() { return activeSourceState().selectedIds; },
+            set(value) { activeSourceState().selectedIds = value instanceof Set ? value : new Set(value || []); }
+        },
+        allFilteredSelected: {
+            get() { return activeSourceState().allFilteredSelected; },
+            set(value) { activeSourceState().allFilteredSelected = Boolean(value); }
+        },
+        selectionMode: {
+            get() { return activeSourceState().selectionMode; },
+            set(value) { activeSourceState().selectionMode = value || "ids"; }
+        },
+        loadingMembers: {
+            get() { return activeSourceState().loadingMembers; },
+            set(value) { activeSourceState().loadingMembers = Boolean(value); }
+        }
+    });
 
     function apiFetch(url, options) {
         if (window.CRM && typeof window.CRM.apiFetch === "function") {
@@ -136,11 +212,175 @@ document.addEventListener("DOMContentLoaded", () => {
         node.replaceChildren();
     }
 
+    function currentSourceLabel() {
+        return state.source === SOURCE_INVITATIONS ? "Invitation" : "Member";
+    }
+
+    function currentSourceLabelPlural() {
+        return state.source === SOURCE_INVITATIONS ? "Invitations" : "Members";
+    }
+
+    function currentSourceInputBundle() {
+        if (state.source === SOURCE_INVITATIONS) {
+            return {
+                searchName: bulkInvitationSearchName,
+                searchPhone: bulkInvitationSearchPhone,
+                usedBy: bulkInvitationUsedBy,
+                month: bulkInvitationMonth,
+                year: bulkInvitationYear
+            };
+        }
+        return {
+            searchId: bulkSearchId,
+            searchName: bulkSearchName,
+            searchPhone: bulkSearchPhone,
+            view: bulkViewFilter,
+            expiresWithin: bulkExpiresWithin,
+            month: bulkExpiresMonth,
+            year: bulkExpiresYear
+        };
+    }
+
+    function sourceQueryPath() {
+        return state.source === SOURCE_INVITATIONS ? "/crm/leads/bulk/invitations" : "/crm/leads/bulk/members";
+    }
+
+    function updateSourceSelector() {
+        if (bulkSourceMembersBtn) {
+            bulkSourceMembersBtn.classList.toggle("active", state.source === SOURCE_EXISTING_MEMBER);
+        }
+        if (bulkSourceInvitationsBtn) {
+            bulkSourceInvitationsBtn.classList.toggle("active", state.source === SOURCE_INVITATIONS);
+        }
+        if (selectionSectionTitle) {
+            selectionSectionTitle.textContent = state.source === SOURCE_INVITATIONS ? "Invitation Selection" : "Member Selection";
+        }
+        if (selectionSectionNote) {
+            selectionSectionNote.textContent = state.source === SOURCE_INVITATIONS
+                ? "Use filters or pick invitation candidates manually. Select-all-filtered uses the current filters and remains authoritative on preview."
+                : "Use filters or pick members manually. Select-all-filtered uses the current filters and remains authoritative on preview.";
+        }
+        if (memberFiltersPanel) {
+            setClassVisibility(memberFiltersPanel, state.source === SOURCE_EXISTING_MEMBER, "grid");
+        }
+        if (invitationFiltersPanel) {
+            setClassVisibility(invitationFiltersPanel, state.source === SOURCE_INVITATIONS, "grid");
+        }
+        if (bulkReloadMembersBtn) {
+            bulkReloadMembersBtn.textContent = state.source === SOURCE_INVITATIONS ? "Refresh Invitations" : "Refresh Members";
+        }
+    }
+
+    function updateTableHeader() {
+        if (!bulkMembersTableHead) return;
+        clearNode(bulkMembersTableHead);
+        const tr = document.createElement("tr");
+        const headers = state.source === SOURCE_INVITATIONS
+            ? ["Sel", "Friend Name", "Phone", "Email", "Inviter Name", "Used By", "Used Date"]
+            : ["Sel", "Member ID", "Name", "Phone", "Package", "End Date", "Status", "CRM"];
+        headers.forEach((header) => {
+            const th = document.createElement("th");
+            th.textContent = header;
+            if (header === "Sel") {
+                th.style.width = "54px";
+            }
+            tr.appendChild(th);
+        });
+        bulkMembersTableHead.appendChild(tr);
+    }
+
+    function updateBrowserSourceParam(nextSource, previewToken) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("preview_token");
+        if (nextSource && nextSource !== SOURCE_EXISTING_MEMBER) {
+            url.searchParams.set("source", nextSource);
+        } else {
+            url.searchParams.delete("source");
+        }
+        if (previewToken) {
+            url.searchParams.set("preview_token", previewToken);
+        }
+        window.history.replaceState({}, "", url.toString());
+    }
+
+    function sourceFromLocation() {
+        const params = new URLSearchParams(window.location.search);
+        const raw = params.get("source");
+        return raw === SOURCE_INVITATIONS ? SOURCE_INVITATIONS : SOURCE_EXISTING_MEMBER;
+    }
+
+    function applyFiltersToInputs(source, filters) {
+        const sourceKey = source === SOURCE_INVITATIONS ? SOURCE_INVITATIONS : SOURCE_EXISTING_MEMBER;
+        const payload = filters || {};
+        if (sourceKey === SOURCE_INVITATIONS) {
+            if (bulkInvitationSearchName) bulkInvitationSearchName.value = payload.search_name || "";
+            if (bulkInvitationSearchPhone) bulkInvitationSearchPhone.value = payload.search_phone || "";
+            if (bulkInvitationUsedBy) bulkInvitationUsedBy.value = payload.used_by || "";
+            if (bulkInvitationMonth) bulkInvitationMonth.value = payload.invitation_month || "";
+            if (bulkInvitationYear) bulkInvitationYear.value = payload.invitation_year || "";
+            return;
+        }
+        if (bulkSearchId) bulkSearchId.value = payload.search_id || "";
+        if (bulkSearchName) bulkSearchName.value = payload.search_name || "";
+        if (bulkSearchPhone) bulkSearchPhone.value = payload.search_phone || "";
+        if (bulkViewFilter) bulkViewFilter.value = payload.view || "all";
+        if (bulkExpiresWithin) bulkExpiresWithin.value = payload.expires_within || "";
+        if (bulkExpiresMonth) bulkExpiresMonth.value = payload.expires_month || "";
+        if (bulkExpiresYear) bulkExpiresYear.value = payload.expires_year || "";
+    }
+
+    function normalizeSourceState(source) {
+        const normalized = source === SOURCE_INVITATIONS ? SOURCE_INVITATIONS : SOURCE_EXISTING_MEMBER;
+        return state.sourceState[normalized] || state.sourceState[SOURCE_EXISTING_MEMBER];
+    }
+
+    function setActiveSource(source, options = {}) {
+        const normalized = source === SOURCE_INVITATIONS ? SOURCE_INVITATIONS : SOURCE_EXISTING_MEMBER;
+        state.source = normalized;
+        updateSourceSelector();
+        updateTableHeader();
+        syncPaginationButtons();
+        if (!options.keepPreview) {
+            resetPreviewState();
+            clearExecutionFeedback();
+        }
+        updateSelectionSummary();
+        updateDistributionEstimate();
+        if (!state.previewToken && previewSource) {
+            previewSource.textContent = state.source;
+        }
+        if (options.updateUrl !== false) {
+            updateBrowserSourceParam(normalized, options.previewToken || "");
+        }
+    }
+
+    function activeSelectionPayload() {
+        if (state.source === SOURCE_INVITATIONS) {
+            return Array.from(state.selectedIds)
+                .map((value) => String(value).trim())
+                .filter(Boolean)
+                .sort((a, b) => a.localeCompare(b));
+        }
+        return Array.from(state.selectedIds)
+            .map((value) => Number(value))
+            .filter((value) => !Number.isNaN(value))
+            .sort((a, b) => a - b);
+    }
+
     function sortedSelectedEmployeeIds() {
         return Array.from(state.selectedEmployeeIds).sort((a, b) => a - b);
     }
 
     function currentFilters() {
+        if (state.source === SOURCE_INVITATIONS) {
+            return {
+                search_name: bulkInvitationSearchName ? bulkInvitationSearchName.value.trim() : "",
+                search_phone: bulkInvitationSearchPhone ? bulkInvitationSearchPhone.value.trim() : "",
+                used_by: bulkInvitationUsedBy ? bulkInvitationUsedBy.value.trim() : "",
+                invitation_month: bulkInvitationMonth ? bulkInvitationMonth.value || "" : "",
+                invitation_year: bulkInvitationYear ? bulkInvitationYear.value || "" : ""
+            };
+        }
         return {
             view: bulkViewFilter ? bulkViewFilter.value || "all" : "all",
             expires_within: bulkExpiresWithin ? bulkExpiresWithin.value || "" : "",
@@ -179,7 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (state.allFilteredSelected) {
             return "All Filtered";
         }
-        return "Explicit IDs";
+        return state.source === SOURCE_INVITATIONS ? "Explicit Keys" : "Explicit IDs";
     }
 
     function updateSelectionSummary() {
@@ -203,16 +443,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (state.allFilteredSelected) {
-            setNotice(selectionInfo, `All ${state.totalCount || 0} members matching the current filters are selected.`, "success");
+            setNotice(selectionInfo, `All ${state.totalCount || 0} ${currentSourceLabelPlural().toLowerCase()} matching the current filters are selected.`, "success");
             return;
         }
 
         if (state.selectedIds.size > 0) {
-            setNotice(selectionInfo, `${state.selectedIds.size} member(s) selected across pages.`, "success");
+            const selectedLabel = state.source === SOURCE_INVITATIONS ? "candidate(s)" : "member(s)";
+            setNotice(selectionInfo, `${state.selectedIds.size} ${selectedLabel} selected across pages.`, "success");
             return;
         }
 
-        setNotice(selectionInfo, "No members selected yet.", "warning");
+        setNotice(selectionInfo, `No ${currentSourceLabelPlural().toLowerCase()} selected yet.`, "warning");
     }
 
     function updateOperationBadge() {
@@ -253,6 +494,11 @@ document.addEventListener("DOMContentLoaded", () => {
             bulkExpiresWithin,
             bulkExpiresMonth,
             bulkExpiresYear,
+            bulkInvitationSearchName,
+            bulkInvitationSearchPhone,
+            bulkInvitationUsedBy,
+            bulkInvitationMonth,
+            bulkInvitationYear,
             bulkReloadMembersBtn,
             selectVisibleBtn,
             clearVisibleBtn,
@@ -281,11 +527,18 @@ document.addEventListener("DOMContentLoaded", () => {
         state.previewToken = serverState && serverState.preview_token ? serverState.preview_token : "";
         state.status = serverState ? serverState.status : null;
         state.previewExecution = serverState ? (serverState.execution || null) : null;
+        if (snapshot.source) {
+            state.source = snapshot.source === SOURCE_INVITATIONS ? SOURCE_INVITATIONS : SOURCE_EXISTING_MEMBER;
+        }
         state.distributionMode = (snapshot.distribution || {}).mode || "unassigned";
 
         if (snapshot.selection && snapshot.selection.mode === "ids") {
             state.selectionMode = "ids";
-            state.selectedIds = new Set(snapshot.selection.selected_member_ids || []);
+            if (state.source === SOURCE_INVITATIONS) {
+                state.selectedIds = new Set((snapshot.selection.selected_candidate_keys || snapshot.selection.candidate_keys || snapshot.selection.selected_member_ids || []).map((value) => String(value)));
+            } else {
+                state.selectedIds = new Set((snapshot.selection.selected_member_ids || []).map((value) => String(value)));
+            }
             state.allFilteredSelected = false;
         } else if (snapshot.selection && snapshot.selection.mode === "filters") {
             state.selectionMode = "filters";
@@ -297,6 +550,9 @@ document.addEventListener("DOMContentLoaded", () => {
             state.selectedEmployeeIds = new Set(snapshot.distribution.user_ids || []);
         } else {
             state.selectedEmployeeIds = new Set();
+        }
+        if (snapshot.selection && snapshot.selection.filters) {
+            applyFiltersToInputs(state.source, snapshot.selection.filters);
         }
 
         if (previewTokenDebug) {
@@ -310,6 +566,8 @@ document.addEventListener("DOMContentLoaded", () => {
             renderExecutionResult(state.previewExecution);
         }
 
+        updateSourceSelector();
+        updateTableHeader();
         setLockedUi(Boolean(state.previewToken));
         updatePreviewLockNotice();
         updateOperationBadge();
@@ -385,7 +643,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         distributionEstimate.replaceChildren();
         const intro = document.createElement("div");
-        intro.textContent = `Estimated split for ${selected} selected member(s):`;
+        intro.textContent = `Estimated split for ${selected} selected ${currentSourceLabelPlural().toLowerCase()}:`;
         distributionEstimate.appendChild(intro);
         const list = document.createElement("div");
         list.className = "summary-list";
@@ -607,6 +865,11 @@ document.addEventListener("DOMContentLoaded", () => {
     function setMembersLoading(isLoading) {
         state.loadingMembers = isLoading;
         setClassVisibility(membersLoading, isLoading, "block");
+        if (membersLoading) {
+            membersLoading.textContent = isLoading
+                ? `Loading ${currentSourceLabelPlural().toLowerCase()}...`
+                : `No ${currentSourceLabelPlural().toLowerCase()} loaded yet.`;
+        }
         if (bulkMembersTable && isLoading) {
             setClassVisibility(bulkMembersTable, false);
         }
@@ -622,6 +885,49 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderMembers(items) {
         if (!bulkMembersTableBody || !bulkMembersTable) return;
         clearNode(bulkMembersTableBody);
+        if (state.source === SOURCE_INVITATIONS) {
+            items.forEach((candidate) => {
+                const tr = document.createElement("tr");
+                const checkboxCell = document.createElement("td");
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.value = String(candidate.candidate_key || "");
+                checkbox.checked = state.allFilteredSelected || state.selectedIds.has(String(candidate.candidate_key || ""));
+                checkbox.disabled = state.locked || state.allFilteredSelected;
+                checkbox.addEventListener("change", () => {
+                    const key = String(candidate.candidate_key || "");
+                    if (checkbox.checked) {
+                        state.selectedIds.add(key);
+                    } else {
+                        state.selectedIds.delete(key);
+                    }
+                    state.selectionMode = "ids";
+                    state.allFilteredSelected = false;
+                    updateSelectionSummary();
+                    updateDistributionEstimate();
+                });
+                checkboxCell.appendChild(checkbox);
+                tr.appendChild(checkboxCell);
+
+                [
+                    candidate.name || "",
+                    candidate.phone || "",
+                    candidate.email || "",
+                    candidate.inviter_name || "",
+                    candidate.used_by || "",
+                    candidate.used_date || ""
+                ].forEach((value) => {
+                    const td = document.createElement("td");
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                tr.dataset.candidateKey = String(candidate.candidate_key || "");
+                bulkMembersTableBody.appendChild(tr);
+            });
+            setClassVisibility(bulkMembersTable, true, "table");
+            return;
+        }
         items.forEach((member) => {
             const tr = document.createElement("tr");
             const hasActiveLead = Boolean(member.has_active_crm_lead);
@@ -629,13 +935,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.value = String(member.id);
-            checkbox.checked = state.allFilteredSelected || state.selectedIds.has(Number(member.id));
+            checkbox.checked = state.allFilteredSelected || state.selectedIds.has(String(member.id));
             checkbox.disabled = state.locked || hasActiveLead || state.allFilteredSelected;
             checkbox.addEventListener("change", () => {
                 if (checkbox.checked) {
-                    state.selectedIds.add(Number(member.id));
+                    state.selectedIds.add(String(member.id));
                 } else {
-                    state.selectedIds.delete(Number(member.id));
+                    state.selectedIds.delete(String(member.id));
                 }
                 state.selectionMode = "ids";
                 state.allFilteredSelected = false;
@@ -681,14 +987,14 @@ document.addEventListener("DOMContentLoaded", () => {
         setMembersLoading(true);
         clearMembersError();
         try {
-            const response = await apiFetch(`/crm/leads/bulk/members?${buildMembersQuery(state.page)}`, { method: "GET" });
+            const response = await apiFetch(`${sourceQueryPath()}?${buildMembersQuery(state.page)}`, { method: "GET" });
             const data = await response.json();
             if (!response.ok) {
-                throw new Error((data && data.message) ? data.message : "Failed to load members.");
+                throw new Error((data && data.message) ? data.message : `Failed to load ${currentSourceLabelPlural().toLowerCase()}.`);
             }
             state.members = data.items || [];
-            state.totalCount = Number(data.total_count || 0);
-            state.totalPages = Number(data.total_pages || 1);
+            state.totalCount = Number(data.total_count ?? data.total ?? 0);
+            state.totalPages = Number(data.total_pages ?? data.pages ?? 1);
             if (membersPageIndicator) {
                 membersPageIndicator.textContent = `Page ${state.page} of ${state.totalPages}`;
             }
@@ -703,7 +1009,7 @@ document.addEventListener("DOMContentLoaded", () => {
             updateDistributionEstimate();
         } catch (error) {
             if (membersError) {
-                membersError.textContent = error && error.message ? error.message : "Failed to load members.";
+                membersError.textContent = error && error.message ? error.message : `Failed to load ${currentSourceLabelPlural().toLowerCase()}.`;
                 setClassVisibility(membersError, true, "block");
             }
         } finally {
@@ -723,6 +1029,12 @@ document.addEventListener("DOMContentLoaded", () => {
         state.previewState = null;
         state.previewExecution = null;
         state.status = null;
+        if (previewSource) previewSource.textContent = state.source || SOURCE_EXISTING_MEMBER;
+        if (previewSelected) previewSelected.textContent = "0";
+        if (previewEligible) previewEligible.textContent = "0";
+        if (previewSkipped) previewSkipped.textContent = "0";
+        if (previewMissing) previewMissing.textContent = "0";
+        if (previewPlanCount) previewPlanCount.textContent = "0";
         if (previewTokenDebug) {
             previewTokenDebug.textContent = "";
         }
@@ -757,16 +1069,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function collectPreviewPayload() {
         const filters = currentFilters();
-        const selection = state.allFilteredSelected
-            ? { mode: "filters", filters: normalizeFilterPayload(filters) }
-            : { mode: "ids", member_ids: Array.from(state.selectedIds).sort((a, b) => a - b) };
+        let selection = null;
+        if (state.allFilteredSelected) {
+            selection = { mode: "filters", filters: normalizeFilterPayload(filters) };
+        } else if (state.source === SOURCE_INVITATIONS) {
+            selection = { mode: "ids", candidate_keys: activeSelectionPayload() };
+        } else {
+            selection = { mode: "ids", member_ids: activeSelectionPayload() };
+        }
         const distribution = state.distributionMode === "equal"
             ? { mode: "equal", user_ids: sortedSelectedEmployeeIds() }
             : { mode: "unassigned" };
         return {
             selection,
             distribution,
-            source: "EXISTING_MEMBER"
+            source: state.source
         };
     }
 
@@ -779,7 +1096,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         const selectedCountValue = effectiveSelectedCount();
         if (selectedCountValue <= 0) {
-            setExecutionFeedback("Select at least one member before previewing.", "error");
+            setExecutionFeedback(`Select at least one ${currentSourceLabel().toLowerCase()} before previewing.`, "error");
             return;
         }
         if (state.distributionMode === "equal" && canAssign && state.selectedEmployeeIds.size === 0) {
@@ -804,7 +1121,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!response.ok) {
                 throw new Error((data && data.message) ? data.message : "Preview failed.");
             }
-            const nextUrl = `/crm/leads/bulk?preview_token=${encodeURIComponent(data.preview_token)}`;
+            const nextUrl = `/crm/leads/bulk?preview_token=${encodeURIComponent(data.preview_token)}${state.source === SOURCE_INVITATIONS ? `&source=${encodeURIComponent(state.source)}` : ""}`;
             window.location.href = nextUrl;
         } catch (error) {
             setExecutionFeedback(error && error.message ? error.message : "Preview failed.", "error");
@@ -923,31 +1240,46 @@ document.addEventListener("DOMContentLoaded", () => {
                 input.addEventListener("change", handler);
             }
         });
+        [bulkInvitationSearchName, bulkInvitationSearchPhone, bulkInvitationUsedBy].forEach((input) => {
+            if (input) {
+                input.addEventListener("input", debouncedHandler);
+            }
+        });
+        [bulkInvitationMonth, bulkInvitationYear].forEach((input) => {
+            if (input) {
+                input.addEventListener("change", handler);
+            }
+        });
     }
 
-    function populateExpiryYearOptions() {
-        if (!bulkExpiresYear) return;
+    function populateYearOptions(selectEl) {
+        if (!selectEl) return;
         const currentYear = new Date().getFullYear();
         const startYear = currentYear - 3;
         const endYear = currentYear + 5;
-        const existingValue = bulkExpiresYear.value;
-        bulkExpiresYear.replaceChildren();
+        const existingValue = selectEl.value;
+        selectEl.replaceChildren();
 
         const anyOption = document.createElement("option");
         anyOption.value = "";
         anyOption.textContent = "Any";
-        bulkExpiresYear.appendChild(anyOption);
+        selectEl.appendChild(anyOption);
 
         for (let year = startYear; year <= endYear; year += 1) {
             const option = document.createElement("option");
             option.value = String(year);
             option.textContent = String(year);
-            bulkExpiresYear.appendChild(option);
+            selectEl.appendChild(option);
         }
 
         if (existingValue) {
-            bulkExpiresYear.value = existingValue;
+            selectEl.value = existingValue;
         }
+    }
+
+    function populateExpiryYearOptions() {
+        populateYearOptions(bulkExpiresYear);
+        populateYearOptions(bulkInvitationYear);
     }
 
     function wireDistributionHandlers() {
@@ -977,8 +1309,12 @@ document.addEventListener("DOMContentLoaded", () => {
             selectVisibleBtn.addEventListener("click", () => {
                 if (state.locked || state.allFilteredSelected) return;
                 state.members.forEach((member) => {
-                    if (!member.has_active_crm_lead) {
-                        state.selectedIds.add(Number(member.id));
+                    if (state.source === SOURCE_INVITATIONS) {
+                        if (member.candidate_key) {
+                            state.selectedIds.add(String(member.candidate_key));
+                        }
+                    } else if (!member.has_active_crm_lead) {
+                        state.selectedIds.add(String(member.id));
                     }
                 });
                 state.selectionMode = "ids";
@@ -992,7 +1328,11 @@ document.addEventListener("DOMContentLoaded", () => {
             clearVisibleBtn.addEventListener("click", () => {
                 if (state.locked || state.allFilteredSelected) return;
                 state.members.forEach((member) => {
-                    state.selectedIds.delete(Number(member.id));
+                    if (state.source === SOURCE_INVITATIONS) {
+                        state.selectedIds.delete(String(member.candidate_key || ""));
+                    } else {
+                        state.selectedIds.delete(String(member.id));
+                    }
                 });
                 state.selectionMode = "ids";
                 updateSelectionSummary();
@@ -1019,6 +1359,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 resetSelectionState();
                 renderMembers(state.members);
                 updateDistributionEstimate();
+            });
+        }
+    }
+
+    function wireSourceHandlers() {
+        if (bulkSourceMembersBtn) {
+            bulkSourceMembersBtn.addEventListener("click", () => {
+                if (state.source === SOURCE_EXISTING_MEMBER) return;
+                setActiveSource(SOURCE_EXISTING_MEMBER, { keepPreview: false, updateUrl: true });
+                loadMembers(1).then(() => {
+                    renderCurrentPage();
+                });
+            });
+        }
+        if (bulkSourceInvitationsBtn) {
+            bulkSourceInvitationsBtn.addEventListener("click", () => {
+                if (state.source === SOURCE_INVITATIONS) return;
+                setActiveSource(SOURCE_INVITATIONS, { keepPreview: false, updateUrl: true });
+                loadMembers(1).then(() => {
+                    renderCurrentPage();
+                });
             });
         }
     }
@@ -1053,7 +1414,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (newPreviewBtn) {
             newPreviewBtn.addEventListener("click", () => {
-                window.location.href = "/crm/leads/bulk";
+                const nextUrl = new URL("/crm/leads/bulk", window.location.origin);
+                if (state.source === SOURCE_INVITATIONS) {
+                    nextUrl.searchParams.set("source", SOURCE_INVITATIONS);
+                }
+                window.location.href = nextUrl.toString();
             });
         }
     }
@@ -1070,72 +1435,82 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function applyInitialState() {
-        if (!initialState || !initialState.preview_token) {
+        const urlSource = sourceFromLocation();
+        if (initialState && initialState.preview_token) {
+            state.previewToken = initialState.preview_token || "";
+            state.status = initialState.status || null;
+            state.previewState = initialState;
+            state.previewExecution = initialState.execution || null;
+            if (previewTokenDebug) {
+                previewTokenDebug.textContent = state.previewToken;
+            }
+
+            const snapshot = initialState.snapshot || {};
+            state.source = snapshot.source === SOURCE_INVITATIONS ? SOURCE_INVITATIONS : SOURCE_EXISTING_MEMBER;
+            setActiveSource(state.source, { keepPreview: true, updateUrl: false });
+            state.distributionMode = (snapshot.distribution || {}).mode || "unassigned";
+            if (snapshot.selection && snapshot.selection.mode === "ids") {
+                state.selectionMode = "ids";
+                if (state.source === SOURCE_INVITATIONS) {
+                    state.selectedIds = new Set((snapshot.selection.selected_candidate_keys || snapshot.selection.candidate_keys || []).map((value) => String(value)));
+                } else {
+                    state.selectedIds = new Set((snapshot.selection.selected_member_ids || []).map((value) => String(value)));
+                }
+                state.allFilteredSelected = false;
+            } else if (snapshot.selection && snapshot.selection.mode === "filters") {
+                state.selectionMode = "filters";
+                state.allFilteredSelected = true;
+                state.selectedIds = new Set();
+            }
+            if (snapshot.distribution && snapshot.distribution.mode === "equal") {
+                state.selectedEmployeeIds = new Set(snapshot.distribution.user_ids || []);
+            }
+            if (snapshot.selection && snapshot.selection.filters) {
+                applyFiltersToInputs(state.source, snapshot.selection.filters);
+            }
+
             updateOperationBadge();
+            setLockedUi(true);
+            syncDistributionRadiosFromState();
+            setClassVisibility(previewLockedNotice, true, "block");
+            updatePreviewLockNotice();
             updateSelectionSummary();
             updateConfirmState();
+            updateDistributionEstimate();
+            if (initialState.summary) {
+                renderPreviewSummary(initialState.summary);
+            }
+            if (initialState.execution) {
+                renderExecutionResult(initialState.execution);
+                if (state.status === "COMPLETED") {
+                    setExecutionFeedback(`Bulk execution completed. Created ${String(initialState.execution.created ?? 0)} lead(s), skipped ${String(initialState.execution.skipped ?? 0)}.`, "success");
+                } else if (state.status === "FAILED") {
+                    setExecutionFeedback("Bulk execution failed.", "error");
+                }
+            }
+            if (state.status === "PREVIEW" && state.previewState && state.previewState.summary) {
+                const requiresAssign = state.previewState.summary.distribution_mode === "equal" && !canAssign;
+                confirmBulkBtn.disabled = Boolean(requiresAssign);
+            }
+            if (state.status === "COMPLETED") {
+                confirmBulkBtn.disabled = true;
+                confirmBulkBtn.textContent = "Completed";
+                newPreviewBtn.disabled = false;
+            }
+            if (state.status === "FAILED") {
+                confirmBulkBtn.disabled = true;
+                newPreviewBtn.disabled = false;
+            }
+            updateSourceSelector();
+            updateTableHeader();
             return;
         }
 
-        state.previewToken = initialState.preview_token || "";
-        state.status = initialState.status || null;
-        state.previewState = initialState;
-        state.previewExecution = initialState.execution || null;
-        if (previewTokenDebug) {
-            previewTokenDebug.textContent = state.previewToken;
-        }
-
-        const snapshot = initialState.snapshot || {};
-        state.distributionMode = (snapshot.distribution || {}).mode || "unassigned";
-        if (snapshot.selection && snapshot.selection.mode === "ids") {
-            state.selectionMode = "ids";
-            state.selectedIds = new Set(snapshot.selection.selected_member_ids || []);
-            state.allFilteredSelected = false;
-        } else if (snapshot.selection && snapshot.selection.mode === "filters") {
-            state.selectionMode = "filters";
-            state.allFilteredSelected = true;
-            state.selectedIds = new Set();
-        }
-        if (snapshot.distribution && snapshot.distribution.mode === "equal") {
-            state.selectedEmployeeIds = new Set(snapshot.distribution.user_ids || []);
-        }
-
+        state.source = urlSource;
+        setActiveSource(state.source, { keepPreview: true, updateUrl: false });
         updateOperationBadge();
-        setLockedUi(true);
-        syncDistributionRadiosFromState();
-        setClassVisibility(previewLockedNotice, true, "block");
-        updatePreviewLockNotice();
         updateSelectionSummary();
         updateConfirmState();
-        updateDistributionEstimate();
-        if (initialState.summary) {
-            renderPreviewSummary(initialState.summary);
-        }
-        if (initialState.execution) {
-            renderExecutionResult(initialState.execution);
-            if (state.status === "COMPLETED") {
-                setExecutionFeedback(`Bulk execution completed. Created ${String(initialState.execution.created ?? 0)} lead(s), skipped ${String(initialState.execution.skipped ?? 0)}.`, "success");
-            } else if (state.status === "FAILED") {
-                setExecutionFeedback("Bulk execution failed.", "error");
-            }
-        }
-        if (state.status === "PREVIEW" && state.previewState && state.previewState.summary) {
-            const requiresAssign = state.previewState.summary.distribution_mode === "equal" && !canAssign;
-            if (requiresAssign) {
-                confirmBulkBtn.disabled = true;
-            } else {
-                confirmBulkBtn.disabled = false;
-            }
-        }
-        if (state.status === "COMPLETED") {
-            confirmBulkBtn.disabled = true;
-            confirmBulkBtn.textContent = "Completed";
-            newPreviewBtn.disabled = false;
-        }
-        if (state.status === "FAILED") {
-            confirmBulkBtn.disabled = true;
-            newPreviewBtn.disabled = false;
-        }
     }
 
     function showPermissionState() {
@@ -1148,6 +1523,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderCurrentPage() {
+        updateSourceSelector();
+        updateTableHeader();
         syncPaginationButtons();
         renderMembers(state.members);
         updateSelectionSummary();
@@ -1158,6 +1535,7 @@ document.addEventListener("DOMContentLoaded", () => {
     populateExpiryYearOptions();
     wireFilterChangeHandlers();
     wireSelectionHandlers();
+    wireSourceHandlers();
     wireDistributionHandlers();
     wirePaginationHandlers();
     wireActionHandlers();

@@ -365,6 +365,17 @@
             cursor: pointer;
             flex: 1;
         }
+        .source-toggle {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .source-toggle .btn.active {
+            background: linear-gradient(135deg, #4caf50, #66d66a);
+            color: white;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.28);
+        }
         .small-note {
             color: #aaa;
             font-size: 13px;
@@ -391,7 +402,7 @@
         <header>
             <div>
                 <h1 class="title">Bulk CRM Leads</h1>
-                <div class="subtitle">Select members, preview a frozen plan, then execute bulk lead creation safely.</div>
+                <div class="subtitle">Select members or invitations, preview a frozen plan, then execute bulk lead creation safely.</div>
             </div>
             <div class="header-actions">
                 {% if user_permissions.get('super_admin') or user_permissions.get('crm_view') %}
@@ -409,15 +420,15 @@
         {% endif %}
 
         <div id="bulkNotice" class="notice" style="margin-bottom: 18px;">
-            Build your selection below. Preview freezes the current member and employee plan until you execute or create a new preview.
+            Build your selection below. Preview freezes the current candidate and employee plan until you execute or create a new preview.
         </div>
 
         <div class="workspace">
             <section class="card" style="grid-column: 1 / -1;">
                 <div class="section-head">
                     <div>
-                        <h2 style="margin-bottom: 4px;">Member Selection</h2>
-                        <div class="small-note">Use filters or pick members manually. Select-all-filtered uses the current filters and remains authoritative on preview.</div>
+                        <h2 id="selectionSectionTitle" style="margin-bottom: 4px;">Member Selection</h2>
+                        <div id="selectionSectionNote" class="small-note">Use filters or pick members manually. Select-all-filtered uses the current filters and remains authoritative on preview.</div>
                     </div>
                     <div class="status-line">
                         <span class="count-pill">Selected: <span id="selectedCount">0</span></span>
@@ -426,7 +437,12 @@
                     </div>
                 </div>
 
-                <div class="subgrid" style="margin-bottom: 14px;">
+                <div class="source-toggle" style="margin-bottom: 14px;">
+                    <button type="button" id="bulkSourceMembersBtn" class="btn btn-secondary active">Existing Members</button>
+                    <button type="button" id="bulkSourceInvitationsBtn" class="btn btn-secondary">Invitations</button>
+                </div>
+
+                <div id="memberFiltersPanel" class="subgrid" style="margin-bottom: 14px;">
                     <div class="field">
                         <label for="bulkSearchId">Member ID</label>
                         <input id="bulkSearchId" type="text" placeholder="Search by member ID">
@@ -482,6 +498,45 @@
                     </div>
                 </div>
 
+                <div id="invitationFiltersPanel" class="subgrid hidden" style="margin-bottom: 14px;">
+                    <div class="field">
+                        <label for="bulkInvitationSearchName">Friend Name</label>
+                        <input id="bulkInvitationSearchName" type="text" placeholder="Search by friend name">
+                    </div>
+                    <div class="field">
+                        <label for="bulkInvitationSearchPhone">Friend Phone</label>
+                        <input id="bulkInvitationSearchPhone" type="text" placeholder="Search by friend phone">
+                    </div>
+                    <div class="field">
+                        <label for="bulkInvitationUsedBy">Used By</label>
+                        <input id="bulkInvitationUsedBy" type="text" placeholder="Search by used by">
+                    </div>
+                    <div class="field">
+                        <label for="bulkInvitationMonth">Invitation Month</label>
+                        <select id="bulkInvitationMonth">
+                            <option value="">Any</option>
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="bulkInvitationYear">Invitation Year</label>
+                        <select id="bulkInvitationYear">
+                            <option value="">Any</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="toolbar">
                     <div class="toolbar-group">
                         <button type="button" id="bulkReloadMembersBtn" class="btn btn-secondary">Refresh Members</button>
@@ -501,18 +556,7 @@
                     <div id="membersLoading" class="notice" style="margin: 14px;">Loading members...</div>
                     <div id="membersError" class="notice error hidden" style="margin: 14px;"></div>
                     <table id="bulkMembersTable" class="hidden">
-                        <thead>
-                            <tr>
-                                <th style="width: 54px;">Sel</th>
-                                <th>Member ID</th>
-                                <th>Name</th>
-                                <th>Phone</th>
-                                <th>Package</th>
-                                <th>End Date</th>
-                                <th>Status</th>
-                                <th>CRM</th>
-                            </tr>
-                        </thead>
+                        <thead id="bulkMembersTableHead"></thead>
                         <tbody id="bulkMembersTableBody"></tbody>
                     </table>
                 </div>
