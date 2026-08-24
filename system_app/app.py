@@ -394,6 +394,7 @@ from .queries import (
     get_attendance_backup_runs
 )
 from .queries import delete_all_data as delete_all_data_from_db
+from .private_training import ensure_private_training_tables
 
 # ==============================================================================
 # Environment Safety Guards and Startup Print Information
@@ -440,6 +441,11 @@ if not is_production or os.environ.get('RUN_DB_MIGRATIONS', '').lower() == 'true
         except Exception as e:
             print(f"Warning: Could not create tables on startup: {e}")
             print("Tables may already exist or database connection failed.")
+        try:
+            ensure_private_training_tables()
+        except Exception as e:
+            print(f"Warning: Could not create private training tables on startup: {e}")
+            print("Private training tables may already exist or database connection failed.")
 
 # Initialize scheduler for daily updates at midnight
 if os.environ.get('RUN_SCHEDULER', '').lower() == 'true':
@@ -965,7 +971,12 @@ def user_permissions():
         ('crm_campaigns', 'CRM - Manage CRM Campaigns'),
         ('crm_bulk_leads', 'CRM - Bulk Leads'),
     ]
-    all_permissions = general_permissions + crm_permissions
+    private_training_permissions = [
+        ('private_training_view', 'Private Training - View'),
+        ('private_training_manage', 'Private Training - Manage'),
+        ('private_training_trainer', 'Private Training - Trainer'),
+    ]
+    all_permissions = general_permissions + crm_permissions + private_training_permissions
 
     if request.method == 'POST':
         user_id = request.form.get('user_id')
