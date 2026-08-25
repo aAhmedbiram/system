@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Private Subscription - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .page { max-width: 1180px; margin: 0 auto; padding: 24px; }
+        .panel {
+            background: rgba(20, 20, 30, 0.88);
+            border: 1px solid rgba(76, 175, 80, 0.25);
+            border-radius: 16px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+            backdrop-filter: blur(16px);
+            padding: 22px;
+        }
+        h1 { margin: 0 0 10px 0; color: #7bff88; }
+        .muted { color: #aeb4c5; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .btn {
+            display: inline-block;
+            padding: 11px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            border: 0;
+            cursor: pointer;
+        }
+        .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+        form { margin-top: 18px; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        label { display: block; font-weight: 700; margin-bottom: 6px; color: #cfe8d1; }
+        select, input[type="text"], input[type="number"], input[type="date"] {
+            width: 100%;
+            padding: 11px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(0,0,0,0.25);
+            color: #fff;
+        }
+        .full { grid-column: 1 / -1; }
+        .flash-message { margin: 0 0 12px 0; padding: 12px 14px; border-radius: 10px; }
+        .flash-message.success { background: rgba(76, 175, 80, 0.15); border: 1px solid rgba(76, 175, 80, 0.3); }
+        .flash-message.error { background: rgba(244, 67, 54, 0.15); border: 1px solid rgba(244, 67, 54, 0.3); }
+        .search-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 16px;
+        }
+        .small { font-size: 13px; color: #aeb4c5; }
+        @media (max-width: 720px) {
+            .grid, .search-row { grid-template-columns: 1fr; }
+            .page { padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+            <div class="flash-message {{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="panel">
+            <h1>New Private Subscription</h1>
+            <div class="muted">Sales creates the subscription here and assigns the trainer immediately.</div>
+            <div class="actions">
+                <a class="btn btn-secondary" href="{{ url_for('private_training.subscription_list') }}">Back to List</a>
+                <a class="btn btn-secondary" href="{{ url_for('index') }}">Back Home</a>
+            </div>
+
+            <form method="get" action="{{ url_for('private_training.new_subscription') }}">
+                <div class="search-row">
+                    <div>
+                        <label for="q">Search Members</label>
+                        <input type="text" id="q" name="q" value="{{ member_query or '' }}" placeholder="Search by member ID, name, phone, or package">
+                    </div>
+                    <div>
+                        <button class="btn btn-secondary" type="submit">Search</button>
+                    </div>
+                </div>
+            </form>
+
+            <form method="post" action="{{ url_for('private_training.create_subscription') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="member_query" value="{{ member_query or '' }}">
+                <div class="grid">
+                    <div class="full">
+                        <label for="member_id">Member</label>
+                        <select id="member_id" name="member_id" required>
+                            <option value="">Select a member</option>
+                            {% for member in members %}
+                                <option value="{{ member.id }}" {% if selected_member_id and selected_member_id|int == member.id %}selected{% endif %}>
+                                    {{ member.id }} - {{ member.name }} {% if member.phone %}({{ member.phone }}){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="small">Use search above to narrow the list.</div>
+                    </div>
+                    <div class="full">
+                        <label for="trainer_user_id">Trainer</label>
+                        <select id="trainer_user_id" name="trainer_user_id" required>
+                            <option value="">Select a trainer</option>
+                            {% for trainer in trainers %}
+                                <option value="{{ trainer.id }}" {% if form_data.trainer_user_id and form_data.trainer_user_id|int == trainer.id %}selected{% endif %}>
+                                    {{ trainer.username }} {% if trainer.email %}({{ trainer.email }}){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="total_sessions">Total Sessions</label>
+                        <input type="number" id="total_sessions" name="total_sessions" min="1" step="1" required value="{{ form_data.total_sessions or '' }}">
+                    </div>
+                    <div>
+                        <label for="private_start_date">Private Start Date</label>
+                        <input type="date" id="private_start_date" name="private_start_date" required value="{{ form_data.private_start_date or '' }}">
+                    </div>
+                    <div class="full">
+                        <label for="private_expiry_date">Private Expiry Date</label>
+                        <input type="date" id="private_expiry_date" name="private_expiry_date" required value="{{ form_data.private_expiry_date or '' }}">
+                    </div>
+                    <div class="full">
+                        <button class="btn btn-primary" type="submit">Create Private Subscription</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

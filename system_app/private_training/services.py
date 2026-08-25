@@ -137,7 +137,7 @@ def _load_trainer_user(trainer_user_id: int) -> dict[str, Any]:
         raise PrivateTrainingInvalidTrainerError("Trainer user does not exist")
     if not is_approved_user(user):
         raise PrivateTrainingInvalidTrainerError("Trainer user is not approved")
-    if not (is_super_user(user) or can_train_private_training(user)):
+    if not can_train_private_training(user):
         raise PrivateTrainingInvalidTrainerError("Trainer user does not have private_training_trainer permission")
     return user
 
@@ -295,11 +295,12 @@ def list_private_clients_for_trainer(current_user: dict[str, Any]) -> list[dict[
     if not (
         is_super_user(current_user)
         or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW)
+        or can_manage_private_training(current_user)
         or can_train_private_training(current_user)
     ):
         raise PrivateTrainingForbiddenError("Current user cannot view private training subscriptions")
 
-    if is_super_user(current_user) or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW):
+    if is_super_user(current_user) or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW) or can_manage_private_training(current_user):
         rows = query_db(
             """
             SELECT *
@@ -328,7 +329,20 @@ def list_private_clients_for_trainer(current_user: dict[str, Any]) -> list[dict[
         ) or []
     else:
         rows = list_private_training_subscriptions_for_trainer(current_user["id"])
-    return [dict(row) for row in rows]
+    normalized_rows = []
+    for row in rows:
+        row_dict = dict(row)
+        approved_count = int(row_dict.get("approved_count") or 0)
+        total_sessions = int(row_dict.get("total_sessions") or 0)
+        row_dict["approved_count"] = approved_count
+        row_dict["remaining_sessions"] = max(total_sessions - approved_count, 0)
+        row_dict["effective_status"] = calculate_effective_subscription_status(
+            row_dict,
+            approved_count=approved_count,
+            cairo_today=_current_cairo_date(),
+        )
+        normalized_rows.append(row_dict)
+    return normalized_rows
 
 
 def get_private_subscription_for_trainer(current_user: dict[str, Any], subscription_id: int) -> dict[str, Any]:
@@ -339,9 +353,15 @@ def get_private_subscription_for_trainer(current_user: dict[str, Any], subscript
     if not subscription:
         raise PrivateTrainingNotFoundError("Subscription not found")
 
-    if not (is_super_user(current_user) or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW)):
-        if subscription.get("trainer_user_id") != current_user.get("id"):
-            raise PrivateTrainingForbiddenError("Current user cannot access this subscription")
+    if (
+        is_super_user(current_user)
+        or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW)
+        or can_manage_private_training(current_user)
+    ):
+        return subscription
+
+    if subscription.get("trainer_user_id") != current_user.get("id"):
+        raise PrivateTrainingForbiddenError("Current user cannot access this subscription")
     return subscription
 
 

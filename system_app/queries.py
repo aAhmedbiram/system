@@ -1,8 +1,8 @@
+# queries.py - Final guaranteed version on Railway
 try:
     from . import env_loader
 except ImportError:
     import env_loader
-# queries.py - Final guaranteed version on Railway
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -71,7 +71,7 @@ def create_table():
                 national_id TEXT UNIQUE
             )
         ''')
-        
+
         # Add national_id column if it doesn't exist (for existing databases)
         try:
             cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS national_id TEXT')
@@ -79,25 +79,25 @@ def create_table():
             cr.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_members_national_id_unique ON members(national_id) WHERE national_id IS NOT NULL AND national_id != \'\'')
         except:
             pass
-        
+
         # Add invitations column if it doesn't exist (for existing databases)
         try:
             cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS invitations INTEGER DEFAULT 0')
         except:
             pass
-        
+
         # Add comment column if it doesn't exist (for existing databases)
         try:
             cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS comment TEXT')
         except:
             pass
-        
+
         # Add freeze_used column if it doesn't exist (for existing databases)
         try:
             cr.execute('ALTER TABLE members ADD COLUMN IF NOT EXISTS freeze_used BOOLEAN DEFAULT FALSE')
         except:
             pass
-        
+
         cr.execute('''
             CREATE TABLE IF NOT EXISTS attendance (
                 num SERIAL PRIMARY KEY,
@@ -124,6 +124,7 @@ def create_table():
                 permissions JSONB
             )
         ''')
+
         # Add email verification columns to users table if they don't exist
         try:
             cr.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE')
@@ -185,7 +186,7 @@ def create_table():
                 edit_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
         # Create action_logs table for undo functionality
         cr.execute('''
             CREATE TABLE IF NOT EXISTS action_logs (
@@ -200,7 +201,7 @@ def create_table():
                 undo_time TIMESTAMP
             )
         ''')
-        
+
         # Add undone column if it doesn't exist (for existing databases)
         try:
             cr.execute('ALTER TABLE action_logs ADD COLUMN IF NOT EXISTS undone BOOLEAN DEFAULT FALSE')
@@ -223,7 +224,7 @@ def create_table():
                 used_by TEXT
             )
         ''')
-        
+
         # Create supplements/products table
         cr.execute('''
             CREATE TABLE IF NOT EXISTS supplements (
@@ -242,7 +243,7 @@ def create_table():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
         # Create supplement sales table
         cr.execute('''
             CREATE TABLE IF NOT EXISTS supplement_sales (
@@ -258,7 +259,7 @@ def create_table():
                 payment_method TEXT DEFAULT 'cash'
             )
         ''')
-        
+
         # Create staff table
         cr.execute('''
             CREATE TABLE IF NOT EXISTS staff (
@@ -274,7 +275,7 @@ def create_table():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
         # Create staff purchases table
         cr.execute('''
             CREATE TABLE IF NOT EXISTS staff_purchases (
@@ -291,7 +292,7 @@ def create_table():
                 recorded_by TEXT
             )
         ''')
-        
+
         # Create renewal_logs table to track membership renewals
         cr.execute('''
             CREATE TABLE IF NOT EXISTS renewal_logs (
@@ -304,7 +305,7 @@ def create_table():
                 edited_by TEXT
             )
         ''')
-        
+
         # Create invoices table
         cr.execute('''
             CREATE TABLE IF NOT EXISTS invoices (
@@ -335,7 +336,7 @@ def create_table():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
         # Create member_training_plans table (الخطط المخصصة للأعضاء)
         cr.execute('''
             CREATE TABLE IF NOT EXISTS member_training_plans (
@@ -352,7 +353,7 @@ def create_table():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
         # Create pending_member_edits table for approval system
         cr.execute('''
             CREATE TABLE IF NOT EXISTS pending_member_edits (
@@ -367,7 +368,7 @@ def create_table():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
         # Create progress_tracking table (نظام متابعة التقدم)
         cr.execute('''
             CREATE TABLE IF NOT EXISTS progress_tracking (
@@ -386,21 +387,6 @@ def create_table():
         ''')
 
         # --- CRM MODULE TABLES (Phase 1A) ---
-        cr.execute('''
-            CREATE TABLE IF NOT EXISTS crm_bulk_lead_operations (
-                id SERIAL PRIMARY KEY,
-                token VARCHAR(128) NOT NULL UNIQUE,
-                created_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
-                status VARCHAR(20) NOT NULL DEFAULT 'PREVIEW',
-                snapshot JSONB NOT NULL,
-                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                started_at TIMESTAMP WITH TIME ZONE NULL,
-                completed_at TIMESTAMP WITH TIME ZONE NULL,
-                CONSTRAINT chk_crm_bulk_lead_operations_status CHECK (status IN ('PREVIEW', 'EXECUTING', 'COMPLETED', 'FAILED'))
-            )
-        ''')
-
         cr.execute('''
             CREATE TABLE IF NOT EXISTS crm_campaigns (
                 id SERIAL PRIMARY KEY,
@@ -457,6 +443,21 @@ def create_table():
             )
         ''')
 
+        cr.execute('''
+            CREATE TABLE IF NOT EXISTS crm_bulk_lead_operations (
+                id SERIAL PRIMARY KEY,
+                token VARCHAR(128) NOT NULL UNIQUE,
+                created_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'PREVIEW',
+                snapshot JSONB NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                started_at TIMESTAMP WITH TIME ZONE NULL,
+                completed_at TIMESTAMP WITH TIME ZONE NULL,
+                CONSTRAINT chk_crm_bulk_lead_operations_status CHECK (status IN ('PREVIEW', 'EXECUTING', 'COMPLETED', 'FAILED'))
+            )
+        ''')
+
         # Create indexes for better query performance
         try:
             # Indexes for members table (frequently queried columns)
@@ -485,51 +486,52 @@ def create_table():
                   AND stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')
                   AND is_archived = FALSE
             ''')
-            
+
             # Indexes for training templates and plans
             cr.execute('CREATE INDEX IF NOT EXISTS idx_training_templates_category ON training_templates(category)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_member_training_plans_member_id ON member_training_plans(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_member_training_plans_template_id ON member_training_plans(template_id)')
-            
+
             # Indexes for pending member edits
             cr.execute('CREATE INDEX IF NOT EXISTS idx_pending_edits_status ON pending_member_edits(status)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_pending_edits_member_id ON pending_member_edits(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_pending_edits_requested_by ON pending_member_edits(requested_by)')
-            
+
             # Indexes for progress tracking
             cr.execute('CREATE INDEX IF NOT EXISTS idx_progress_tracking_member_id ON progress_tracking(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_progress_tracking_date ON progress_tracking(tracking_date)')
-            
+
             # Indexes for attendance table
             cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_member_id ON attendance(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(attendance_date)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_num ON attendance(num)')
-            
+            cr.execute('CREATE INDEX IF NOT EXISTS idx_attendance_member_date ON attendance(member_id, attendance_date)')
+
             # Indexes for member_logs table
             cr.execute('CREATE INDEX IF NOT EXISTS idx_member_logs_member_id ON member_logs(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_member_logs_edit_time ON member_logs(edit_time)')
-            
+
             # Indexes for invitations table
             cr.execute('CREATE INDEX IF NOT EXISTS idx_invitations_member_id ON invitations(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_invitations_used_date ON invitations(used_date)')
-            
+
             # Indexes for action_logs table
             cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_member_id ON action_logs(member_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_action_time ON action_logs(action_time)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_action_logs_undone ON action_logs(undone)')
-            
+
             # Indexes for supplements tables
             cr.execute('CREATE INDEX IF NOT EXISTS idx_supplements_name ON supplements(name)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_supplements_category ON supplements(category)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_supplement_sales_date ON supplement_sales(sale_date)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_supplement_sales_supplement_id ON supplement_sales(supplement_id)')
-            
+
             # Indexes for staff tables
             cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_role ON staff(role)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_status ON staff(status)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_purchases_staff_id ON staff_purchases(staff_id)')
             cr.execute('CREATE INDEX IF NOT EXISTS idx_staff_purchases_date ON staff_purchases(purchase_date)')
-            
+
             conn.commit()
             print("PostgreSQL tables and indexes created successfully!")
         except Exception as e:
@@ -553,7 +555,7 @@ def query_db(query, args=(), one=False, commit=False):
     pool = get_connection_pool()
     conn = None
     cur = None
-    
+
     # Fallback to direct connection if pool fails
     if pool is None:
         try:
@@ -574,7 +576,7 @@ def query_db(query, args=(), one=False, commit=False):
             except Exception as fallback_error:
                 print(f"Fallback connection also failed: {fallback_error}")
                 raise fallback_error
-    
+
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(query, args)
@@ -627,8 +629,8 @@ def add_member(name, email, phone, age, gender, birthdate,
     try:
         if custom_id is not None:
             result = query_db('''
-                INSERT INTO members 
-                (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
+                INSERT INTO members
+                (id, name, email, phone, age, gender, birthdate, actual_starting_date,
                 starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
@@ -639,8 +641,8 @@ def add_member(name, email, phone, age, gender, birthdate,
             return result['id']
         else:
             result = query_db('''
-                INSERT INTO members 
-                (name, email, phone, age, gender, birthdate, actual_starting_date, 
+                INSERT INTO members
+                (name, email, phone, age, gender, birthdate, actual_starting_date,
                 starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
@@ -664,43 +666,43 @@ def bulk_add_members(members_list):
     """
     if not members_list:
         return 0
-    
+
     conn = None
     cur = None
     inserted = 0
-    
+
     try:
         db_url = get_database_url()
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()
-        
+
         # Check if first member has custom_id
         has_custom_id = members_list[0][0] is not None if len(members_list) > 0 else False
-        
+
         if has_custom_id:
             # Bulk insert with custom_id
             insert_query = '''
-                INSERT INTO members 
-                (id, name, email, phone, age, gender, birthdate, actual_starting_date, 
+                INSERT INTO members
+                (id, name, email, phone, age, gender, birthdate, actual_starting_date,
                 starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             '''
         else:
             # Bulk insert without custom_id
             insert_query = '''
-                INSERT INTO members 
-                (name, email, phone, age, gender, birthdate, actual_starting_date, 
+                INSERT INTO members
+                (name, email, phone, age, gender, birthdate, actual_starting_date,
                 starting_date, end_date, membership_packages, membership_fees, membership_status, invitations, comment, national_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             '''
-        
+
         # Use execute_batch for efficient bulk insert
         from psycopg2.extras import execute_batch
         execute_batch(cur, insert_query, members_list, page_size=len(members_list))
-        
+
         conn.commit()
         inserted = len(members_list)
-        
+
     except Exception as e:
         if conn:
             conn.rollback()
@@ -756,7 +758,7 @@ def bulk_add_members(members_list):
             cur.close()
         if conn:
             conn.close()
-    
+
     return inserted
 
 
@@ -771,29 +773,29 @@ def update_member(member_id, **kwargs):
     old_member = get_member(member_id)
     if not old_member:
         return
-    
+
     # Extract edited_by for logging (it's not a column in members table)
     edited_by = kwargs.pop('edited_by', 'Unknown')
     member_name = old_member.get('name', 'Unknown')
-    
+
     # Update the member (edited_by is now removed from kwargs)
     if not kwargs:  # If only edited_by was passed, nothing to update
         return
-    
+
     fields = [f"{k} = %s" for k in kwargs.keys()]
     values = list(kwargs.values()) + [member_id]
     query = f"UPDATE members SET {', '.join(fields)} WHERE id = %s"
     query_db(query, tuple(values), commit=True)
-    
+
     # Log the changes
     from datetime import datetime
     for field, new_value in kwargs.items():
         old_value = old_member.get(field)
-        
+
         # Convert values to strings for comparison
         old_str = str(old_value) if old_value is not None else ''
         new_str = str(new_value) if new_value is not None else ''
-        
+
         # Only log if value actually changed
         if old_str != new_str:
             add_member_log(member_id, member_name, field, old_str, new_str, edited_by)
@@ -812,10 +814,10 @@ def delete_all_data():
         # Use CASCADE to truncate members table and all child tables that reference it
         # This will automatically truncate: attendance, member_logs, invitations
         cur.execute('TRUNCATE TABLE members RESTART IDENTITY CASCADE')
-        
+
         # Truncate attendance_backup separately (it has no foreign keys to members)
         cur.execute('TRUNCATE TABLE attendance_backup RESTART IDENTITY')
-        
+
         conn.commit()
         print("All data deleted successfully!")
         print("Deleted: All Members, All Attendance Records, All Edit Logs, All Invitation Records, All Attendance Backup Records")
@@ -843,7 +845,7 @@ def search_members(name=None, phone=None, national_id=None):
     if national_id:
         conditions.append("national_id ILIKE %s")
         args.append(f"%{national_id}%")
-    
+
     query = "SELECT * FROM members"
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
@@ -859,13 +861,13 @@ def add_attendance(member_id, name, end_date, membership_status):
         attendance_time = now.strftime("%H:%M:%S")
         attendance_date = now.strftime("%Y-%m-%d")
         day = now.strftime("%A")
-        
+
         query_db('''
-            INSERT INTO attendance 
+            INSERT INTO attendance
             (member_id, name, end_date, membership_status, attendance_time, attendance_date, day)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         ''', (member_id, name, end_date, membership_status, attendance_time, attendance_date, day), commit=True)
-        
+
     except Exception as e:
         print("Error in add_attendance:", e)
         raise e
@@ -912,7 +914,7 @@ def add_member_log(member_id, member_name, field_name, old_value, new_value, edi
     """Add a log entry for a member edit"""
     try:
         query_db('''
-            INSERT INTO member_logs 
+            INSERT INTO member_logs
             (member_id, member_name, field_name, old_value, new_value, edited_by)
             VALUES (%s, %s, %s, %s, %s, %s)
         ''', (member_id, member_name, field_name, old_value, new_value, edited_by), commit=True)
@@ -925,13 +927,13 @@ def get_member_logs(member_id=None):
     """Get logs for a specific member or all logs"""
     if member_id:
         return query_db('''
-            SELECT * FROM member_logs 
-            WHERE member_id = %s 
+            SELECT * FROM member_logs
+            WHERE member_id = %s
             ORDER BY id ASC
         ''', (member_id,))
     else:
         return query_db('''
-            SELECT * FROM member_logs 
+            SELECT * FROM member_logs
             ORDER BY id ASC
         ''')
 
@@ -939,7 +941,7 @@ def get_member_logs(member_id=None):
 def get_all_logs():
     """Get all logs ordered by ID ascending"""
     return query_db('''
-        SELECT * FROM member_logs 
+        SELECT * FROM member_logs
         ORDER BY id ASC
     ''')
 
@@ -955,7 +957,7 @@ def log_action(action_type, member_id=None, member_name=None, action_data=None, 
     try:
         action_data_json = json.dumps(action_data) if action_data else None
         query_db('''
-            INSERT INTO action_logs 
+            INSERT INTO action_logs
             (action_type, member_id, member_name, action_data, performed_by)
             VALUES (%s, %s, %s, %s, %s)
         ''', (action_type, member_id, member_name, action_data_json, performed_by), commit=True)
@@ -969,7 +971,7 @@ def get_undoable_actions(limit=100):
     """Get recent actions that can be undone"""
     try:
         return query_db('''
-            SELECT * FROM action_logs 
+            SELECT * FROM action_logs
             WHERE undone = FALSE
             ORDER BY action_time DESC
             LIMIT %s
@@ -983,7 +985,7 @@ def mark_action_undone(action_id):
     """Mark an action as undone"""
     try:
         query_db('''
-            UPDATE action_logs 
+            UPDATE action_logs
             SET undone = TRUE, undo_time = CURRENT_TIMESTAMP
             WHERE id = %s
         ''', (action_id,), commit=True)
@@ -1009,18 +1011,18 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
         member = get_member(member_id)
         if not member:
             raise ValueError(f"Member with ID {member_id} not found")
-        
+
         # Check if member's end date has expired
         end_date_str = member.get('end_date')
         if end_date_str:
             from datetime import datetime
-            
+
             try:
                 # Parse the end date - handle various formats
                 if isinstance(end_date_str, str):
                     end_date_str = end_date_str.strip()
                     end_date = None
-                    
+
                     # Try common date formats
                     date_formats = [
                         '%Y-%m-%d',      # 2024-12-31
@@ -1030,14 +1032,14 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
                         '%d-%m-%Y',       # 31-12-2024
                         '%Y/%m/%d',       # 2024/12/31
                     ]
-                    
+
                     for fmt in date_formats:
                         try:
                             end_date = datetime.strptime(end_date_str, fmt).date()
                             break
                         except ValueError:
                             continue
-                    
+
                     # If parsing succeeded, check if expired using Cairo date
                     if end_date:
                         today = get_cairo_date()
@@ -1052,26 +1054,26 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
             except Exception as e:
                 # For other exceptions, log but don't block
                 print(f"Warning: Error checking end date for member {member_id}: {e}")
-        
+
         # Check if member has available invitations
         current_invitations = member.get('invitations', 0) or 0
         if current_invitations <= 0:
             raise ValueError(f"Member {member['name']} (ID: {member_id}) has no available invitations")
-        
+
         # Record the invitation usage
         query_db('''
-            INSERT INTO invitations 
+            INSERT INTO invitations
             (member_id, member_name, friend_name, friend_phone, friend_email, used_by)
             VALUES (%s, %s, %s, %s, %s, %s)
         ''', (member_id, member['name'], friend_name, friend_phone, friend_email, used_by), commit=True)
-        
+
         # Deduct one invitation from member
         query_db('''
-            UPDATE members 
-            SET invitations = invitations - 1 
+            UPDATE members
+            SET invitations = invitations - 1
             WHERE id = %s
         ''', (member_id,), commit=True)
-        
+
         return True
     except Exception as e:
         print(f"Error using invitation: {e}")
@@ -1081,7 +1083,7 @@ def use_invitation(member_id, friend_name, friend_phone=None, friend_email=None,
 def get_all_invitations():
     """Get all invitation records ordered by ID ascending"""
     return query_db('''
-        SELECT * FROM invitations 
+        SELECT * FROM invitations
         ORDER BY id ASC
     ''')
 
@@ -1089,8 +1091,8 @@ def get_all_invitations():
 def get_member_invitations(member_id):
     """Get all invitations used by a specific member"""
     return query_db('''
-        SELECT * FROM invitations 
-        WHERE member_id = %s 
+        SELECT * FROM invitations
+        WHERE member_id = %s
         ORDER BY id ASC
     ''', (member_id,))
 
@@ -1118,7 +1120,7 @@ def log_renewal(member_id, package_name, renewal_date, fees, edited_by=None):
             else:
                 print(f"Warning: Could not parse renewal_date: {renewal_date}")
                 return False
-        
+
         query_db('''
             INSERT INTO renewal_logs (member_id, package_name, renewal_date, fees, edited_by)
             VALUES (%s, %s, %s, %s, %s)
@@ -1141,14 +1143,14 @@ def get_daily_totals():
     """Get daily income totals from renewals"""
     try:
         results = query_db('''
-            SELECT 
+            SELECT
                 renewal_date::date as date,
                 COALESCE(SUM(fees), 0) as sum
             FROM renewal_logs
             GROUP BY renewal_date::date
             ORDER BY renewal_date::date DESC
         ''', ())
-        
+
         # Ensure all sums are floats
         if results:
             for result in results:
@@ -1156,7 +1158,7 @@ def get_daily_totals():
                     result['sum'] = 0.0
                 else:
                     result['sum'] = float(result['sum'])
-        
+
         return results or []
     except Exception as e:
         print(f"Error getting daily totals: {e}")
@@ -1171,14 +1173,14 @@ def get_monthly_total(year=None, month=None):
             now = datetime.now()
             year = now.year
             month = now.month
-        
+
         result = query_db('''
             SELECT COALESCE(SUM(fees), 0) as total
             FROM renewal_logs
             WHERE EXTRACT(YEAR FROM renewal_date) = %s
             AND EXTRACT(MONTH FROM renewal_date) = %s
         ''', (year, month), one=True)
-        
+
         if result:
             total = result.get('total')
             if total is None:
@@ -1195,14 +1197,14 @@ def generate_invoice_number():
     from datetime import datetime
     now = datetime.now()
     prefix = f"INV-{now.year}{now.month:02d}{now.day:02d}-"
-    
+
     # Get the last invoice number for today
     last_invoice = query_db(
         "SELECT invoice_number FROM invoices WHERE invoice_number LIKE %s ORDER BY id DESC LIMIT 1",
         (f"{prefix}%",),
         one=True
     )
-    
+
     if last_invoice:
         try:
             last_num = int(last_invoice['invoice_number'].split('-')[-1])
@@ -1211,7 +1213,7 @@ def generate_invoice_number():
             new_num = 1
     else:
         new_num = 1
-    
+
     return f"{prefix}{new_num:04d}"
 
 
@@ -1221,13 +1223,13 @@ def create_invoice(member_id, member_name, invoice_type, package_name=None, amou
         from datetime import datetime
         invoice_number = generate_invoice_number()
         invoice_date = datetime.now().date()
-        
+
         result = query_db('''
             INSERT INTO invoices (invoice_number, member_id, member_name, invoice_type, package_name, amount, invoice_date, created_by, notes)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         ''', (invoice_number, member_id, member_name, invoice_type, package_name, amount, invoice_date, created_by, notes), commit=True, one=True)
-        
+
         # Return both invoice_number and invoice_id
         if result:
             return {'invoice_number': invoice_number, 'invoice_id': result.get('id')}
@@ -1250,9 +1252,9 @@ def get_invoice_by_number(invoice_number):
 def get_all_invoices():
     """Get all invoices ordered by ID ascending, including member phone number"""
     return query_db(
-        '''SELECT i.*, m.phone as member_phone 
-           FROM invoices i 
-           LEFT JOIN members m ON i.member_id = m.id 
+        '''SELECT i.*, m.phone as member_phone
+           FROM invoices i
+           LEFT JOIN members m ON i.member_id = m.id
            ORDER BY i.id ASC''',
         ()
     )
@@ -1263,7 +1265,7 @@ def add_supplement(name, category=None, subcategory=None, price=0, cost=0, stock
     """Add a new supplement/product"""
     try:
         result = query_db('''
-            INSERT INTO supplements 
+            INSERT INTO supplements
             (name, category, subcategory, price, cost, stock_quantity, unit, description, supplier, barcode)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
@@ -1306,14 +1308,14 @@ def add_supplement_sale(supplement_id, supplement_name, quantity, unit_price, to
     try:
         # Record the sale
         query_db('''
-            INSERT INTO supplement_sales 
+            INSERT INTO supplement_sales
             (supplement_id, supplement_name, quantity, unit_price, total_price, sold_by, customer_name, payment_method)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ''', (supplement_id, supplement_name, quantity, unit_price, total_price, sold_by, customer_name, payment_method), commit=True)
-        
+
         # Update stock quantity
         query_db('''
-            UPDATE supplements 
+            UPDATE supplements
             SET stock_quantity = stock_quantity - %s, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         ''', (quantity, supplement_id), commit=True)
@@ -1326,8 +1328,8 @@ def get_supplement_sales(limit=100):
     """Get recent supplement sales"""
     try:
         return query_db('''
-            SELECT * FROM supplement_sales 
-            ORDER BY sale_date DESC 
+            SELECT * FROM supplement_sales
+            ORDER BY sale_date DESC
             LIMIT %s
         ''', (limit,))
     except Exception as e:
@@ -1338,7 +1340,7 @@ def get_supplement_sales(limit=100):
 def get_supplement_statistics():
     """Get statistics for supplements"""
     stats = {}
-    
+
     try:
         # Total products
         total_products = query_db('SELECT COUNT(*) as count FROM supplements', one=True)
@@ -1346,7 +1348,7 @@ def get_supplement_statistics():
     except Exception as e:
         print(f"Error getting total products: {e}")
         stats['total_products'] = 0
-    
+
     try:
         # Low stock items (stock < 10)
         low_stock = query_db('SELECT COUNT(*) as count FROM supplements WHERE stock_quantity < 10', one=True)
@@ -1354,76 +1356,76 @@ def get_supplement_statistics():
     except Exception as e:
         print(f"Error getting low stock: {e}")
         stats['low_stock'] = 0
-    
+
     # Total sales today
     from datetime import datetime
     today = datetime.now().strftime('%Y-%m-%d')
     try:
         today_sales = query_db('''
-            SELECT COALESCE(SUM(total_price), 0) as total 
-            FROM supplement_sales 
+            SELECT COALESCE(SUM(total_price), 0) as total
+            FROM supplement_sales
             WHERE sale_date::date = %s
         ''', (today,), one=True)
         stats['today_sales'] = float(today_sales['total']) if today_sales else 0
     except:
         stats['today_sales'] = 0
-    
+
     # Cash sales today
     try:
         cash_sales_today = query_db('''
-            SELECT COALESCE(SUM(total_price), 0) as total 
-            FROM supplement_sales 
+            SELECT COALESCE(SUM(total_price), 0) as total
+            FROM supplement_sales
             WHERE sale_date::date = %s AND payment_method = 'cash'
         ''', (today,), one=True)
         stats['cash_sales_today'] = float(cash_sales_today['total']) if cash_sales_today else 0
     except:
         stats['cash_sales_today'] = 0
-    
+
     # Visa/Card sales today
     try:
         visa_sales_today = query_db('''
-            SELECT COALESCE(SUM(total_price), 0) as total 
-            FROM supplement_sales 
+            SELECT COALESCE(SUM(total_price), 0) as total
+            FROM supplement_sales
             WHERE sale_date::date = %s AND (payment_method = 'card' OR payment_method = 'visa')
         ''', (today,), one=True)
         stats['visa_sales_today'] = float(visa_sales_today['total']) if visa_sales_today else 0
     except:
         stats['visa_sales_today'] = 0
-    
+
     # Total sales this month
     month_start = datetime.now().replace(day=1).strftime('%Y-%m-%d')
     try:
         month_sales = query_db('''
-            SELECT COALESCE(SUM(total_price), 0) as total 
-            FROM supplement_sales 
+            SELECT COALESCE(SUM(total_price), 0) as total
+            FROM supplement_sales
             WHERE sale_date::date >= %s
         ''', (month_start,), one=True)
         stats['month_sales'] = float(month_sales['total']) if month_sales else 0
     except:
         stats['month_sales'] = 0
-    
+
     # Total all-time sales
     try:
         total_sales = query_db('''
-            SELECT COALESCE(SUM(total_price), 0) as total 
+            SELECT COALESCE(SUM(total_price), 0) as total
             FROM supplement_sales
         ''', one=True)
         stats['total_sales'] = float(total_sales['total']) if total_sales else 0
     except Exception as e:
         print(f"Error getting total sales: {e}")
         stats['total_sales'] = 0
-    
+
     # Total sales count
     try:
         total_sales_count = query_db('''
-            SELECT COUNT(*) as count 
+            SELECT COUNT(*) as count
             FROM supplement_sales
         ''', one=True)
         stats['total_sales_count'] = total_sales_count['count'] if total_sales_count else 0
     except Exception as e:
         print(f"Error getting total sales count: {e}")
         stats['total_sales_count'] = 0
-    
+
     # Top selling products
     try:
         top_products = query_db('''
@@ -1437,11 +1439,11 @@ def get_supplement_statistics():
     except Exception as e:
         print(f"Error getting top products: {e}")
         stats['top_products'] = []
-    
+
     # Per-product statistics
     try:
         product_stats = query_db('''
-            SELECT 
+            SELECT
                 s.id,
                 s.name,
                 s.stock_quantity,
@@ -1459,22 +1461,22 @@ def get_supplement_statistics():
     except Exception as e:
         print(f"Error getting product stats: {e}")
         stats['product_stats'] = []
-    
+
     # Total inventory value
     try:
         inventory_value = query_db('''
-            SELECT COALESCE(SUM(stock_quantity * cost), 0) as total 
+            SELECT COALESCE(SUM(stock_quantity * cost), 0) as total
             FROM supplements
         ''', one=True)
         stats['inventory_value'] = float(inventory_value['total']) if inventory_value else 0
     except Exception as e:
         print(f"Error getting inventory value: {e}")
         stats['inventory_value'] = 0
-    
+
     # Per-user sales statistics
     try:
         user_sales = query_db('''
-            SELECT 
+            SELECT
                 sold_by,
                 COUNT(*) as sales_count,
                 SUM(quantity) as total_quantity,
@@ -1490,11 +1492,11 @@ def get_supplement_statistics():
     except Exception as e:
         print(f"Error getting user sales: {e}")
         stats['user_sales'] = []
-    
+
     # Per-user sales today
     try:
         user_sales_today = query_db('''
-            SELECT 
+            SELECT
                 sold_by,
                 COUNT(*) as sales_count,
                 SUM(quantity) as total_quantity,
@@ -1507,7 +1509,7 @@ def get_supplement_statistics():
         stats['user_sales_today'] = user_sales_today or []
     except:
         stats['user_sales_today'] = []
-    
+
     return stats
 
 def get_attendance_backup_runs():
@@ -1581,15 +1583,15 @@ def add_staff_purchase(staff_id, staff_name, supplement_id, supplement_name, qua
     """Record a staff purchase"""
     try:
         query_db('''
-            INSERT INTO staff_purchases 
+            INSERT INTO staff_purchases
             (staff_id, staff_name, supplement_id, supplement_name, quantity, unit_price, total_price, notes, recorded_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (staff_id, staff_name, supplement_id, supplement_name, quantity, unit_price, total_price, notes, recorded_by), commit=True)
-        
+
         # Update stock quantity
         if supplement_id:
             query_db('''
-                UPDATE supplements 
+                UPDATE supplements
                 SET stock_quantity = stock_quantity - %s, updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
             ''', (quantity, supplement_id), commit=True)
@@ -1603,15 +1605,15 @@ def get_staff_purchases(staff_id=None, limit=100):
     try:
         if staff_id:
             return query_db('''
-                SELECT * FROM staff_purchases 
+                SELECT * FROM staff_purchases
                 WHERE staff_id = %s
-                ORDER BY purchase_date DESC 
+                ORDER BY purchase_date DESC
                 LIMIT %s
             ''', (staff_id, limit))
         else:
             return query_db('''
-                SELECT * FROM staff_purchases 
-                ORDER BY purchase_date DESC 
+                SELECT * FROM staff_purchases
+                ORDER BY purchase_date DESC
                 LIMIT %s
             ''', (limit,))
     except Exception as e:
@@ -1622,7 +1624,7 @@ def get_staff_purchases(staff_id=None, limit=100):
 def get_staff_statistics():
     """Get statistics for staff"""
     stats = {}
-    
+
     try:
         # Total staff
         total_staff = query_db('SELECT COUNT(*) as count FROM staff WHERE status = %s', ('active',), one=True)
@@ -1630,12 +1632,12 @@ def get_staff_statistics():
     except Exception as e:
         print(f"Error getting total staff: {e}")
         stats['total_staff'] = 0
-    
+
     try:
         # Staff by role
         staff_by_role = query_db('''
-            SELECT role, COUNT(*) as count 
-            FROM staff 
+            SELECT role, COUNT(*) as count
+            FROM staff
             WHERE status = 'active'
             GROUP BY role
         ''')
@@ -1643,11 +1645,11 @@ def get_staff_statistics():
     except Exception as e:
         print(f"Error getting staff by role: {e}")
         stats['staff_by_role'] = []
-    
+
     try:
         # Per-staff purchase statistics
         staff_purchase_stats = query_db('''
-            SELECT 
+            SELECT
                 s.id,
                 s.name,
                 s.role,
@@ -1664,11 +1666,11 @@ def get_staff_statistics():
     except Exception as e:
         print(f"Error getting staff purchase stats: {e}")
         stats['staff_purchase_stats'] = []
-    
+
     try:
         # Total staff purchases
         total_staff_purchases = query_db('''
-            SELECT 
+            SELECT
                 COALESCE(SUM(total_price), 0) as total,
                 COALESCE(COUNT(*), 0) as count,
                 COALESCE(SUM(quantity), 0) as total_quantity
@@ -1682,19 +1684,19 @@ def get_staff_statistics():
         stats['total_staff_purchases'] = 0
         stats['total_staff_purchase_count'] = 0
         stats['total_staff_purchase_quantity'] = 0
-    
+
     try:
         # Staff purchases this month
         from datetime import datetime
         month_start = datetime.now().replace(day=1).strftime('%Y-%m-%d')
         month_staff_purchases = query_db('''
-            SELECT COALESCE(SUM(total_price), 0) as total 
-            FROM staff_purchases 
+            SELECT COALESCE(SUM(total_price), 0) as total
+            FROM staff_purchases
             WHERE purchase_date::date >= %s
         ''', (month_start,), one=True)
         stats['month_staff_purchases'] = float(month_staff_purchases['total']) if month_staff_purchases else 0
     except Exception as e:
         print(f"Error getting month staff purchases: {e}")
         stats['month_staff_purchases'] = 0
-    
+
     return stats

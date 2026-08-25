@@ -22,27 +22,27 @@ def run_migration(sql_file):
         if not os.path.exists(migration_path):
             print(f"❌ Migration file not found: {migration_path}")
             return False
-        
+
         with open(migration_path, 'r') as f:
             sql_content = f.read()
-        
+
         # Connect to database
         print(f"🔌 Connecting to database...")
         conn = psycopg2.connect(DATABASE_URL)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cur = conn.cursor()
-        
+
         # Execute SQL
         print(f"📝 Running migration: {sql_file}")
         cur.execute(sql_content)
-        
+
         # Close connection
         cur.close()
         conn.close()
-        
+
         print(f"✅ Migration completed successfully: {sql_file}")
         return True
-        
+
     except Exception as e:
         print(f"❌ Migration failed: {e}")
         import traceback
@@ -53,10 +53,10 @@ if __name__ == '__main__':
     print("=" * 80)
     print("Database Migration Runner")
     print("=" * 80)
-    
+
     # Run indexes migration
     success = run_migration('add_indexes.sql')
-    
+
     if success:
         success = run_migration('add_crm_bulk_lead_operations.sql')
 
@@ -70,4 +70,3 @@ if __name__ == '__main__':
         print("❌ Migration failed. Please check the errors above.")
         print("=" * 80)
         sys.exit(1)
-

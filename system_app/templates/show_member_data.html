@@ -520,6 +520,11 @@
                             <td>
                                 <a class="edit-link" href="{{ url_for('edit_member', member_id=member_data.id) }}">{{
                                     t.edit }}</a>
+                                {% if user_permissions.private_training_manage or user_permissions.super_admin %}
+                                <a class="edit-link" style="margin-left: 8px;" href="{{ url_for('private_training.new_subscription', member_id=member_data.id) }}">
+                                    Add Private Training
+                                </a>
+                                {% endif %}
                             </td>
                         </tr>
                     </tbody>

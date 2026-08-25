@@ -377,6 +377,12 @@ def handle_csrf_error(e):
         flash('Your session expired. Please log in again.', 'error')
         return redirect(url_for('login'))
     flash('CSRF token missing or invalid. Please try again.', 'error')
+    if request and request.path.startswith('/private-training/'):
+        return render_template(
+            'error.html',
+            error_code=400,
+            error_message='CSRF token missing or invalid. Please try again.'
+        ), 400
     return redirect(request.url or url_for('index'))
 
 from .func import calculate_age, calculate_end_date, membership_fees, compare_dates, calculate_invitations, get_cairo_date, get_cairo_now, validate_national_id
@@ -3042,7 +3048,8 @@ def show_member_data():
         if not member_data:
             flash("Member not found!", "error")
             return redirect(url_for("index"))
-        return render_template("show_member_data.html", member_data=member_data)
+        common_context = get_common_template_context()
+        return render_template("show_member_data.html", member_data=member_data, **common_context)
     except Exception as e:
         print(f"Error in show_member_data route: {e}")
         import traceback
@@ -6326,6 +6333,8 @@ def debug_test():
 # === Register Blueprints ===
 from system_app.crm import crm_bp
 app.register_blueprint(crm_bp, url_prefix='/crm')
+from system_app.private_training.routes import private_training_bp
+app.register_blueprint(private_training_bp, url_prefix='/private-training')
 
 # === Run application ===
 if __name__ == '__main__':

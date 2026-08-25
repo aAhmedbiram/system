@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ workspace_title }} - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .page {
+            max-width: 1480px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .hero, .panel {
+            background: rgba(20, 20, 30, 0.88);
+            border: 1px solid rgba(76, 175, 80, 0.25);
+            border-radius: 16px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+            backdrop-filter: blur(16px);
+        }
+        .hero {
+            padding: 22px 24px;
+            margin-bottom: 18px;
+        }
+        h1, h2 {
+            margin: 0 0 10px 0;
+            color: #7bff88;
+        }
+        .muted { color: #aeb4c5; }
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 11px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            border: 0;
+            cursor: pointer;
+        }
+        .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+        .panel { padding: 18px; margin-bottom: 18px; }
+        form.filters {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            align-items: end;
+        }
+        label { display: block; font-weight: 700; margin-bottom: 6px; color: #cfe8d1; }
+        select, input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(0,0,0,0.25);
+            color: #fff;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            color: #7bff88;
+            position: sticky;
+            top: 0;
+            background: rgba(20, 20, 30, 0.98);
+        }
+        tr:hover td { background: rgba(76, 175, 80, 0.06); }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(255,255,255,0.08);
+        }
+        .pill.ok { background: rgba(76, 175, 80, 0.18); color: #7bff88; }
+        .pill.warn { background: rgba(255, 193, 7, 0.15); color: #ffd54f; }
+        .pill.bad { background: rgba(244, 67, 54, 0.15); color: #ff8a80; }
+        .flash-message { margin: 0 0 12px 0; padding: 12px 14px; border-radius: 10px; }
+        .flash-message.success { background: rgba(76, 175, 80, 0.15); border: 1px solid rgba(76, 175, 80, 0.3); }
+        .flash-message.error { background: rgba(244, 67, 54, 0.15); border: 1px solid rgba(244, 67, 54, 0.3); }
+        .table-wrap { overflow-x: auto; }
+        @media (max-width: 1100px) {
+            form.filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 720px) {
+            .page { padding: 14px; }
+            form.filters { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+            <div class="flash-message {{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="hero">
+            <h1>{{ workspace_title }}</h1>
+            <div class="muted">
+                {% if is_trainer_workspace %}
+                    Trainer-scoped clients only.
+                {% else %}
+                    Sales and manager workspace for Private Training subscriptions.
+                {% endif %}
+            </div>
+            <div class="actions">
+                <a class="btn btn-secondary" href="{{ url_for('index') }}">Back Home</a>
+                {% if allow_create %}
+                    <a class="btn btn-primary" href="{{ url_for('private_training.new_subscription') }}">New Private Subscription</a>
+                {% endif %}
+                {% if is_trainer_workspace and show_all_subscriptions_link %}
+                    <a class="btn btn-secondary" href="{{ url_for('private_training.subscription_list') }}">All Visible Subscriptions</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="panel">
+            <form class="filters" method="get" action="{{ url_for('private_training.subscription_list' if not is_trainer_workspace else 'private_training.my_clients') }}">
+                <div>
+                    <label for="trainer_user_id">Trainer Filter</label>
+                    <input type="text" id="trainer_user_id" name="trainer_user_id" value="{{ active_filters.trainer_user_id }}" placeholder="Trainer user ID">
+                </div>
+                <div>
+                    <label for="status">Effective Status</label>
+                    <select id="status" name="status">
+                        <option value="">All</option>
+                        {% for value in ['ASSIGNED', 'ACTIVE', 'COMPLETED', 'EXPIRED', 'CANCELLED'] %}
+                            <option value="{{ value }}" {% if active_filters.status == value %}selected{% endif %}>{{ value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <button class="btn btn-primary" type="submit">Apply Filters</button>
+                </div>
+                <div>
+                    <a class="btn btn-secondary" href="{{ url_for('private_training.subscription_list' if not is_trainer_workspace else 'private_training.my_clients') }}">Reset</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th>Trainer</th>
+                            <th>Gym</th>
+                            <th>Private</th>
+                            <th>Sessions</th>
+                            <th>Pending</th>
+                            <th>Status</th>
+                            <th>Portal</th>
+                            <th>Creator</th>
+                            <th>Open</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for subscription in subscriptions %}
+                        <tr>
+                            <td>
+                                <strong>{{ subscription.member_name }}</strong><br>
+                                <span class="muted">{{ subscription.member_phone or '-' }}</span>
+                            </td>
+                            <td>
+                                {{ subscription.trainer_username }}<br>
+                                <span class="muted">ID {{ subscription.trainer_user_id }}</span>
+                            </td>
+                            <td>
+                                {{ subscription.gym_membership_packages or '-' }}<br>
+                                {{ subscription.gym_membership_status or '-' }}<br>
+                                {{ subscription.gym_starting_date or '-' }} - {{ subscription.gym_end_date or '-' }}
+                            </td>
+                            <td>
+                                Start: {{ subscription.private_start_date }}<br>
+                                Expiry: {{ subscription.private_expiry_date }}<br>
+                                Total: {{ subscription.total_sessions }}
+                            </td>
+                            <td>
+                                Approved: {{ subscription.approved_count or 0 }}<br>
+                                Remaining: {{ subscription.remaining_sessions or 0 }}
+                            </td>
+                            <td>{{ subscription.pending_count or 0 }}</td>
+                            <td>
+                                <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% elif subscription.effective_status in ['COMPLETED', 'EXPIRED', 'CANCELLED'] %}bad{% endif %}">
+                                    {{ subscription.effective_status or subscription.status }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if subscription.active_token_count and subscription.active_token_count > 0 %}
+                                    <span class="pill ok">Active link exists</span>
+                                {% else %}
+                                    <span class="pill">No active link</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ subscription.created_by_username or '-' }}</td>
+                            <td>
+                                <a class="btn btn-primary" href="{{ url_for('private_training.subscription_detail', subscription_id=subscription.id) }}">Open</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="10">No private training subscriptions found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

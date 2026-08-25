@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Training Subscription - Rival Gym System</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .hero, .panel, .card {
+            background: rgba(20, 20, 30, 0.88);
+            border: 1px solid rgba(76, 175, 80, 0.25);
+            border-radius: 16px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+            backdrop-filter: blur(16px);
+        }
+        .hero { padding: 22px 24px; margin-bottom: 18px; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .card { padding: 18px; }
+        h1, h2, h3 { margin: 0 0 10px 0; color: #7bff88; }
+        .muted { color: #aeb4c5; }
+        .meta { color: #cfe8d1; line-height: 1.7; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .btn {
+            display: inline-block;
+            padding: 11px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            border: 0;
+            cursor: pointer;
+        }
+        .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+        .btn-danger { background: rgba(244, 67, 54, 0.18); color: #ffb3b3; border: 1px solid rgba(244, 67, 54, 0.3); }
+        .panel { padding: 18px; margin-bottom: 18px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            padding: 10px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            text-align: left;
+            vertical-align: top;
+        }
+        th { color: #7bff88; background: rgba(20,20,30,0.95); position: sticky; top: 0; }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(255,255,255,0.08);
+        }
+        .pill.ok { background: rgba(76, 175, 80, 0.18); color: #7bff88; }
+        .pill.warn { background: rgba(255, 193, 7, 0.15); color: #ffd54f; }
+        .pill.bad { background: rgba(244, 67, 54, 0.15); color: #ff8a80; }
+        .flash-message { margin: 0 0 12px 0; padding: 12px 14px; border-radius: 10px; }
+        .flash-message.success { background: rgba(76, 175, 80, 0.15); border: 1px solid rgba(76, 175, 80, 0.3); }
+        .flash-message.error { background: rgba(244, 67, 54, 0.15); border: 1px solid rgba(244, 67, 54, 0.3); }
+        .token-box {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+        .token-box input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(0,0,0,0.25);
+            color: #fff;
+        }
+        .stack { display: grid; gap: 12px; }
+        .table-wrap { overflow-x: auto; }
+        @media (max-width: 960px) {
+            .grid, .token-box { grid-template-columns: 1fr; }
+            .page { padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+            <div class="flash-message {{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="hero">
+            <h1>Private Training Subscription #{{ subscription.id }}</h1>
+            <div class="muted">{{ subscription.member_name }} with trainer {{ subscription.trainer_username }}</div>
+            <div class="actions">
+                <a class="btn btn-secondary" href="{{ url_for('private_training.subscription_list') }}">Back to List</a>
+                <a class="btn btn-secondary" href="{{ url_for('private_training.my_clients') }}">My Clients</a>
+                {% if user_permissions.private_training_manage or user_permissions.super_admin %}
+                    <a class="btn btn-secondary" href="{{ url_for('private_training.new_subscription', member_id=subscription.member_id) }}">New Subscription</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Gym Details</h2>
+                <div class="meta">
+                    Member: <strong>{{ subscription.member_name }}</strong><br>
+                    Phone: {{ subscription.member_phone or '-' }}<br>
+                    Package: {{ subscription.gym_membership_packages or '-' }}<br>
+                    Status: {{ subscription.gym_membership_status or '-' }}<br>
+                    Start: {{ subscription.gym_starting_date or '-' }}<br>
+                    Expiry: {{ subscription.gym_end_date or '-' }}
+                </div>
+            </div>
+            <div class="card">
+                <h2>Private Training</h2>
+                <div class="meta">
+                    Trainer: <strong>{{ subscription.trainer_username }}</strong><br>
+                    Creator: {{ subscription.created_by_username or '-' }}<br>
+                    Start: {{ subscription.private_start_date }}<br>
+                    Expiry: {{ subscription.private_expiry_date }}<br>
+                    Total Sessions: {{ subscription.total_sessions }}<br>
+                    Approved Sessions: {{ subscription.approved_count or 0 }}<br>
+                    Remaining Sessions: {{ subscription.remaining_sessions or 0 }}<br>
+                    Pending Sessions: {{ subscription.pending_count or 0 }}<br>
+                    Effective Status: <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Portal Link</h2>
+            <div class="stack">
+                <div class="meta">
+                    Status: <strong>{{ portal_link_status }}</strong>
+                </div>
+                {% if show_generate_result and generated_portal_url %}
+                    <div class="token-box">
+                        <input id="portal-link" type="text" readonly value="{{ generated_portal_url }}">
+                        <button class="btn btn-primary" type="button" onclick="copyPortalLink()">Copy Link</button>
+                    </div>
+                    <div class="muted">The raw token is only shown once in the generated URL above. Reloading will not expose it again.</div>
+                {% else %}
+                    <div class="muted">No raw portal token is shown on this page load. Generate or regenerate a link to display it once.</div>
+                {% endif %}
+                {% if can_manage_tokens %}
+                    <div class="actions">
+                        <form method="post" action="{{ url_for('private_training.generate_subscription_portal_token', subscription_id=subscription.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-primary" type="submit">{% if portal_link_status == 'Active link exists' %}Regenerate Link{% else %}Generate Link{% endif %}</button>
+                        </form>
+                        <form method="post" action="{{ url_for('private_training.revoke_subscription_portal_token', subscription_id=subscription.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-danger" type="submit">Revoke Link</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Session History</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Trainer</th>
+                            <th>Checked In</th>
+                            <th>Status</th>
+                            <th>Approved At</th>
+                            <th>Rejected At</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session_row in sessions %}
+                        <tr>
+                            <td>{{ session_row.id }}</td>
+                            <td>{{ session_row.trainer_user_id }}</td>
+                            <td>{{ session_row.checked_in_at }}</td>
+                            <td>{{ session_row.status }}</td>
+                            <td>{{ session_row.approved_at or '-' }}</td>
+                            <td>{{ session_row.rejected_at or '-' }}</td>
+                            <td>{{ session_row.rejection_reason or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7">No session history yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyPortalLink() {
+            const input = document.getElementById('portal-link');
+            if (!input) return;
+            input.select();
+            input.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(input.value);
+        }
+    </script>
+</body>
+</html>

@@ -45,12 +45,19 @@ def has_private_training_permission(user: Mapping[str, Any] | None, permission_k
     return bool(perms.get(permission_key))
 
 
+def has_explicit_private_training_permission(user: Mapping[str, Any] | None, permission_key: str) -> bool:
+    if not user:
+        return False
+    perms = _load_permissions(user.get("permissions"))
+    return bool(perms.get(permission_key))
+
+
 def can_manage_private_training(user: Mapping[str, Any] | None) -> bool:
     return has_private_training_permission(user, PRIVATE_TRAINING_MANAGE)
 
 
 def can_train_private_training(user: Mapping[str, Any] | None) -> bool:
-    return has_private_training_permission(user, PRIVATE_TRAINING_TRAINER)
+    return has_explicit_private_training_permission(user, PRIVATE_TRAINING_TRAINER)
 
 
 def can_view_private_training(user: Mapping[str, Any] | None) -> bool:

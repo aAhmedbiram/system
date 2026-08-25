@@ -96,16 +96,23 @@
 
         /* Rest of the style as is */
         .flash-message {
-            padding: 16px;
-            margin: 20px auto;
-            max-width: 800px;
-            border-radius: 10px;
+            padding: 20px 30px;
+            border-radius: 12px;
             font-weight: bold;
             text-align: center;
             background: rgba(46, 125, 50, 0.95);
             color: white;
             border: 1px solid #4caf50;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10000;
+            max-width: 90%;
+            width: auto;
+            font-size: 18px;
+            transition: opacity 0.5s ease-out;
         }
 
         .flash-message.error {
@@ -470,6 +477,15 @@
 
         document.addEventListener("DOMContentLoaded", function () {
             scrollToBottom();
+            
+            // Auto fade and remove flash messages after 1 second
+            const flashes = document.querySelectorAll(".flash-message");
+            flashes.forEach(flash => {
+                setTimeout(() => {
+                    flash.style.opacity = '0';
+                    setTimeout(() => flash.remove(), 500);
+                }, 1000);
+            });
             
             document.querySelector("form").addEventListener("submit", function () {
                 setTimeout(scrollToBottom, 500);
