@@ -21,6 +21,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
 
@@ -376,6 +377,8 @@ def not_found_error(error):
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Catch all unhandled exceptions"""
+    if isinstance(e, HTTPException):
+        return e
     import traceback
     error_trace = traceback.format_exc()
     

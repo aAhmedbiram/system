@@ -107,6 +107,12 @@
                 {% if user_permissions.private_training_manage or user_permissions.super_admin %}
                     <a class="btn btn-secondary" href="{{ url_for('private_training.new_subscription', member_id=subscription.member_id) }}">New Subscription</a>
                 {% endif %}
+                {% if can_cancel_subscription %}
+                    <form method="post" action="{{ url_for('private_training.cancel_subscription', subscription_id=subscription.id) }}" onsubmit="return confirm('Cancel this Private Training subscription?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Cancel Subscription</button>
+                    </form>
+                {% endif %}
             </div>
         </div>
 

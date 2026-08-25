@@ -289,6 +289,51 @@ def create_private_training_subscription(
     }
 
 
+def cancel_private_training_subscription(current_user: dict[str, Any], subscription_id: Any) -> dict[str, Any]:
+    _require_managed_current_user(current_user)
+    subscription_id_int = validate_positive_int(subscription_id, "subscription_id")
+
+    def _cancel(cur):
+        subscription = lock_private_training_subscription(cur, subscription_id_int)
+        if not subscription:
+            raise PrivateTrainingNotFoundError("Subscription not found")
+
+        effective_status = get_subscription_effective_status(subscription)
+        if effective_status == "CANCELLED":
+            raise PrivateTrainingCancelledError("Subscription is cancelled")
+        if effective_status == "COMPLETED":
+            raise PrivateTrainingCompletedError("Subscription is completed")
+        if effective_status == "EXPIRED":
+            raise PrivateTrainingExpiredError("Subscription is expired")
+        if effective_status not in ("ASSIGNED", "ACTIVE"):
+            raise PrivateTrainingConflictError("Subscription cannot be cancelled")
+
+        cur.execute(
+            """
+            UPDATE private_training_subscriptions
+            SET status = 'CANCELLED',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            RETURNING id
+            """,
+            (subscription_id_int,),
+        )
+        updated = cur.fetchone()
+        cancelled_subscription = dict(subscription)
+        cancelled_subscription["status"] = "CANCELLED"
+        cancelled_subscription["effective_status"] = "CANCELLED"
+        return {
+            "subscription": cancelled_subscription,
+            "outcome": "cancelled",
+            "updated": bool(updated),
+        }
+
+    result = run_in_transaction(_cancel)
+    if not result or not result.get("subscription"):
+        raise PrivateTrainingError("Failed to cancel private training subscription")
+    return result
+
+
 def list_private_clients_for_trainer(current_user: dict[str, Any]) -> list[dict[str, Any]]:
     if not current_user:
         raise PrivateTrainingForbiddenError("Login required")

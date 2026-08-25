@@ -28,6 +28,7 @@ from .services import (
     PrivateTrainingValidationError,
     create_private_training_subscription,
     create_private_training_session_checkin,
+    cancel_private_training_subscription,
     generate_portal_token,
     get_private_subscription_for_trainer,
     get_private_training_pending_session,
@@ -402,6 +403,10 @@ def subscription_detail(subscription_id: int):
     portal_link_status = "Active link exists" if int(subscription.get("active_token_count") or 0) > 0 else "No active token"
     pending_session = get_private_training_pending_session(subscription_id)
     ownership_context = _subscription_ownership_context(current_user, subscription)
+    can_cancel_subscription = bool(
+        _is_manage_authorized(current_user)
+        and str(subscription.get("effective_status") or "").upper() in {"ASSIGNED", "ACTIVE"}
+    )
     return _render(
         "private_training/subscription_detail.html",
         current_user=current_user,
@@ -413,6 +418,7 @@ def subscription_detail(subscription_id: int):
         generated_portal_token=None,
         show_generate_result=False,
         check_in_status_message=_check_in_status_message(subscription),
+        can_cancel_subscription=can_cancel_subscription,
         **ownership_context,
     )
 
@@ -475,6 +481,31 @@ def revoke_subscription_portal_token(subscription_id: int):
         flash("Member portal link revoked successfully.", "success")
     except PrivateTrainingForbiddenError as exc:
         flash(str(exc), "error")
+    except PrivateTrainingError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+
+
+@private_training_bp.route("/subscriptions/<int:subscription_id>/cancel", methods=["POST"])
+@login_required
+def cancel_subscription(subscription_id: int):
+    current_user, response = _current_user_or_redirect()
+    if response:
+        return response
+    if not _is_manage_authorized(current_user):
+        flash("You do not have permission to cancel private training subscriptions.", "error")
+        return redirect(url_for("attendance_table"))
+    try:
+        cancel_private_training_subscription(current_user, subscription_id)
+        flash("Private training subscription cancelled successfully.", "success")
+    except PrivateTrainingNotFoundError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("private_training.subscription_list"))
+    except (PrivateTrainingCancelledError, PrivateTrainingCompletedError, PrivateTrainingExpiredError) as exc:
+        flash(str(exc), "error")
+    except PrivateTrainingForbiddenError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("attendance_table"))
     except PrivateTrainingError as exc:
         flash(str(exc), "error")
     return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
