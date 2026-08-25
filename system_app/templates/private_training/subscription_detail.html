@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Private Training Subscription - Rival Gym System</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/png" href="/static/logo.png">
     <style>
         * { box-sizing: border-box; }
@@ -99,7 +100,7 @@
 
         <div class="hero">
             <h1>Private Training Subscription #{{ subscription.id }}</h1>
-            <div class="muted">{{ subscription.member_name }} with trainer {{ subscription.trainer_username }}</div>
+            <div class="muted">{{ subscription.member_name }} with trainer {{ subscription.trainer_display_name or subscription.trainer_username }}</div>
             <div class="actions">
                 <a class="btn btn-secondary" href="{{ url_for('private_training.subscription_list') }}">Back to List</a>
                 <a class="btn btn-secondary" href="{{ url_for('private_training.my_clients') }}">My Clients</a>
@@ -124,8 +125,8 @@
             <div class="card">
                 <h2>Private Training</h2>
                 <div class="meta">
-                    Trainer: <strong>{{ subscription.trainer_username }}</strong><br>
-                    Creator: {{ subscription.created_by_username or '-' }}<br>
+                    Trainer: <strong>{{ subscription.trainer_display_name or subscription.trainer_username }}</strong><br>
+                    Creator: {{ subscription.created_by_display_name or subscription.created_by_username or '-' }}<br>
                     Start: {{ subscription.private_start_date }}<br>
                     Expiry: {{ subscription.private_expiry_date }}<br>
                     Total Sessions: {{ subscription.total_sessions }}<br>
@@ -134,6 +135,31 @@
                     Pending Sessions: {{ subscription.pending_count or 0 }}<br>
                     Effective Status: <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
                 </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Trainer Session Check-In</h2>
+            <div class="stack">
+                {% if pending_session %}
+                    <div class="pill warn">Waiting for Member Approval</div>
+                    <div class="meta">
+                        Pending session checked in at {{ pending_session.checked_in_at }} by {{ pending_session.trainer_display_name or pending_session.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}
+                    </div>
+                {% elif check_in_status_message %}
+                    <div class="pill {% if can_check_in %}ok{% else %}warn{% endif %}">{{ check_in_status_message }}</div>
+                {% endif %}
+
+                {% if can_check_in %}
+                    <form method="post" action="{{ url_for('private_training.check_in_subscription', subscription_id=subscription.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-primary" type="submit">Check-In Session</button>
+                    </form>
+                {% endif %}
+
+                {% if not can_check_in and not pending_session and not check_in_status_message %}
+                    <div class="muted">No check-in action is currently available.</div>
+                {% endif %}
             </div>
         </div>
 
@@ -186,7 +212,7 @@
                         {% for session_row in sessions %}
                         <tr>
                             <td>{{ session_row.id }}</td>
-                            <td>{{ session_row.trainer_user_id }}</td>
+                            <td>{{ session_row.trainer_display_name or session_row.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}</td>
                             <td>{{ session_row.checked_in_at }}</td>
                             <td>{{ session_row.status }}</td>
                             <td>{{ session_row.approved_at or '-' }}</td>

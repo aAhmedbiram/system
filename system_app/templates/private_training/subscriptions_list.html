@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ workspace_title }} - Rival Gym System</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/png" href="/static/logo.png">
     <style>
         * { box-sizing: border-box; }
@@ -190,7 +191,7 @@
                                 <span class="muted">{{ subscription.member_phone or '-' }}</span>
                             </td>
                             <td>
-                                {{ subscription.trainer_username }}<br>
+                                {{ subscription.trainer_display_name or subscription.trainer_username }}<br>
                                 <span class="muted">ID {{ subscription.trainer_user_id }}</span>
                             </td>
                             <td>

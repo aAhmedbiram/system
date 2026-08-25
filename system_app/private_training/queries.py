@@ -17,6 +17,19 @@ PRIVATE_TRAINING_SESSION_STATUSES = ("PENDING_MEMBER_APPROVAL", "APPROVED", "REJ
 CAIRO_TODAY_SQL = "(CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Cairo')::DATE"
 
 
+def _display_user_name(username: Any) -> str | None:
+    if username is None:
+        return None
+    text = str(username).strip()
+    if not text:
+        return None
+    normalized = text.replace("_", " ")
+    if normalized.lower().startswith("ptc "):
+        remainder = normalized[4:].strip()
+        return f"PTC {remainder.title()}" if remainder else "PTC"
+    return normalized.title()
+
+
 def ensure_private_training_tables() -> None:
     """Create the private-training schema and supporting indexes if needed."""
     db_url = get_database_url()
@@ -183,6 +196,8 @@ def _normalize_subscription_row(row: dict[str, Any] | None) -> dict[str, Any] | 
     if not row:
         return None
     normalized = dict(row)
+    normalized["trainer_display_name"] = _display_user_name(normalized.get("trainer_username"))
+    normalized["created_by_display_name"] = _display_user_name(normalized.get("created_by_username"))
     approved_count = int(normalized.get("approved_count") or 0)
     total_sessions = int(normalized.get("total_sessions") or 0)
     normalized["approved_count"] = approved_count
@@ -282,30 +297,44 @@ def list_private_training_subscriptions_for_member(member_id: int) -> list[dict[
 
 
 def get_private_training_sessions(subscription_id: int) -> list[dict[str, Any]]:
-    return query_db(
+    rows = query_db(
         """
-        SELECT *
-        FROM private_training_sessions
-        WHERE subscription_id = %s
-        ORDER BY checked_in_at DESC, id DESC
+        SELECT
+            ps.*,
+            t.username AS trainer_username,
+            t.email AS trainer_email
+        FROM private_training_sessions ps
+        JOIN users t ON t.id = ps.trainer_user_id
+        WHERE ps.subscription_id = %s
+        ORDER BY ps.checked_in_at DESC, ps.id DESC
         """,
         (subscription_id,),
     ) or []
+    for row in rows:
+        row["trainer_display_name"] = _display_user_name(row.get("trainer_username"))
+    return rows
 
 
 def get_private_training_pending_session(subscription_id: int) -> dict[str, Any] | None:
-    return query_db(
+    row = query_db(
         """
-        SELECT *
-        FROM private_training_sessions
-        WHERE subscription_id = %s
-          AND status = 'PENDING_MEMBER_APPROVAL'
-        ORDER BY checked_in_at DESC, id DESC
+        SELECT
+            ps.*,
+            t.username AS trainer_username,
+            t.email AS trainer_email
+        FROM private_training_sessions ps
+        JOIN users t ON t.id = ps.trainer_user_id
+        WHERE ps.subscription_id = %s
+          AND ps.status = 'PENDING_MEMBER_APPROVAL'
+        ORDER BY ps.checked_in_at DESC, ps.id DESC
         LIMIT 1
         """,
         (subscription_id,),
         one=True,
     )
+    if row:
+        row["trainer_display_name"] = _display_user_name(row.get("trainer_username"))
+    return row
 
 
 def get_private_training_active_subscription_for_member(member_id: int) -> dict[str, Any] | None:

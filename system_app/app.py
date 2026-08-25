@@ -95,6 +95,29 @@ if not app.debug or is_production:
     app.logger.info('Rival Gym System startup')
 
 # === Request ID Tracking ===
+_PRIVATE_TRAINING_PORTAL_PATH_RE = re.compile(r"^(/private-training/member/)([^/]+)(.*)$")
+
+
+def _redact_private_training_portal_value(value):
+    if not value:
+        return value
+    text = str(value)
+    match = _PRIVATE_TRAINING_PORTAL_PATH_RE.match(text)
+    if not match:
+        return text
+    return f"{match.group(1)}[REDACTED]{match.group(3) or ''}"
+
+
+def _redact_private_training_portal_url(url):
+    if not url:
+        return url
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(str(url))
+    redacted_path = _redact_private_training_portal_value(parts.path)
+    return urlunsplit((parts.scheme, parts.netloc, redacted_path, parts.query, parts.fragment))
+
+
 @app.before_request
 def add_request_id():
     """Add unique request ID for tracking"""
@@ -119,6 +142,11 @@ def set_security_headers(response):
     if hasattr(g, 'start_time'):
         duration = (datetime.now() - g.start_time).total_seconds()
         response.headers['X-Response-Time'] = f"{duration:.3f}s"
+    if request and request.path.startswith('/private-training/member/'):
+        response.headers['Cache-Control'] = 'no-store, private'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+        response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
 # === Global Error Handlers for Debugging ===
@@ -130,10 +158,13 @@ def log_request_info():
         if isinstance(ip_address, str) and ',' in ip_address:
             ip_address = ip_address.split(',')[0].strip()
         client = anonymize_ip(ip_address)
-        log_msg = f"{request.method} {request.path}"
+        safe_path = _redact_private_training_portal_value(request.path)
+        safe_url = _redact_private_training_portal_url(request.url)
+        log_msg = f"{request.method} {safe_path}"
         if not is_production and app.debug:
             print(f"\n{'='*80}")
-            print(f"REQUEST: {request.method} {request.path} [ID: {request_id}]")
+            print(f"REQUEST: {request.method} {safe_path} [ID: {request_id}]")
+            print(f"Request URL: {safe_url}")
             print(f"Client: {client}")
             print(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
             if request.method == 'POST':
@@ -322,8 +353,8 @@ def internal_error(error):
     # Try to get more context
     try:
         print(f"Request Method: {request.method}")
-        print(f"Request Path: {request.path}")
-        print(f"Request URL: {request.url}")
+        print(f"Request Path: {_redact_private_training_portal_value(request.path)}")
+        print(f"Request URL: {_redact_private_training_portal_url(request.url)}")
         if request.method == 'POST':
             print(f"Form Data: {dict(request.form)}")
     except:
@@ -337,7 +368,7 @@ def internal_error(error):
 @app.errorhandler(404)
 def not_found_error(error):
     """Handle 404 Not Found Errors"""
-    print(f"404 Error: {request.path}")
+    print(f"404 Error: {_redact_private_training_portal_value(request.path)}")
     return render_template('error.html', 
                           error_code=404,
                           error_message="The page you're looking for doesn't exist."), 404
@@ -360,7 +391,8 @@ def handle_exception(e):
     # Try to get request context
     try:
         print(f"Request Method: {request.method if request else 'N/A'}")
-        print(f"Request Path: {request.path if request else 'N/A'}")
+        print(f"Request Path: {_redact_private_training_portal_value(request.path) if request else 'N/A'}")
+        print(f"Request URL: {_redact_private_training_portal_url(request.url) if request else 'N/A'}")
     except:
         pass
     
@@ -373,6 +405,13 @@ def handle_exception(e):
 def handle_csrf_error(e):
     """Handle CSRF token errors"""
     print(f"CSRF Error: {e.description}")
+    if request and request.path.startswith('/private-training/member/'):
+        flash('CSRF token missing or invalid. Please try again.', 'error')
+        return render_template(
+            'error.html',
+            error_code=400,
+            error_message='CSRF token missing or invalid. Please try again.'
+        ), 400
     if 'user_id' not in session:
         flash('Your session expired. Please log in again.', 'error')
         return redirect(url_for('login'))
@@ -6333,6 +6372,8 @@ def debug_test():
 # === Register Blueprints ===
 from system_app.crm import crm_bp
 app.register_blueprint(crm_bp, url_prefix='/crm')
+from system_app.private_training.public_routes import private_training_public_bp
+app.register_blueprint(private_training_public_bp, url_prefix='/private-training')
 from system_app.private_training.routes import private_training_bp
 app.register_blueprint(private_training_bp, url_prefix='/private-training')
 

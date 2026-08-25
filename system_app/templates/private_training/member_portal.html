@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Training Portal - Rival Gym System</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #08111f 0%, #10192f 45%, #17284a 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .page {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 18px;
+        }
+        .hero, .panel, .card {
+            background: rgba(15, 20, 32, 0.9);
+            border: 1px solid rgba(123, 255, 136, 0.18);
+            border-radius: 16px;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(14px);
+        }
+        .hero { padding: 20px; margin-bottom: 16px; }
+        .panel, .card { padding: 18px; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+        h1, h2, h3 {
+            margin: 0 0 10px 0;
+            color: #7bff88;
+        }
+        .muted { color: #aeb4c5; }
+        .meta { color: #d8f2db; line-height: 1.7; }
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 11px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            border: 0;
+            cursor: pointer;
+        }
+        .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+        .btn-danger { background: rgba(244, 67, 54, 0.16); color: #ffd2d2; border: 1px solid rgba(244, 67, 54, 0.25); }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(255,255,255,0.08);
+        }
+        .pill.ok { background: rgba(76, 175, 80, 0.18); color: #7bff88; }
+        .pill.warn { background: rgba(255, 193, 7, 0.16); color: #ffd54f; }
+        .pill.bad { background: rgba(244, 67, 54, 0.16); color: #ff8a80; }
+        .stack { display: grid; gap: 12px; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            padding: 10px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            color: #7bff88;
+            background: rgba(15, 20, 32, 0.98);
+            position: sticky;
+            top: 0;
+        }
+        .flash-message {
+            margin: 0 0 12px 0;
+            padding: 12px 14px;
+            border-radius: 10px;
+        }
+        .flash-message.success { background: rgba(76, 175, 80, 0.15); border: 1px solid rgba(76, 175, 80, 0.3); }
+        .flash-message.error { background: rgba(244, 67, 54, 0.15); border: 1px solid rgba(244, 67, 54, 0.3); }
+        .flash-message.info { background: rgba(33, 150, 243, 0.14); border: 1px solid rgba(33, 150, 243, 0.25); }
+        label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: #cfe8d1;
+        }
+        textarea {
+            width: 100%;
+            min-height: 96px;
+            resize: vertical;
+            padding: 11px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(0,0,0,0.28);
+            color: #fff;
+        }
+        @media (max-width: 860px) {
+            .grid { grid-template-columns: 1fr; }
+            .page { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% if portal_ended %}
+            <div class="hero">
+                <h1>Private Training Portal</h1>
+                <div class="muted">{{ portal_ended_message or 'This private training subscription is no longer available.' }}</div>
+                <div class="actions">
+                    <a class="btn btn-secondary" href="{{ url_for('index') }}">Go Home</a>
+                </div>
+            </div>
+        {% else %}
+            <div class="hero">
+                <h1>Private Training Portal</h1>
+                <div class="muted">Secure member access for gym and private training details.</div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h2>Gym Details</h2>
+                    <div class="meta">
+                        Member: <strong>{{ subscription.member_name }}</strong><br>
+                        Package: {{ subscription.gym_membership_packages or '-' }}<br>
+                        Status: {{ subscription.gym_membership_status or '-' }}<br>
+                        Start: {{ subscription.gym_starting_date or '-' }}<br>
+                        Expiry: {{ subscription.gym_end_date or '-' }}
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>Private Training</h2>
+                    <div class="meta">
+                        Trainer: <strong>{{ subscription.trainer_display_name or subscription.trainer_username }}</strong><br>
+                        Start: {{ subscription.private_start_date }}<br>
+                        Expiry: {{ subscription.private_expiry_date }}<br>
+                        Total Sessions: {{ subscription.total_sessions }}<br>
+                        Approved Sessions: {{ subscription.approved_count or 0 }}<br>
+                        Remaining Sessions: {{ subscription.remaining_sessions or 0 }}<br>
+                        Effective Status: <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Pending Session</h2>
+                <div class="stack">
+                    {% if pending_session %}
+                        <div class="pill warn">Pending Member Approval</div>
+                        <div class="meta">
+                            Checked In: {{ pending_session.checked_in_at }}<br>
+                            Trainer: {{ pending_session.trainer_display_name or pending_session.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}
+                        </div>
+                        <div class="grid" style="margin-bottom: 0;">
+                            <div class="card">
+                                <h3>Approve</h3>
+                                <form method="post" action="{{ approve_url }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-primary" type="submit">Approve Session</button>
+                                </form>
+                            </div>
+                            <div class="card">
+                                <h3>Reject</h3>
+                                <form method="post" action="{{ reject_url }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <label for="rejection_reason">Rejection Reason</label>
+                                    <textarea id="rejection_reason" name="rejection_reason" maxlength="1000" required placeholder="Tell the trainer why this session is rejected"></textarea>
+                                    <div class="actions" style="margin-top: 12px;">
+                                        <button class="btn btn-danger" type="submit">Reject Session</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="muted">No session is waiting for approval right now.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Session History</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Checked In</th>
+                                <th>Trainer</th>
+                                <th>Status</th>
+                                <th>Approved At</th>
+                                <th>Rejected At</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session_row in sessions %}
+                            <tr>
+                                <td>{{ session_row.checked_in_at }}</td>
+                                <td>{{ session_row.trainer_display_name or session_row.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}</td>
+                                <td>
+                                    <span class="pill {% if session_row.status == 'APPROVED' %}ok{% elif session_row.status == 'PENDING_MEMBER_APPROVAL' %}warn{% else %}bad{% endif %}">
+                                        {{ session_row.status }}
+                                    </span>
+                                </td>
+                                <td>{{ session_row.approved_at or '-' }}</td>
+                                <td>{{ session_row.rejected_at or '-' }}</td>
+                                <td>{{ session_row.rejection_reason or '-' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6">No session history yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from urllib.parse import urljoin
-
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from system_app.crm.permissions import get_current_user, login_required
@@ -17,17 +15,22 @@ from .permissions import (
 )
 from .services import (
     PrivateTrainingCancelledError,
+    PrivateTrainingConflictError,
     PrivateTrainingCompletedError,
     PrivateTrainingError,
     PrivateTrainingExpiredError,
     PrivateTrainingForbiddenError,
+    PrivateTrainingAlreadyProcessedError,
     PrivateTrainingInvalidTrainerError,
     PrivateTrainingNotFoundError,
+    PrivateTrainingPendingSessionConflictError,
     PrivateTrainingSubscriptionConflictError,
     PrivateTrainingValidationError,
     create_private_training_subscription,
+    create_private_training_session_checkin,
     generate_portal_token,
     get_private_subscription_for_trainer,
+    get_private_training_pending_session,
     list_private_clients_for_trainer,
     list_private_training_sessions,
     revoke_portal_token,
@@ -68,7 +71,46 @@ def _is_trainer_authorized(current_user):
 
 
 def _member_link(raw_token: str) -> str:
-    return urljoin((request.host_url or "").rstrip("/") + "/", f"private-training/member/{raw_token}")
+    return url_for("private_training_public.member_portal", raw_token=raw_token, _external=True)
+
+
+def _subscription_ownership_context(current_user, subscription):
+    owns_subscription = bool(subscription and current_user and subscription.get("trainer_user_id") == current_user.get("id"))
+    trainer_authorized = bool(current_user) and can_train_private_training(current_user)
+    super_admin = bool(current_user) and is_super_user(current_user)
+    portal_can_manage = bool(super_admin or (trainer_authorized and owns_subscription))
+    return {
+        "owns_subscription": owns_subscription,
+        "is_trainer_owner": owns_subscription and trainer_authorized,
+        "portal_can_manage": portal_can_manage,
+        "can_manage_tokens": portal_can_manage,
+        "can_check_in": bool(
+            subscription
+            and portal_can_manage
+            and str(subscription.get("effective_status") or "").upper() == "ACTIVE"
+            and int(subscription.get("remaining_sessions") or 0) > 0
+            and int(subscription.get("pending_count") or 0) == 0
+        ),
+    }
+
+
+def _check_in_status_message(subscription):
+    if not subscription:
+        return None
+    if int(subscription.get("pending_count") or 0) > 0:
+        return "Waiting for Member Approval"
+    effective_status = str(subscription.get("effective_status") or "").upper()
+    if effective_status == "ASSIGNED":
+        return "Private training has not started yet"
+    if effective_status == "EXPIRED":
+        return "Private training is expired"
+    if effective_status == "COMPLETED":
+        return "Private training is completed"
+    if effective_status == "CANCELLED":
+        return "Private training is cancelled"
+    if int(subscription.get("remaining_sessions") or 0) <= 0:
+        return "No remaining sessions"
+    return None
 
 
 def _load_member_options(member_query: str | None = None):
@@ -358,17 +400,20 @@ def subscription_detail(subscription_id: int):
         return response
     sessions = list_private_training_sessions(subscription_id)
     portal_link_status = "Active link exists" if int(subscription.get("active_token_count") or 0) > 0 else "No active token"
-    portal_permissions = _portal_action_permissions(current_user, subscription)
+    pending_session = get_private_training_pending_session(subscription_id)
+    ownership_context = _subscription_ownership_context(current_user, subscription)
     return _render(
         "private_training/subscription_detail.html",
         current_user=current_user,
         subscription=subscription,
         sessions=sessions,
+        pending_session=pending_session,
         portal_link_status=portal_link_status,
         generated_portal_url=None,
         generated_portal_token=None,
         show_generate_result=False,
-        **portal_permissions,
+        check_in_status_message=_check_in_status_message(subscription),
+        **ownership_context,
     )
 
 
@@ -389,18 +434,21 @@ def generate_subscription_portal_token(subscription_id: int):
         sessions = list_private_training_sessions(subscription_id)
         portal_url = _member_link(raw_token)
         flash("Member portal link generated successfully.", "success")
-        portal_permissions = _portal_action_permissions(current_user, subscription)
+        pending_session = get_private_training_pending_session(subscription_id)
+        ownership_context = _subscription_ownership_context(current_user, subscription)
         return _render(
             "private_training/subscription_detail.html",
             current_user=current_user,
             subscription=subscription,
             sessions=sessions,
+            pending_session=pending_session,
             portal_link_status="Active link exists",
             generated_portal_url=portal_url,
             generated_portal_token=raw_token,
             generated_token_id=token_row.get("id"),
             show_generate_result=True,
-            **portal_permissions,
+            check_in_status_message=_check_in_status_message(subscription),
+            **ownership_context,
         )
     except PrivateTrainingForbiddenError as exc:
         flash(str(exc), "error")
@@ -430,3 +478,29 @@ def revoke_subscription_portal_token(subscription_id: int):
     except PrivateTrainingError as exc:
         flash(str(exc), "error")
     return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+
+
+@private_training_bp.route("/subscriptions/<int:subscription_id>/check-in", methods=["POST"])
+@login_required
+def check_in_subscription(subscription_id: int):
+    current_user, response = _current_user_or_redirect()
+    if response:
+        return response
+    try:
+        result = create_private_training_session_checkin(current_user, subscription_id)
+        flash("Private training session check-in created successfully.", "success")
+        return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+    except PrivateTrainingPendingSessionConflictError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+    except (PrivateTrainingCancelledError, PrivateTrainingCompletedError, PrivateTrainingExpiredError, PrivateTrainingConflictError) as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+    except (PrivateTrainingForbiddenError, PrivateTrainingNotFoundError) as exc:
+        flash(str(exc), "error")
+        if can_train_private_training(current_user):
+            return redirect(url_for("private_training.my_clients"))
+        return redirect(url_for("private_training.subscription_list"))
+    except PrivateTrainingError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
