@@ -92,7 +92,7 @@ class TestLoginLandingPhase1(unittest.TestCase):
             (self.trainer_user_id, True, ["private_training_trainer"]),
             (self.manager_user_id, True, ["private_training_manage"]),
             (self.viewer_user_id, True, ["private_training_view"]),
-            (self.ordinary_user_id, True, []),
+            (self.ordinary_user_id, True, ["attendance"]),
             (self.unapproved_user_id, False, []),
         ]
         self._login_as_rino()
@@ -169,7 +169,23 @@ class TestLoginLandingPhase1(unittest.TestCase):
             sess["username"] = self.trainer_user["username"]
         direct = self.client.get("/private-training/my-clients")
         self.assertEqual(direct.status_code, 200)
-        self.assertIn("My Private Clients", direct.data.decode())
+        html = direct.data.decode()
+        self.assertIn("My Private Clients", html)
+        self.assertIn("Logout", html)
+
+    def test_05b_trainer_only_cannot_use_attendance_home_or_index(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = self.trainer_user_id
+            sess["username"] = self.trainer_user["username"]
+
+        attendance = self.client.get("/attendance_table", follow_redirects=False)
+        self.assertEqual(attendance.status_code, 302)
+        self.assertIn("/private-training/my-clients", attendance.location)
+
+        home = self.client.get("/home", follow_redirects=True)
+        self.assertEqual(home.status_code, 200)
+        self.assertIn("My Private Clients", home.data.decode())
+        self.assertNotIn("Attendance Table", home.data.decode())
 
     def test_06_manager_lands_on_subscription_list(self):
         response = self._login(self.manager_user["username"])
@@ -186,6 +202,28 @@ class TestLoginLandingPhase1(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/attendance_table", response.location)
 
+    def test_08b_user_with_attendance_permission_can_open_attendance_directly(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = self.ordinary_user_id
+            sess["username"] = self.ordinary_user["username"]
+        direct = self.client.get("/attendance_table")
+        self.assertEqual(direct.status_code, 200)
+        self.assertIn("Attendance Table", direct.data.decode())
+
+    def test_08c_approved_user_without_attendance_cannot_open_attendance_directly(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = self.manager_user_id
+            sess["username"] = self.manager_user["username"]
+        direct = self.client.get("/attendance_table", follow_redirects=False)
+        self.assertEqual(direct.status_code, 302)
+        self.assertIn("/private-training/subscriptions", direct.location)
+
+        follow = self.client.get("/attendance_table", follow_redirects=True)
+        self.assertEqual(follow.status_code, 200)
+        html = follow.data.decode()
+        self.assertIn("Private Training Subscriptions", html)
+        self.assertNotIn("Attendance Table", html)
+
     def test_09_super_admin_behaviour_remains_compatible(self):
         response = self._login(self.super_user["username"])
         self.assertEqual(response.status_code, 302)
@@ -194,6 +232,16 @@ class TestLoginLandingPhase1(unittest.TestCase):
             or response.location.endswith("/home")
             or response.location.endswith("/")
         )
+
+    def test_09b_trainer_logout_clears_session(self):
+        self._login(self.trainer_user["username"])
+        response = self.client.get("/logout", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.location)
+
+        protected = self.client.get("/private-training/my-clients", follow_redirects=False)
+        self.assertEqual(protected.status_code, 302)
+        self.assertIn("/login", protected.location)
 
     def test_10_pending_approval_page_is_accessible_to_blocked_user(self):
         with self.client.session_transaction() as sess:

@@ -132,7 +132,10 @@
                 {% endif %}
             </div>
             <div class="actions">
-                <a class="btn btn-secondary" href="{{ url_for('index') }}">Back Home</a>
+                {% if current_user.username == 'rino' or current_user.permissions.get('index') or current_user.permissions.get('super_admin') %}
+                    <a class="btn btn-secondary" href="{{ url_for('index') }}">Back Home</a>
+                {% endif %}
+                <a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
                 {% if allow_create %}
                     <a class="btn btn-primary" href="{{ url_for('private_training.new_subscription') }}">New Private Subscription</a>
                 {% endif %}

@@ -2,7 +2,7 @@ try:
     from . import env_loader
 except ImportError:
     import env_loader
-from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify, has_request_context
+from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify, has_request_context, abort
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from datetime import datetime, timedelta
 import os
@@ -3206,6 +3206,31 @@ def change_password():
 @app.route('/attendance_table', methods=['GET', 'POST'])
 @login_required
 def attendance_table():
+    user = get_current_user()
+    if not user:
+        session.clear()
+        flash('Session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+
+    user_permissions = user.get('permissions') or {}
+    if not isinstance(user_permissions, dict):
+        user_permissions = {}
+
+    can_access_attendance = bool(
+        user.get('username') == 'rino'
+        or user_permissions.get('super_admin')
+        or user_permissions.get('attendance')
+    )
+    if not can_access_attendance:
+        flash("You do not have permission to access the attendance table.", "error")
+        if user_permissions.get('private_training_trainer'):
+            return redirect(url_for('private_training.my_clients'))
+        if user_permissions.get('private_training_manage') or user_permissions.get('private_training_view'):
+            return redirect(url_for('private_training.subscription_list'))
+        if user_permissions.get('index'):
+            return redirect(url_for('index'))
+        abort(403)
+
     if request.method == 'POST':
         member_id_str = request.form.get('member_id', '').strip()
         if not member_id_str.isdigit():

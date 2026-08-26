@@ -104,6 +104,10 @@
             <div class="actions">
                 <a class="btn btn-secondary" href="{{ url_for('private_training.subscription_list') }}">Back to List</a>
                 <a class="btn btn-secondary" href="{{ url_for('private_training.my_clients') }}">My Clients</a>
+                {% if current_user.username == 'rino' or current_user.permissions.get('index') or current_user.permissions.get('super_admin') %}
+                    <a class="btn btn-secondary" href="{{ url_for('index') }}">Back Home</a>
+                {% endif %}
+                <a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
                 {% if user_permissions.private_training_manage or user_permissions.super_admin %}
                     <a class="btn btn-secondary" href="{{ url_for('private_training.new_subscription', member_id=subscription.member_id) }}">New Subscription</a>
                 {% endif %}
