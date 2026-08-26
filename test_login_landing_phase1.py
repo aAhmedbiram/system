@@ -1,6 +1,7 @@
 import unittest
 
 from psycopg2.extras import Json
+from werkzeug.datastructures import MultiDict
 from werkzeug.security import generate_password_hash
 
 from system_app.app import app
@@ -14,6 +15,7 @@ class TestLoginLandingPhase1(unittest.TestCase):
     viewer_user_id = 970004
     ordinary_user_id = 970005
     super_user_id = 970006
+    rino_user_id = 970007
 
     def setUp(self):
         self._old_testing = app.config.get("TESTING")
@@ -24,12 +26,14 @@ class TestLoginLandingPhase1(unittest.TestCase):
 
         self._cleanup_users()
         self._upsert_users()
+        self._apply_permissions_via_admin_ui()
         self.unapproved_user = self._load_user(self.unapproved_user_id)
         self.trainer_user = self._load_user(self.trainer_user_id)
         self.manager_user = self._load_user(self.manager_user_id)
         self.viewer_user = self._load_user(self.viewer_user_id)
         self.ordinary_user = self._load_user(self.ordinary_user_id)
         self.super_user = self._load_user(self.super_user_id)
+        self.rino_user = self._load_user(self.rino_user_id)
 
     def tearDown(self):
         self._cleanup_users()
@@ -38,18 +42,19 @@ class TestLoginLandingPhase1(unittest.TestCase):
 
     def _cleanup_users(self):
         query_db(
-            "DELETE FROM users WHERE id IN (970001, 970002, 970003, 970004, 970005, 970006)",
+            "DELETE FROM users WHERE id IN (970001, 970002, 970003, 970004, 970005, 970006, 970007)",
             commit=True,
         )
 
     def _upsert_users(self):
         users = [
             (self.unapproved_user_id, "pt_pending_login", False, {}),
-            (self.trainer_user_id, "pt_login_trainer", True, {"private_training_trainer": True}),
-            (self.manager_user_id, "pt_login_manager", True, {"private_training_manage": True}),
-            (self.viewer_user_id, "pt_login_viewer", True, {"private_training_view": True}),
+            (self.trainer_user_id, "pt_login_trainer", True, {}),
+            (self.manager_user_id, "pt_login_manager", True, {}),
+            (self.viewer_user_id, "pt_login_viewer", True, {}),
             (self.ordinary_user_id, "pt_login_ordinary", True, {}),
             (self.super_user_id, "pt_login_super", True, {"super_admin": True}),
+            (self.rino_user_id, "rino", True, {}),
         ]
         for user_id, username, is_approved, permissions in users:
             query_db(
@@ -74,6 +79,34 @@ class TestLoginLandingPhase1(unittest.TestCase):
                 commit=True,
             )
 
+    def _login_as_rino(self):
+        response = self._login("rino")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            response.location.endswith("/home")
+            or response.location.endswith("/index")
+        )
+
+    def _apply_permissions_via_admin_ui(self):
+        permission_sets = [
+            (self.trainer_user_id, True, ["private_training_trainer"]),
+            (self.manager_user_id, True, ["private_training_manage"]),
+            (self.viewer_user_id, True, ["private_training_view"]),
+            (self.ordinary_user_id, True, []),
+            (self.unapproved_user_id, False, []),
+        ]
+        self._login_as_rino()
+        for user_id, is_approved, perms in permission_sets:
+            payload = MultiDict([("user_id", str(user_id))])
+            if is_approved:
+                payload.add("is_approved", "on")
+            for perm in perms:
+                payload.add("perms", perm)
+            response = self.client.post("/user_permissions", data=payload, follow_redirects=False)
+            self.assertEqual(response.status_code, 302)
+            self.assertIn("/user_permissions", response.location)
+        self.client.get("/logout", follow_redirects=False)
+
     def _load_user(self, user_id):
         return query_db(
             "SELECT id, username, email, is_approved, permissions FROM users WHERE id = %s",
@@ -92,6 +125,15 @@ class TestLoginLandingPhase1(unittest.TestCase):
         response = self._login(self.unapproved_user["username"])
         self.assertEqual(response.status_code, 302)
         self.assertIn("/pending-approval", response.location)
+
+    def test_01b_trainer_permission_is_persisted_via_admin_ui(self):
+        trainer = self._load_user(self.trainer_user_id)
+        manager = self._load_user(self.manager_user_id)
+        viewer = self._load_user(self.viewer_user_id)
+        self.assertTrue(trainer["is_approved"])
+        self.assertTrue(trainer["permissions"].get("private_training_trainer"))
+        self.assertTrue(manager["permissions"].get("private_training_manage"))
+        self.assertTrue(viewer["permissions"].get("private_training_view"))
 
     def test_02_unapproved_user_cannot_open_home(self):
         with self.client.session_transaction() as sess:

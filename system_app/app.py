@@ -1559,9 +1559,6 @@ def login():
                 if _account_requires_pending_approval(user):
                     return redirect(url_for('pending_approval'))
 
-                # Special handling for hossam - always redirect to attendance_table
-                if user.get('username') == 'hossam' or user.get('username') == 'hossam_marghany':
-                    return redirect(url_for('attendance_table'))
                 return redirect(url_for(_post_login_landing_endpoint(user)))
             # If get_current_user failed or returned None, clear session and show login
             session.clear()
@@ -1653,9 +1650,6 @@ def login():
 
                 flash('Login successful!', 'success')
                 
-                # Special handling for hossam - always redirect to attendance_table
-                if user.get('username') == 'hossam' or user.get('username') == 'hossam_marghany':
-                    return redirect(url_for('attendance_table'))
                 if user.get('username') == 'rino':
                     return redirect(url_for('index'))
 
