@@ -36,6 +36,12 @@ def _load_permissions(permissions_val):
     except:
         return {}
 
+
+def _user_requires_pending_approval(user):
+    if not user:
+        return False
+    return bool(user.get('username') not in ['rino', 'ahmed_adel', 'malit_deng'] and not user.get('is_approved'))
+
 def get_current_user():
     """Resolves and loads the current logged-in user with permission values."""
     user_id = session.get('user_id')
@@ -64,6 +70,14 @@ def login_required(f):
         if 'user_id' not in session:
             flash('You must log in first!', 'error')
             return redirect(url_for('login'))
+        user = get_current_user()
+        if not user:
+            session.clear()
+            flash('Session expired. Please log in again.', 'error')
+            return redirect(url_for('login'))
+        if _user_requires_pending_approval(user):
+            flash('Your account is pending approval.', 'error')
+            return redirect(url_for('pending_approval'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -88,12 +102,9 @@ def crm_permission_required(permission_key):
                 return f(*args, **kwargs)
 
             # Block other unapproved users from CRM
-            if username not in ['ahmed_adel', 'malit_deng'] and not user.get('is_approved'):
+            if _user_requires_pending_approval(user):
                 flash('Your account is pending Rino approval.', 'error')
-                referrer = request.referrer
-                if referrer and referrer != request.url:
-                    return redirect(referrer)
-                return redirect(url_for('attendance_table'))
+                return redirect(url_for('pending_approval'))
 
             perms = user.get('permissions') or {}
             # Allow if they have the specific permission OR if they are a super_admin

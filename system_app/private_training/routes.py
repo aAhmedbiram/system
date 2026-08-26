@@ -59,8 +59,8 @@ def _current_user_or_redirect():
         flash("You must log in first!", "error")
         return None, redirect(url_for("login"))
     if not is_approved_user(current_user):
-        flash("Your account is pending Rino approval.", "error")
-        return None, redirect(url_for("attendance_table"))
+        flash("Your account is pending approval.", "error")
+        return None, redirect(url_for("pending_approval"))
     return current_user, None
 
 

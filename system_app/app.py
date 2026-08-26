@@ -682,8 +682,45 @@ def login_required(f):
         if 'user_id' not in session:
             flash('You must log in first!', 'error')
             return redirect(url_for('login'))
+        user = get_current_user()
+        if not user:
+            session.clear()
+            flash('Session expired. Please login again.', 'error')
+            return redirect(url_for('login'))
+        username = user.get('username')
+        if username not in ['rino', 'ahmed_adel', 'malit_deng'] and not user.get('is_approved'):
+            flash('Your account is pending approval.', 'error')
+            return redirect(url_for('pending_approval'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+def _account_requires_pending_approval(user):
+    if not user:
+        return False
+    username = user.get('username')
+    return bool(username not in ['rino', 'ahmed_adel', 'malit_deng'] and not user.get('is_approved'))
+
+
+def _post_login_landing_endpoint(user):
+    if not user:
+        return 'login'
+
+    username = user.get('username')
+    if username == 'rino':
+        return 'index'
+
+    perms = user.get('permissions') or {}
+    if not isinstance(perms, dict):
+        perms = {}
+
+    if perms.get('private_training_trainer'):
+        return 'private_training.my_clients'
+    if perms.get('private_training_manage') or perms.get('private_training_view'):
+        return 'private_training.subscription_list'
+    if perms.get('index'):
+        return 'index'
+    return 'attendance_table'
 
 
 def permission_required(permission_key):
@@ -718,17 +755,12 @@ def permission_required(permission_key):
             # Block other unapproved users from everything except attendance
             elif not user.get('is_approved'):
                 flash('Your account is pending Rino approval.', 'error')
-                # Redirect back to previous page or attendance if no referrer
-                referrer = request.referrer
-                if referrer and referrer != request.url:
-                    return redirect(referrer)
-                return redirect(url_for('attendance_table'))
+                return redirect(url_for('pending_approval'))
 
             perms = user.get('permissions') or {}
             # Allow if they have the specific permission OR if they are a super_admin
             if not perms.get(permission_key) and not perms.get('super_admin'):
                 flash('You do not have permission to access this page!', 'error')
-                # Stay on current page (redirect back to referrer) or go to attendance_table if no referrer
                 referrer = request.referrer
                 if referrer and referrer != request.url:
                     return redirect(referrer)
@@ -1422,6 +1454,26 @@ def index():
                             **common_context)
 
 
+@app.route('/pending-approval')
+def pending_approval():
+    """Safe landing page for authenticated users awaiting approval."""
+    if 'user_id' not in session:
+        flash('You must log in first!', 'error')
+        return redirect(url_for('login'))
+
+    user = get_current_user()
+    if not user:
+        session.clear()
+        flash('Session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+
+    if not _account_requires_pending_approval(user):
+        return redirect(url_for(_post_login_landing_endpoint(user)))
+
+    common_context = get_common_template_context()
+    return render_template('pending_approval_notice.html', current_user=user, **common_context)
+
+
 # Rate limiting for login (simple in-memory implementation)
 _login_attempts = {}
 _MAX_LOGIN_ATTEMPTS = 5
@@ -1504,24 +1556,13 @@ def login():
         try:
             user = get_current_user()
             if user and user.get('username'):
+                if _account_requires_pending_approval(user):
+                    return redirect(url_for('pending_approval'))
+
                 # Special handling for hossam - always redirect to attendance_table
                 if user.get('username') == 'hossam' or user.get('username') == 'hossam_marghany':
                     return redirect(url_for('attendance_table'))
-                
-                # Check if user has index permission, otherwise go to attendance
-                if user.get('username') == 'rino':
-                    return redirect(url_for('index'))
-                
-                perms = user.get('permissions') or {}
-                # Ensure perms is a dict
-                if not isinstance(perms, dict):
-                    perms = {}
-                
-                if perms.get('index'):
-                    return redirect(url_for('index'))
-                else:
-                    # Always redirect to attendance_table for users without index permission
-                    return redirect(url_for('attendance_table'))
+                return redirect(url_for(_post_login_landing_endpoint(user)))
             # If get_current_user failed or returned None, clear session and show login
             session.clear()
             flash('Session expired. Please login again.', 'info')
@@ -1606,31 +1647,25 @@ def login():
                     'ip_address': ip_address
                 }
                 
+                if _account_requires_pending_approval(user):
+                    flash('Your account is pending approval.', 'error')
+                    return redirect(url_for('pending_approval'))
+
                 flash('Login successful!', 'success')
                 
                 # Special handling for hossam - always redirect to attendance_table
                 if user.get('username') == 'hossam' or user.get('username') == 'hossam_marghany':
                     return redirect(url_for('attendance_table'))
-                
-                # Redirect based on user permissions
-                # Check if user has index permission, otherwise go to attendance
                 if user.get('username') == 'rino':
                     return redirect(url_for('index'))
-                
-                # Load permissions to check
+
                 perms = user.get('permissions') or {}
                 if not perms or (isinstance(perms, str) and perms.strip() == ''):
-                    # If permissions are empty/None, load from DB or use defaults
                     perms = _load_permissions(user.get('permissions'))
                     if not perms:
-                        # Get default permissions for this username
                         perms = get_default_permissions_for_username(user.get('username'))
-                
-                if perms.get('index'):
-                    return redirect(url_for('index'))
-                else:
-                    # Always redirect to attendance_table for users without index permission
-                    return redirect(url_for('attendance_table'))
+                user['permissions'] = perms
+                return redirect(url_for(_post_login_landing_endpoint(user)))
             else:
                 record_failed_login(ip_address)
                 flash('Username or password is incorrect!', 'error')
@@ -1640,7 +1675,6 @@ def login():
     return render_template('login.html')
 
 @app.route('/logout')
-@login_required
 def logout():
     # Remove user from online tracking
     user_id = session.get('user_id')
