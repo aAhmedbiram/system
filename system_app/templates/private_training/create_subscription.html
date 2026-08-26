@@ -64,6 +64,14 @@
             margin-bottom: 16px;
         }
         .small { font-size: 13px; color: #aeb4c5; }
+        .empty-state {
+            margin-top: 10px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            border: 1px dashed rgba(255,255,255,0.18);
+            color: #d7dceb;
+        }
         @media (max-width: 720px) {
             .grid, .search-row { grid-template-columns: 1fr; }
             .page { padding: 14px; }
@@ -114,18 +122,26 @@
                                 </option>
                             {% endfor %}
                         </select>
-                        <div class="small">Use search above to narrow the list.</div>
+                        {% if members %}
+                            <div class="small">Use search above to narrow the list.</div>
+                        {% else %}
+                            <div class="empty-state">No valid or active members matched your search.</div>
+                        {% endif %}
                     </div>
                     <div class="full">
                         <label for="trainer_user_id">Trainer</label>
-                        <select id="trainer_user_id" name="trainer_user_id" required>
-                            <option value="">Select a trainer</option>
-                            {% for trainer in trainers %}
-                                <option value="{{ trainer.id }}" {% if form_data.trainer_user_id and form_data.trainer_user_id|int == trainer.id %}selected{% endif %}>
-                                    {{ trainer.username }} {% if trainer.email %}({{ trainer.email }}){% endif %}
-                                </option>
-                            {% endfor %}
-                        </select>
+                        {% if trainers %}
+                            <select id="trainer_user_id" name="trainer_user_id" required>
+                                <option value="">Select a trainer</option>
+                                {% for trainer in trainers %}
+                                    <option value="{{ trainer.id }}" {% if form_data.trainer_user_id and form_data.trainer_user_id|int == trainer.id %}selected{% endif %}>
+                                        {{ trainer.username }} {% if trainer.email %}({{ trainer.email }}){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        {% else %}
+                            <div class="empty-state">No Private Training trainers are configured.</div>
+                        {% endif %}
                     </div>
                     <div>
                         <label for="total_sessions">Total Sessions</label>

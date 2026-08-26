@@ -41,6 +41,9 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
     member_d_id = 940004
     member_e_id = 940005
     member_f_id = 940006
+    member_g_id = 940101
+    member_h_id = 940102
+    member_i_id = 940103
 
     def setUp(self):
         self._old_csrf_enabled = app.config.get("WTF_CSRF_ENABLED")
@@ -115,14 +118,25 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
             (self.member_d_id, "PTB Member D", "880004"),
             (self.member_e_id, "PTB Member E", "880005"),
             (self.member_f_id, "PTB Member F", "880006"),
+            (self.member_g_id, "PTB Search Alpha", "880101"),
+            (self.member_h_id, "PTB Expired Search", "880102"),
+            (self.member_i_id, "PTB Phone Clash", "94000199"),
         ]
         for member_id, name, phone in members:
+            if member_id == self.member_h_id:
+                membership_status = "EX"
+                start_date = self._date_str(-60)
+                end_date = self._date_str(-1)
+            else:
+                membership_status = "VAL"
+                start_date = self._date_str(-1)
+                end_date = self._date_str(30)
             query_db(
                 """
                 INSERT INTO members (
                     id, name, phone, membership_packages, membership_fees,
                     membership_status, starting_date, end_date
-                ) VALUES (%s, %s, %s, '1 Month', 500.0, 'VAL', %s, %s)
+                ) VALUES (%s, %s, %s, '1 Month', 500.0, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     name = EXCLUDED.name,
                     phone = EXCLUDED.phone,
@@ -132,7 +146,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
                     starting_date = EXCLUDED.starting_date,
                     end_date = EXCLUDED.end_date
                 """,
-                (member_id, name, phone, self._date_str(-1), self._date_str(30)),
+                (member_id, name, phone, membership_status, start_date, end_date),
                 commit=True,
             )
 
@@ -142,9 +156,9 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
             DELETE FROM private_training_portal_tokens
             WHERE subscription_id IN (
                 SELECT id FROM private_training_subscriptions
-               WHERE member_id BETWEEN 940001 AND 940006
-                   OR trainer_user_id BETWEEN 930001 AND 930008
-                   OR created_by_user_id BETWEEN 930001 AND 930008
+               WHERE member_id IN (940001, 940002, 940003, 940004, 940005, 940006, 940101, 940102, 940103)
+                   OR trainer_user_id IN (930001, 930002, 930003, 930004, 930005, 930006, 930007, 930008)
+                   OR created_by_user_id IN (930001, 930002, 930003, 930004, 930005, 930006, 930007, 930008)
             )
             """,
             commit=True,
@@ -154,9 +168,9 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
             DELETE FROM private_training_sessions
             WHERE subscription_id IN (
                 SELECT id FROM private_training_subscriptions
-               WHERE member_id BETWEEN 940001 AND 940006
-                   OR trainer_user_id BETWEEN 930001 AND 930008
-                   OR created_by_user_id BETWEEN 930001 AND 930008
+               WHERE member_id IN (940001, 940002, 940003, 940004, 940005, 940006, 940101, 940102, 940103)
+                   OR trainer_user_id IN (930001, 930002, 930003, 930004, 930005, 930006, 930007, 930008)
+                   OR created_by_user_id IN (930001, 930002, 930003, 930004, 930005, 930006, 930007, 930008)
             )
             """,
             commit=True,
@@ -164,18 +178,18 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
         query_db(
             """
             DELETE FROM private_training_subscriptions
-            WHERE member_id BETWEEN 940001 AND 940006
-               OR trainer_user_id BETWEEN 930001 AND 930008
-               OR created_by_user_id BETWEEN 930001 AND 930008
+            WHERE member_id IN (940001, 940002, 940003, 940004, 940005, 940006, 940101, 940102, 940103)
+               OR trainer_user_id IN (930001, 930002, 930003, 930004, 930005, 930006, 930007, 930008)
+               OR created_by_user_id IN (930001, 930002, 930003, 930004, 930005, 930006, 930007, 930008)
             """,
             commit=True,
         )
 
     def _cleanup_members(self):
-        query_db("DELETE FROM members WHERE id BETWEEN 940001 AND 940006", commit=True)
+        query_db("DELETE FROM members WHERE id IN (940001, 940002, 940003, 940004, 940005, 940006, 940101, 940102, 940103)", commit=True)
 
     def _cleanup_users(self):
-        query_db("DELETE FROM users WHERE id BETWEEN 930001 AND 930008", commit=True)
+        query_db("DELETE FROM users WHERE id IN (930001, 930002, 930003, 930004, 930005, 930006, 930007, 930008)", commit=True)
 
     def _load_user(self, user_id):
         return query_db(
@@ -270,15 +284,70 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
         self.assertIn('name="private_start_date"', html)
         self.assertIn('name="private_expiry_date"', html)
 
+    def test_03b_default_member_results_only_include_active_members(self):
+        self._login_as(self.manager_user)
+        response = self.client.get("/private-training/subscriptions/new")
+        html = response.data.decode()
+        self.assertIn("PTB Member A", html)
+        self.assertIn("PTB Search Alpha", html)
+        self.assertIn("PTB Phone Clash", html)
+        self.assertNotIn("PTB Expired Search", html)
+
+    def test_03c_numeric_member_id_search_prioritizes_exact_id(self):
+        self._login_as(self.manager_user)
+        response = self.client.get(
+            "/private-training/subscriptions/new",
+            query_string={"q": str(self.member_a_id)},
+        )
+        html = response.data.decode()
+        exact_index = html.index(f'value="{self.member_a_id}"')
+        phone_match_index = html.index(f'value="{self.member_i_id}"')
+        self.assertLess(exact_index, phone_match_index)
+
+    def test_03d_name_partial_search_works(self):
+        self._login_as(self.manager_user)
+        response = self.client.get(
+            "/private-training/subscriptions/new",
+            query_string={"q": "Search Alpha"},
+        )
+        html = response.data.decode()
+        self.assertIn("PTB Search Alpha", html)
+        self.assertNotIn("PTB Expired Search", html)
+
+    def test_03e_phone_search_works(self):
+        self._login_as(self.manager_user)
+        response = self.client.get(
+            "/private-training/subscriptions/new",
+            query_string={"q": "880002"},
+        )
+        html = response.data.decode()
+        self.assertIn("PTB Member B", html)
+        self.assertNotIn("PTB Member C", html)
+
     def test_04_trainer_selector_only_includes_approved_private_training_trainers(self):
         self._login_as(self.manager_user)
         response = self.client.get("/private-training/subscriptions/new")
         html = response.data.decode()
         self.assertIn("ptb_trainer_a", html)
         self.assertIn("ptb_trainer_b", html)
+        self.assertIn("ptb_mixed", html)
         self.assertNotIn("ptb_no_perm", html)
         self.assertNotIn("ptb_pending_trainer", html)
         self.assertNotIn("ptb_super_admin", html)
+
+    def test_04b_empty_trainer_state_renders_useful_message(self):
+        self._login_as(self.manager_user)
+        for user_id in (self.trainer_a_user_id, self.trainer_b_user_id, self.mixed_user_id):
+            permissions = dict(self._load_user(user_id).get("permissions") or {})
+            permissions["private_training_trainer"] = False
+            query_db(
+                "UPDATE users SET permissions = %s WHERE id = %s",
+                (Json(permissions), user_id),
+                commit=True,
+            )
+        response = self.client.get("/private-training/subscriptions/new")
+        html = response.data.decode()
+        self.assertIn("No Private Training trainers are configured.", html)
 
     def test_05_invalid_member_rejected(self):
         self._login_as(self.manager_user)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from system_app.crm.permissions import get_current_user, login_required
+from system_app.func import get_cairo_date
 from system_app.queries import query_db
 
 from .permissions import (
@@ -114,27 +115,80 @@ def _check_in_status_message(subscription):
     return None
 
 
+def _active_member_filter_sql():
+    return """
+        end_date IS NOT NULL
+        AND btrim(COALESCE(end_date, '')) <> ''
+        AND LENGTH(btrim(end_date)) >= 10
+        AND SUBSTRING(btrim(end_date), 1, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        AND CAST(SUBSTRING(btrim(end_date), 1, 10) AS DATE) >= %s
+        AND COALESCE(membership_status, '') <> 'EX'
+    """
+
+
 def _load_member_options(member_query: str | None = None):
-    members = query_db(
-        """
+    query = (member_query or "").strip()
+    today = get_cairo_date()
+    base_select = """
         SELECT id, name, phone, membership_packages, membership_status, starting_date, end_date
         FROM members
-        ORDER BY name ASC, id DESC
-        """,
-    ) or []
-    query = (member_query or "").strip().lower()
+    """
+    active_clause = _active_member_filter_sql()
     if not query:
+        members = query_db(
+            f"""
+            {base_select}
+            WHERE {active_clause}
+            ORDER BY name ASC, id ASC
+            """,
+            (today,),
+        ) or []
         return [dict(row) for row in members]
-    filtered = []
-    for row in members:
-        row_dict = dict(row)
-        searchable = " ".join(
-            str(row_dict.get(key) or "")
-            for key in ("id", "name", "phone", "membership_packages", "membership_status")
-        ).lower()
-        if query in searchable:
-            filtered.append(row_dict)
-    return filtered
+
+    like_query = f"%{query}%"
+    params = [today]
+    where_parts = [active_clause]
+    order_clause = "ORDER BY name ASC, id ASC"
+
+    if query.isdigit():
+        where_parts.append("(CAST(id AS TEXT) = %s OR name ILIKE %s OR COALESCE(phone, '') ILIKE %s)")
+        params.extend([query, like_query, like_query])
+        order_clause = """
+            ORDER BY
+                CASE
+                    WHEN CAST(id AS TEXT) = %s THEN 0
+                    WHEN name ILIKE %s THEN 1
+                    WHEN COALESCE(phone, '') ILIKE %s THEN 2
+                    ELSE 3
+                END,
+                name ASC,
+                id ASC
+        """
+        params.extend([query, like_query, like_query])
+    else:
+        where_parts.append("(name ILIKE %s OR COALESCE(phone, '') ILIKE %s)")
+        params.extend([like_query, like_query])
+        order_clause = """
+            ORDER BY
+                CASE
+                    WHEN name ILIKE %s THEN 0
+                    WHEN COALESCE(phone, '') ILIKE %s THEN 1
+                    ELSE 2
+                END,
+                name ASC,
+                id ASC
+        """
+        params.extend([like_query, like_query])
+
+    members = query_db(
+        f"""
+        {base_select}
+        WHERE {' AND '.join(where_parts)}
+        {order_clause}
+        """,
+        tuple(params),
+    ) or []
+    return [dict(row) for row in members]
 
 
 def _load_trainer_options():
