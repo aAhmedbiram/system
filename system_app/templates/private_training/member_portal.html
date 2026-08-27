@@ -199,8 +199,6 @@
                                 <th>Trainer</th>
                                 <th>Status</th>
                                 <th>Approved At</th>
-                                <th>Rejected At</th>
-                                <th>Reason</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -214,12 +212,10 @@
                                     </span>
                                 </td>
                                 <td>{{ session_row.approved_at or '-' }}</td>
-                                <td>{{ session_row.rejected_at or '-' }}</td>
-                                <td>{{ session_row.rejection_reason or '-' }}</td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="6">No session history yet.</td>
+                                <td colspan="4">No session history yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

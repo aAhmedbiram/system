@@ -327,11 +327,14 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertIn("Private Training", html)
         self.assertIn("Pending Member Approval", html)
         self.assertIn("Session History", html)
+        self.assertIn("Approved At", html)
         self.assertIn("Approved Sessions: 0", html)
         self.assertIn("Remaining Sessions: 2", html)
         self.assertIn('name="csrf_token"', html)
         self.assertIn("Approve Session", html)
         self.assertNotIn("Reject Session", html)
+        self.assertNotIn("Rejected At", html)
+        self.assertNotIn("Reason", html)
         self.assertNotIn("rejection_reason", html)
 
     def test_02_invalid_token_returns_404(self):
@@ -552,6 +555,8 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertIn("PTC Trainer A", portal_html)
         self.assertIn("Approve Session", portal_html)
         self.assertNotIn("Reject Session", portal_html)
+        self.assertNotIn("Rejected At", portal_html)
+        self.assertNotIn("Reason", portal_html)
         self.assertNotIn("rejection_reason", portal_html)
 
     def test_14_checkin_ui_blocks_future_expired_cancelled_completed_and_zero_remaining(self):
@@ -670,6 +675,14 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
             {"subscription_id": subscription["id"]},
         )
         self.assertEqual(repeated["outcome"], "already_rejected")
+
+        _, _, _, raw_token = self._generate_portal(subscription["id"])
+        portal_html = self._portal_get(raw_token).data.decode()
+        self.assertNotIn("REJECTED", portal_html)
+        self.assertNotIn("Rejected At", portal_html)
+        self.assertNotIn("Reason", portal_html)
+        self.assertNotIn("rejection_reason", portal_html)
+        self.assertIn("No session history yet.", portal_html)
 
         second = create_private_training_session_checkin(self.trainer_user, subscription["id"])
         self.assertEqual(second["status"], "PENDING_MEMBER_APPROVAL")

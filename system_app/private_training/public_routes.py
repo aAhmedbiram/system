@@ -69,7 +69,8 @@ def _resolve_portal(raw_token: str):
 
 def _portal_context(raw_token: str, resolved: dict):
     subscription = resolved["subscription"]
-    sessions = list_private_training_sessions(subscription["id"])
+    all_sessions = list_private_training_sessions(subscription["id"])
+    sessions = [session for session in all_sessions if session.get("status") != "REJECTED"]
     pending_session = get_private_training_pending_session(subscription["id"])
     return {
         "raw_token": raw_token,

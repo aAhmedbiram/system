@@ -344,6 +344,8 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
         self._login_as(refreshed_client, self.trainer_user)
         detail_html = refreshed_client.get(f"/private-training/subscriptions/{subscription['id']}").data.decode()
         self.assertIn("CANCELLED", detail_html)
+        self.assertIn("REJECTED", detail_html)
+        self.assertIn("Trainer needs to reschedule", detail_html)
         self.assertNotIn("Cancel Subscription", detail_html)
 
         with self.assertRaises(PrivateTrainingCancelledError):
