@@ -192,6 +192,18 @@ class TestLoginLandingPhase1(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/private-training/subscriptions", response.location)
 
+    def test_06b_private_training_card_is_rendered_below_monthly_statistics(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = self.super_user_id
+            sess["username"] = self.super_user["username"]
+        response = self.client.get("/home")
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode()
+        stats_index = html.index("Monthly Statistics")
+        private_training_index = html.index("🏋️ Private Training")
+        self.assertGreater(private_training_index, stats_index)
+        self.assertIn("Open Private Training", html)
+
     def test_07_view_user_lands_on_subscription_list(self):
         response = self._login(self.viewer_user["username"])
         self.assertEqual(response.status_code, 302)

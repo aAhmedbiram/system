@@ -1285,26 +1285,6 @@
                     </form>
                 </div>
 
-                {% if user_permissions.private_training_manage or user_permissions.private_training_trainer or user_permissions.super_admin %}
-                <div class="action-card">
-                    <h3>🏋️ Private Training</h3>
-                    <p style="color: #cfcfcf; margin-bottom: 12px; line-height: 1.5;">
-                        {% if user_permissions.private_training_manage or user_permissions.super_admin %}
-                            Create and manage private training subscriptions.
-                        {% else %}
-                            View your assigned private training clients.
-                        {% endif %}
-                    </p>
-                    <a href="{% if user_permissions.private_training_manage or user_permissions.super_admin %}{{ url_for('private_training.subscription_list') }}{% else %}{{ url_for('private_training.my_clients') }}{% endif %}"
-                       class="edit-link" style="display: inline-block; text-decoration: none;">
-                        {% if user_permissions.private_training_manage or user_permissions.super_admin %}
-                            Open Private Training
-                        {% else %}
-                            My Private Clients
-                        {% endif %}
-                    </a>
-                </div>
-                {% endif %}
             </div>
 
             <!-- Monthly Statistics Box -->
@@ -1389,6 +1369,27 @@
                     </div>
                     {% endfor %}
                 </div>
+            </div>
+            {% endif %}
+
+            {% if user_permissions.private_training_manage or user_permissions.private_training_trainer or user_permissions.super_admin %}
+            <div class="action-card">
+                <h3>🏋️ Private Training</h3>
+                <p style="color: #cfcfcf; margin-bottom: 12px; line-height: 1.5;">
+                    {% if user_permissions.private_training_manage or user_permissions.super_admin %}
+                        Create and manage private training subscriptions.
+                    {% else %}
+                        View your assigned private training clients.
+                    {% endif %}
+                </p>
+                <a href="{% if user_permissions.private_training_manage or user_permissions.super_admin %}{{ url_for('private_training.subscription_list') }}{% else %}{{ url_for('private_training.my_clients') }}{% endif %}"
+                   class="edit-link" style="display: inline-block; text-decoration: none;">
+                    {% if user_permissions.private_training_manage or user_permissions.super_admin %}
+                        Open Private Training
+                    {% else %}
+                        My Private Clients
+                    {% endif %}
+                </a>
             </div>
             {% endif %}
 
