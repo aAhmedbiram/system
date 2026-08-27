@@ -96,6 +96,16 @@
             z-index: 1;
         }
 
+        .action-card,
+        .stat-item,
+        .nav-btn,
+        .monthly-stats-box,
+        .alert-widget,
+        .revenue-package-widget,
+        .chart-container {
+            min-width: 0;
+        }
+
         /* Header with logo */
         header {
             background: rgba(20, 20, 30, 0.85);
@@ -115,12 +125,14 @@
             align-items: center;
             max-width: 1400px;
             margin: 0 auto;
+            gap: 20px;
         }
 
         .logo-section {
             display: flex;
             align-items: center;
             gap: 20px;
+            min-width: 0;
         }
 
         .logo-container {
@@ -161,6 +173,8 @@
             background-clip: text;
             background-size: 200% auto;
             animation: gradientShift 3s ease infinite;
+            overflow-wrap: anywhere;
+            min-width: 0;
         }
 
         @keyframes gradientShift {
@@ -179,18 +193,23 @@
             display: flex;
             align-items: center;
             gap: 20px;
+            min-width: 0;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .welcome-text {
             color: #4caf50;
             font-size: 16px;
             font-weight: 600;
+            overflow-wrap: anywhere;
         }
 
         #datetime {
             color: #888;
             font-size: 14px;
             font-weight: normal;
+            overflow-wrap: anywhere;
         }
 
         .change-password-btn {
@@ -201,6 +220,10 @@
             border: 1px solid #4caf50;
             border-radius: 6px;
             transition: all 0.3s;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .change-password-btn:hover {
@@ -221,6 +244,9 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            min-height: 44px;
+            justify-content: center;
+            min-width: 0;
         }
 
         .language-toggle-btn:hover {
@@ -257,6 +283,7 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 40px 20px;
+            min-width: 0;
         }
 
         /* Quick actions grid */
@@ -265,6 +292,7 @@
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 25px;
             margin-bottom: 40px;
+            min-width: 0;
         }
 
         .action-card {
@@ -277,6 +305,7 @@
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
             overflow: hidden;
+            min-width: 0;
         }
 
         .action-card::before {
@@ -307,12 +336,15 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
 
         .action-card form {
             display: flex;
             flex-direction: column;
             gap: 15px;
+            min-width: 0;
         }
 
         .action-card label {
@@ -331,6 +363,7 @@
             color: white;
             font-size: 15px;
             transition: all 0.3s;
+            min-width: 0;
         }
 
         .action-card input:focus {
@@ -351,6 +384,7 @@
             cursor: pointer;
             transition: all 0.3s;
             box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            min-height: 44px;
         }
 
         .action-card button:hover {
@@ -376,6 +410,7 @@
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-top: 30px;
+            min-width: 0;
         }
 
         .nav-btn {
@@ -392,6 +427,11 @@
             transition: all 0.3s;
             position: relative;
             overflow: hidden;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            min-width: 0;
         }
 
         .nav-btn::before {
@@ -421,6 +461,8 @@
         .nav-btn span {
             position: relative;
             z-index: 1;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
 
         /* Special colored buttons */
@@ -488,6 +530,7 @@
             padding: 30px;
             margin: 30px 0;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            min-width: 0;
         }
 
         .monthly-stats-box h3 {
@@ -502,6 +545,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 25px;
+            min-width: 0;
         }
 
         .stat-item {
@@ -511,6 +555,7 @@
             padding: 20px;
             text-align: center;
             transition: all 0.3s;
+            min-width: 0;
         }
 
         .stat-item:hover {
@@ -524,6 +569,7 @@
             font-size: 16px;
             margin-bottom: 10px;
             font-weight: 500;
+            overflow-wrap: anywhere;
         }
 
         .stat-item-value {
@@ -531,6 +577,7 @@
             font-weight: bold;
             color: #4caf50;
             text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            word-break: break-word;
         }
 
         /* Bottom action bar */
@@ -552,6 +599,7 @@
             gap: 15px;
             max-width: 1400px;
             margin: 0 auto;
+            min-width: 0;
         }
 
         .bottom-btn {
@@ -566,6 +614,12 @@
             font-size: 14px;
             transition: all 0.3s;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            min-width: 0;
+            text-align: center;
         }
 
         .bottom-btn:hover {
@@ -596,21 +650,25 @@
                 flex-direction: column;
                 gap: 15px;
                 align-items: flex-start;
+                width: 100%;
             }
 
             .logo-section {
                 width: 100%;
                 justify-content: space-between;
+                min-width: 0;
             }
 
             .header-title {
                 font-size: 20px;
+                line-height: 1.2;
             }
 
             .user-info {
                 width: 100%;
                 flex-wrap: wrap;
                 gap: 10px;
+                justify-content: flex-start;
             }
 
             .welcome-text {
@@ -644,14 +702,95 @@
                 font-size: 18px;
             }
 
+            .action-card input,
+            .action-card button {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .action-card button {
+                font-size: 15px;
+            }
+
             .nav-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 15px;
             }
 
             .nav-btn {
                 padding: 15px;
                 font-size: 14px;
+                text-align: center;
+            }
+
+            .monthly-stats-box {
+                padding: 20px;
+            }
+
+            .monthly-stats-box h3,
+            .revenue-package-widget h3,
+            .alert-widget h3 {
+                font-size: 20px;
+                margin-bottom: 18px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+            }
+
+            .stat-item {
+                padding: 16px 12px;
+            }
+
+            .stat-item-label {
+                font-size: 13px;
+                line-height: 1.4;
+            }
+
+            .stat-item-value {
+                font-size: 30px;
+                line-height: 1.1;
+            }
+
+            .alert-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .alert-item {
+                padding: 16px;
+                align-items: flex-start;
+            }
+
+            .alert-icon {
+                font-size: 32px;
+            }
+
+            .package-revenue-item {
+                padding: 16px;
+                align-items: flex-start;
+            }
+
+            .package-name {
+                font-size: 16px;
+            }
+
+            .package-stats {
+                align-items: flex-start;
+                gap: 3px;
+            }
+
+            .package-revenue {
+                font-size: 18px;
+            }
+
+            .chart-container {
+                padding: 16px;
+            }
+
+            .chart-container h3 {
+                font-size: 18px !important;
+                margin-bottom: 14px !important;
             }
 
             .bottom-bar {
@@ -665,6 +804,7 @@
             .bottom-btn {
                 padding: 10px 16px;
                 font-size: 12px;
+                width: 100%;
             }
         }
 
@@ -696,6 +836,11 @@
                 padding: 15px 8px;
             }
 
+            .flash-message {
+                margin: 12px auto;
+                padding: 12px 14px;
+            }
+
             .action-card {
                 padding: 15px;
             }
@@ -706,21 +851,59 @@
                 padding: 12px;
             }
 
+            .action-card button {
+                min-height: 44px;
+            }
+
             .nav-grid {
                 grid-template-columns: 1fr;
+                gap: 12px;
             }
 
             .nav-btn {
                 padding: 12px;
             }
 
+            .monthly-stats-box {
+                padding: 16px 14px;
+                margin: 20px 0;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-item-value {
+                font-size: 28px;
+            }
+
+            .package-revenue-item,
+            .alert-item {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .package-stats {
+                width: 100%;
+            }
+
+            .bottom-bar {
+                padding: 12px 8px;
+                margin-top: 32px;
+            }
+
             .bottom-buttons {
                 flex-direction: column;
+                gap: 8px;
             }
 
             .bottom-btn {
                 width: 100%;
                 text-align: center;
+            }
+
+            .chart-container {
+                padding: 14px 12px;
             }
         }
 
@@ -733,6 +916,7 @@
         .revenue-value {
             font-size: 36px;
             color: #4caf50;
+            word-break: break-word;
         }
 
         .revenue-growth {
@@ -772,6 +956,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
+            min-width: 0;
         }
 
         .alert-item {
@@ -782,6 +967,7 @@
             align-items: center;
             gap: 15px;
             transition: all 0.3s;
+            min-width: 0;
         }
 
         .alert-item.urgent {
@@ -877,6 +1063,8 @@
             justify-content: space-between;
             align-items: center;
             transition: all 0.3s;
+            gap: 12px;
+            min-width: 0;
         }
 
         .package-revenue-item:hover {
@@ -889,6 +1077,7 @@
             font-size: 18px;
             font-weight: 600;
             color: #fff;
+            overflow-wrap: anywhere;
         }
 
         .package-stats {
@@ -896,17 +1085,20 @@
             flex-direction: column;
             align-items: flex-end;
             gap: 5px;
+            min-width: 0;
         }
 
         .package-count {
             font-size: 12px;
             color: #888;
+            overflow-wrap: anywhere;
         }
 
         .package-revenue {
             font-size: 20px;
             font-weight: bold;
             color: #4caf50;
+            overflow-wrap: anywhere;
         }
 
         /* Toast Notifications */
@@ -1120,6 +1312,15 @@
             border-radius: 12px;
             padding: 20px;
             margin: 20px 0;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .chart-container canvas {
+            display: block;
+            max-width: 100%;
+            width: 100% !important;
+            height: auto !important;
         }
 
         /* Skeleton Loader */
