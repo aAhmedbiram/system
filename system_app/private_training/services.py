@@ -410,6 +410,11 @@ def list_private_clients_for_trainer(current_user: dict[str, Any]) -> list[dict[
                 SELECT
                     s.*,
                     m.name AS member_name,
+                    m.phone AS member_phone,
+                    m.membership_packages AS gym_membership_packages,
+                    m.membership_status AS gym_membership_status,
+                    m.starting_date AS gym_starting_date,
+                    m.end_date AS gym_end_date,
                     t.username AS trainer_username,
                     creator.username AS created_by_username,
                     COALESCE(sess.approved_count, 0) AS approved_count,

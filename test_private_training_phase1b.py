@@ -433,10 +433,24 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
 
     def test_09_manager_can_access_subscription_list(self):
+        subscription = self._create_subscription(
+            self.member_a_id,
+            self.trainer_a_user_id,
+            total_sessions=2,
+            start_offset_days=0,
+            expiry_offset_days=30,
+        )
         self._login_as(self.manager_user)
         response = self.client.get("/private-training/subscriptions")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Private Training Subscriptions", response.data)
+        html = response.data.decode()
+        self.assertIn("Private Training Subscriptions", html)
+        self.assertIn("PTB Member A", html)
+        self.assertIn("1 Month", html)
+        self.assertIn("VAL", html)
+        self.assertIn(self._date_str(0), html)
+        self.assertIn(self._date_str(30), html)
+        self.assertIn(str(subscription["trainer_user_id"]), html)
 
     def test_10_trainer_can_open_my_clients(self):
         self._create_subscription(self.member_a_id, self.trainer_a_user_id, total_sessions=2)
