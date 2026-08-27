@@ -163,6 +163,16 @@
                         Effective Status: <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
                     </div>
                 </div>
+                <div class="card">
+                    <h2>Today's Workout</h2>
+                    <div class="meta">
+                        {% if today_workout %}
+                            <strong>{{ today_workout.workout_name }}</strong>
+                        {% else %}
+                            No workout assigned for today.
+                        {% endif %}
+                    </div>
+                </div>
             </div>
 
             <div class="panel">

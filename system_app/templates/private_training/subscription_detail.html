@@ -80,6 +80,19 @@
             background: rgba(0,0,0,0.25);
             color: #fff;
         }
+        .workout-form {
+            display: grid;
+            gap: 12px;
+            max-width: 560px;
+        }
+        .workout-form input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(0,0,0,0.25);
+            color: #fff;
+        }
         .stack { display: grid; gap: 12px; }
         .table-wrap { overflow-x: auto; }
         @media (max-width: 960px) {
@@ -145,6 +158,42 @@
                     Pending Sessions: {{ subscription.pending_count or 0 }}<br>
                     Effective Status: <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
                 </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Today's Workout</h2>
+            <div class="stack">
+                {% if can_edit_today_workout %}
+                    <form class="workout-form" method="post" action="{{ url_for('private_training.save_today_workout', subscription_id=subscription.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div>
+                            <label for="workout_name">Workout Name</label>
+                            <input
+                                class="workout-input"
+                                type="text"
+                                id="workout_name"
+                                name="workout_name"
+                                maxlength="255"
+                                value="{{ today_workout.workout_name if today_workout else '' }}"
+                                placeholder="Chest, Back &amp; Biceps, Push Day, Rest Day"
+                                required
+                            >
+                        </div>
+                        <div class="actions" style="margin-top: 0;">
+                            <button class="btn btn-primary" type="submit">Save Workout</button>
+                        </div>
+                    </form>
+                    <div class="muted">Stored for the current Cairo calendar day.</div>
+                {% else %}
+                    <div class="meta">
+                        {% if today_workout %}
+                            <strong>{{ today_workout.workout_name }}</strong>
+                        {% else %}
+                            No workout assigned for today.
+                        {% endif %}
+                    </div>
+                {% endif %}
             </div>
         </div>
 

@@ -26,6 +26,7 @@ from .permissions import (
 from .queries import (
     calculate_effective_subscription_status,
     get_private_training_approved_count,
+    get_private_training_daily_workout,
     get_private_training_pending_session,
     get_private_training_remaining_sessions,
     get_private_training_sessions,
@@ -37,6 +38,7 @@ from .queries import (
     lock_private_training_session,
     lock_private_training_subscription,
     lock_private_training_subscriptions_for_member,
+    upsert_private_training_daily_workout,
 )
 from .validators import (
     parse_private_date,
@@ -153,6 +155,19 @@ def _current_cairo_date():
     return get_cairo_date()
 
 
+def can_write_private_training_daily_workout(current_user: dict[str, Any] | None, subscription_row: dict[str, Any] | None) -> bool:
+    if not current_user or not subscription_row:
+        return False
+    if not is_approved_user(current_user):
+        return False
+    if is_super_user(current_user) or can_manage_private_training(current_user):
+        return True
+    return bool(
+        can_train_private_training(current_user)
+        and subscription_row.get("trainer_user_id") == current_user.get("id")
+    )
+
+
 def _subscription_is_live(subscription_row: dict[str, Any]) -> bool:
     if not subscription_row:
         return False
@@ -194,6 +209,47 @@ def remaining_sessions(subscription_row_or_id: int | dict[str, Any]) -> int:
     if not subscription:
         raise PrivateTrainingNotFoundError("Subscription not found")
     return get_private_training_remaining_sessions(subscription)
+
+
+def get_private_training_todays_workout(subscription_id: int) -> dict[str, Any] | None:
+    return get_private_training_daily_workout(subscription_id, _current_cairo_date())
+
+
+def _normalize_daily_workout_name(workout_name: Any) -> str:
+    if workout_name is None:
+        raise PrivateTrainingValidationError("workout_name is required")
+    workout_text = str(workout_name).strip()
+    if not workout_text:
+        raise PrivateTrainingValidationError("workout_name is required")
+    if len(workout_text) > 255:
+        raise PrivateTrainingValidationError("workout_name must be 255 characters or fewer")
+    return workout_text
+
+
+def save_private_training_todays_workout(
+    current_user: dict[str, Any],
+    subscription_id: Any,
+    workout_name: Any,
+) -> dict[str, Any]:
+    subscription_id_int = validate_positive_int(subscription_id, "subscription_id")
+    subscription = get_private_training_subscription(subscription_id_int)
+    if not subscription:
+        raise PrivateTrainingNotFoundError("Subscription not found")
+    if not can_write_private_training_daily_workout(current_user, subscription):
+        raise PrivateTrainingForbiddenError("Current user cannot edit today's workout for this subscription")
+
+    normalized_workout_name = _normalize_daily_workout_name(workout_name)
+    workout = upsert_private_training_daily_workout(
+        subscription_id_int,
+        normalized_workout_name,
+        _current_cairo_date(),
+    )
+    if not workout:
+        raise PrivateTrainingError("Failed to save today's workout")
+    return {
+        "subscription": subscription,
+        "workout": workout,
+    }
 
 
 def create_private_training_subscription(

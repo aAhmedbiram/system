@@ -14,6 +14,7 @@ from .services import (
     list_private_training_sessions,
     resolve_portal_token,
     approve_private_training_session,
+    get_private_training_todays_workout,
 )
 
 private_training_public_bp = Blueprint("private_training_public", __name__)
@@ -72,11 +73,13 @@ def _portal_context(raw_token: str, resolved: dict):
     all_sessions = list_private_training_sessions(subscription["id"])
     sessions = [session for session in all_sessions if session.get("status") != "REJECTED"]
     pending_session = get_private_training_pending_session(subscription["id"])
+    today_workout = get_private_training_todays_workout(subscription["id"])
     return {
         "raw_token": raw_token,
         "subscription": subscription,
         "pending_session": pending_session,
         "sessions": sessions,
+        "today_workout": today_workout,
         "portal_ended": False,
         "portal_ended_message": None,
         "approve_url": url_for("private_training_public.member_portal_approve", raw_token=raw_token, session_id=pending_session["id"]) if pending_session else None,

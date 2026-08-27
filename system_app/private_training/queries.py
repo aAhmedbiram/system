@@ -91,6 +91,20 @@ def ensure_private_training_tables() -> None:
             """
         )
 
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS private_training_daily_workouts (
+                id SERIAL PRIMARY KEY,
+                subscription_id INTEGER NOT NULL REFERENCES private_training_subscriptions(id) ON DELETE RESTRICT,
+                workout_date DATE NOT NULL,
+                workout_name TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_private_training_daily_workouts_subscription_date UNIQUE (subscription_id, workout_date)
+            )
+            """
+        )
+
         # Indexes
         cur.execute(
             """
@@ -335,6 +349,44 @@ def get_private_training_pending_session(subscription_id: int) -> dict[str, Any]
     if row:
         row["trainer_display_name"] = _display_user_name(row.get("trainer_username"))
     return row
+
+
+def get_private_training_daily_workout(subscription_id: int, workout_date: date | None = None) -> dict[str, Any] | None:
+    target_date = workout_date or get_cairo_date()
+    return query_db(
+        """
+        SELECT *
+        FROM private_training_daily_workouts
+        WHERE subscription_id = %s
+          AND workout_date = %s
+        LIMIT 1
+        """,
+        (subscription_id, target_date),
+        one=True,
+    )
+
+
+def upsert_private_training_daily_workout(
+    subscription_id: int,
+    workout_name: str,
+    workout_date: date | None = None,
+) -> dict[str, Any] | None:
+    target_date = workout_date or get_cairo_date()
+    return query_db(
+        """
+        INSERT INTO private_training_daily_workouts (
+            subscription_id, workout_date, workout_name
+        ) VALUES (%s, %s, %s)
+        ON CONFLICT (subscription_id, workout_date)
+        DO UPDATE SET
+            workout_name = EXCLUDED.workout_name,
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING *
+        """,
+        (subscription_id, target_date, workout_name),
+        commit=True,
+        one=True,
+    )
 
 
 def get_private_training_active_subscription_for_member(member_id: int) -> dict[str, Any] | None:

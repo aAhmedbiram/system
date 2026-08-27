@@ -27,15 +27,18 @@ from .services import (
     PrivateTrainingPendingSessionConflictError,
     PrivateTrainingSubscriptionConflictError,
     PrivateTrainingValidationError,
+    can_write_private_training_daily_workout,
     create_private_training_subscription,
     create_private_training_session_checkin,
     cancel_private_training_subscription,
     generate_portal_token,
     get_private_subscription_for_trainer,
     get_private_training_pending_session,
+    get_private_training_todays_workout,
     list_private_clients_for_trainer,
     list_private_training_sessions,
     revoke_portal_token,
+    save_private_training_todays_workout,
 )
 
 private_training_bp = Blueprint("private_training", __name__)
@@ -94,6 +97,10 @@ def _subscription_ownership_context(current_user, subscription):
             and int(subscription.get("pending_count") or 0) == 0
         ),
     }
+
+
+def _can_edit_today_workout(current_user, subscription):
+    return can_write_private_training_daily_workout(current_user, subscription)
 
 
 def _check_in_status_message(subscription):
@@ -456,6 +463,7 @@ def subscription_detail(subscription_id: int):
     sessions = list_private_training_sessions(subscription_id)
     portal_link_status = "Active link exists" if int(subscription.get("active_token_count") or 0) > 0 else "No active token"
     pending_session = get_private_training_pending_session(subscription_id)
+    today_workout = get_private_training_todays_workout(subscription_id)
     ownership_context = _subscription_ownership_context(current_user, subscription)
     can_cancel_subscription = bool(
         _is_manage_authorized(current_user)
@@ -467,6 +475,8 @@ def subscription_detail(subscription_id: int):
         subscription=subscription,
         sessions=sessions,
         pending_session=pending_session,
+        today_workout=today_workout,
+        can_edit_today_workout=_can_edit_today_workout(current_user, subscription),
         portal_link_status=portal_link_status,
         generated_portal_url=None,
         generated_portal_token=None,
@@ -495,6 +505,7 @@ def generate_subscription_portal_token(subscription_id: int):
         portal_url = _member_link(raw_token)
         flash("Member portal link generated successfully.", "success")
         pending_session = get_private_training_pending_session(subscription_id)
+        today_workout = get_private_training_todays_workout(subscription_id)
         ownership_context = _subscription_ownership_context(current_user, subscription)
         return _render(
             "private_training/subscription_detail.html",
@@ -502,6 +513,8 @@ def generate_subscription_portal_token(subscription_id: int):
             subscription=subscription,
             sessions=sessions,
             pending_session=pending_session,
+            today_workout=today_workout,
+            can_edit_today_workout=_can_edit_today_workout(current_user, subscription),
             portal_link_status="Active link exists",
             generated_portal_url=portal_url,
             generated_portal_token=raw_token,
@@ -519,6 +532,32 @@ def generate_subscription_portal_token(subscription_id: int):
     except PrivateTrainingError as exc:
         flash(str(exc), "error")
         return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+
+
+@private_training_bp.route("/subscriptions/<int:subscription_id>/today-workout", methods=["POST"])
+@login_required
+def save_today_workout(subscription_id: int):
+    current_user, response = _current_user_or_redirect()
+    if response:
+        return response
+    subscription, response = _load_subscription_or_redirect(current_user, subscription_id)
+    if response:
+        return response
+
+    workout_name = request.form.get("workout_name", "")
+    try:
+        save_private_training_todays_workout(current_user, subscription_id, workout_name)
+        flash("Today's workout saved successfully.", "success")
+    except PrivateTrainingValidationError as exc:
+        flash(str(exc), "error")
+    except PrivateTrainingForbiddenError as exc:
+        flash(str(exc), "error")
+    except PrivateTrainingNotFoundError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("private_training.subscription_list"))
+    except PrivateTrainingError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
 
 
 @private_training_bp.route("/subscriptions/<int:subscription_id>/portal-token/revoke", methods=["POST"])
