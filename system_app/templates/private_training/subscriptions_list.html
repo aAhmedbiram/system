@@ -43,16 +43,29 @@
             margin-top: 16px;
         }
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
             padding: 11px 16px;
             border-radius: 10px;
             text-decoration: none;
             font-weight: 700;
             border: 0;
             cursor: pointer;
+            text-align: center;
         }
         .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
         .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+        .btn {
+            max-width: 100%;
+            min-width: 0;
+        }
+        select, input[type="text"] {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+        }
         .panel { padding: 18px; margin-bottom: 18px; }
         form.filters {
             display: grid;
@@ -71,6 +84,7 @@
         }
         table {
             width: 100%;
+            min-width: 1120px;
             border-collapse: collapse;
             overflow: hidden;
         }
@@ -79,6 +93,8 @@
             border-bottom: 1px solid rgba(255,255,255,0.08);
             text-align: left;
             vertical-align: top;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
         th {
             color: #7bff88;
@@ -102,13 +118,23 @@
         .flash-message { margin: 0 0 12px 0; padding: 12px 14px; border-radius: 10px; }
         .flash-message.success { background: rgba(76, 175, 80, 0.15); border: 1px solid rgba(76, 175, 80, 0.3); }
         .flash-message.error { background: rgba(244, 67, 54, 0.15); border: 1px solid rgba(244, 67, 54, 0.3); }
-        .table-wrap { overflow-x: auto; }
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
         @media (max-width: 1100px) {
             form.filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 720px) {
             .page { padding: 14px; }
             form.filters { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; align-items: stretch; }
+            .actions > * { width: 100%; }
+            .btn { width: 100%; }
+            .panel { padding: 14px; }
+            table { min-width: 980px; }
+            th, td { padding: 10px 8px; font-size: 14px; }
+            .pill { max-width: 100%; white-space: normal; text-align: center; }
         }
     </style>
 </head>

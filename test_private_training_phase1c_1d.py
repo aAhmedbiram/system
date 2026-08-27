@@ -329,6 +329,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertIn("Workout: Chest", html)
         self.assertIn("Session History", html)
         self.assertIn("Approved At", html)
+        self.assertIn("table-wrap", html)
         self.assertIn("Approved Sessions: 0", html)
         self.assertIn("Remaining Sessions: 2", html)
         self.assertIn('name="csrf_token"', html)

@@ -29,15 +29,19 @@
         h1, h2, h3 { margin: 0 0 10px 0; color: #7bff88; }
         .muted { color: #aeb4c5; }
         .meta { color: #cfe8d1; line-height: 1.7; }
-        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; align-items: stretch; }
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
             padding: 11px 16px;
             border-radius: 10px;
             text-decoration: none;
             font-weight: 700;
             border: 0;
             cursor: pointer;
+            text-align: center;
         }
         .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
         .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
@@ -68,7 +72,7 @@
         .flash-message.error { background: rgba(244, 67, 54, 0.15); border: 1px solid rgba(244, 67, 54, 0.3); }
         .token-box {
             display: grid;
-            grid-template-columns: 1fr auto;
+            grid-template-columns: minmax(0, 1fr) auto;
             gap: 10px;
             align-items: center;
         }
@@ -79,11 +83,13 @@
             border: 1px solid rgba(255,255,255,0.15);
             background: rgba(0,0,0,0.25);
             color: #fff;
+            min-width: 0;
         }
         .workout-form {
             display: grid;
             gap: 12px;
             max-width: 560px;
+            width: 100%;
         }
         .workout-form input[type="text"] {
             width: 100%;
@@ -92,12 +98,39 @@
             border: 1px solid rgba(255,255,255,0.15);
             background: rgba(0,0,0,0.25);
             color: #fff;
+            min-width: 0;
         }
         .stack { display: grid; gap: 12px; }
-        .table-wrap { overflow-x: auto; }
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .btn, .token-box input {
+            max-width: 100%;
+        }
+        table {
+            width: 100%;
+            min-width: 820px;
+        }
+        th, td {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
         @media (max-width: 960px) {
             .grid, .token-box { grid-template-columns: 1fr; }
             .page { padding: 14px; }
+            .actions { flex-direction: column; align-items: stretch; }
+            .actions > * { width: 100%; }
+            .btn { width: 100%; }
+            .hero, .panel, .card { padding-left: 14px; padding-right: 14px; }
+            .grid { gap: 12px; }
+            .card { padding: 16px; }
+            .panel { padding: 16px; }
+            .table-wrap { margin: 0 -4px; }
+            table { min-width: 760px; }
+            th, td { padding: 9px 8px; font-size: 14px; }
+            .meta { line-height: 1.6; }
+            .token-box input { font-size: 14px; }
         }
     </style>
 </head>

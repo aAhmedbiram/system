@@ -27,16 +27,29 @@
         .muted { color: #aeb4c5; }
         .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
             padding: 11px 16px;
             border-radius: 10px;
             text-decoration: none;
             font-weight: 700;
             border: 0;
             cursor: pointer;
+            text-align: center;
         }
         .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
         .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+        .btn {
+            max-width: 100%;
+            min-width: 0;
+        }
+        select, input[type="text"], input[type="number"], input[type="date"] {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+        }
         form { margin-top: 18px; }
         .grid {
             display: grid;
@@ -63,6 +76,10 @@
             align-items: end;
             margin-bottom: 16px;
         }
+        .search-row > div:last-child,
+        .actions > * {
+            min-width: 0;
+        }
         .small { font-size: 13px; color: #aeb4c5; }
         .empty-state {
             margin-top: 10px;
@@ -74,7 +91,14 @@
         }
         @media (max-width: 720px) {
             .grid, .search-row { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; align-items: stretch; }
+            .actions > * { width: 100%; }
+            .btn { width: 100%; }
             .page { padding: 14px; }
+            .panel { padding: 16px; }
+            .grid { gap: 12px; }
+            .search-row { gap: 12px; }
+            .small { line-height: 1.5; }
         }
     </style>
 </head>

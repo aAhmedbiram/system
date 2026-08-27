@@ -46,15 +46,20 @@
             gap: 12px;
             flex-wrap: wrap;
             margin-top: 14px;
+            align-items: stretch;
         }
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
             padding: 11px 16px;
             border-radius: 10px;
             text-decoration: none;
             font-weight: 700;
             border: 0;
             cursor: pointer;
+            text-align: center;
         }
         .btn-primary { background: linear-gradient(135deg, #4caf50, #66d66a); color: #fff; }
         .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
@@ -72,13 +77,22 @@
         .pill.warn { background: rgba(255, 193, 7, 0.16); color: #ffd54f; }
         .pill.bad { background: rgba(244, 67, 54, 0.16); color: #ff8a80; }
         .stack { display: grid; gap: 12px; }
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; }
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            width: 100%;
+            min-width: 720px;
+            border-collapse: collapse;
+        }
         th, td {
             padding: 10px 8px;
             border-bottom: 1px solid rgba(255,255,255,0.08);
             text-align: left;
             vertical-align: top;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
         th {
             color: #7bff88;
@@ -110,9 +124,24 @@
             background: rgba(0,0,0,0.28);
             color: #fff;
         }
-        @media (max-width: 860px) {
+        .btn, textarea {
+            max-width: 100%;
+        }
+        @media (max-width: 960px) {
             .grid { grid-template-columns: 1fr; }
             .page { padding: 12px; }
+            .actions { flex-direction: column; align-items: stretch; }
+            .actions > * { width: 100%; }
+            .btn { width: 100%; }
+            .hero, .panel, .card { padding-left: 14px; padding-right: 14px; }
+            .panel, .card { padding-top: 16px; padding-bottom: 16px; }
+            .grid { gap: 12px; margin-bottom: 14px; }
+            .table-wrap { margin: 0 -4px; }
+            table { min-width: 640px; }
+            th, td { padding: 9px 8px; font-size: 14px; }
+            .meta { line-height: 1.6; overflow-wrap: anywhere; word-break: break-word; }
+            textarea { min-height: 88px; font-size: 14px; }
+            .pill { max-width: 100%; text-align: center; white-space: normal; }
         }
     </style>
 </head>

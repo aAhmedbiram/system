@@ -451,6 +451,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
         self.assertIn(self._date_str(0), html)
         self.assertIn(self._date_str(30), html)
         self.assertIn(str(subscription["trainer_user_id"]), html)
+        self.assertIn("table-wrap", html)
 
     def test_10_trainer_can_open_my_clients(self):
         self._create_subscription(self.member_a_id, self.trainer_a_user_id, total_sessions=2)
@@ -501,6 +502,9 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
         self.assertIn("Approved Sessions: 0", html)
         self.assertIn("Remaining Sessions: 2", html)
         self.assertIn("Pending Sessions: 0", html)
+        self.assertIn("workout-form", html)
+        self.assertIn("token-box", html)
+        self.assertIn("table-wrap", html)
 
     def test_14b_manager_sees_read_only_status_but_no_portal_controls(self):
         subscription = self._create_subscription(self.member_a_id, self.trainer_a_user_id, total_sessions=2)
