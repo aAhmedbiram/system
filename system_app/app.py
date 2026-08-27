@@ -2,7 +2,7 @@ try:
     from . import env_loader
 except ImportError:
     import env_loader
-from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify, has_request_context, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify, has_request_context, abort, send_from_directory
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from datetime import datetime, timedelta
 import os
@@ -150,6 +150,64 @@ def set_security_headers(response):
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
+
+def _inject_pwa_markup_into_html(response):
+    """Inject PWA metadata and service-worker registration into HTML pages."""
+    try:
+        if not request:
+            return response
+        if request.path.startswith('/private-training/member/'):
+            return response
+
+        content_type = response.headers.get('Content-Type', '')
+        if 'text/html' not in content_type.lower():
+            return response
+
+        body = response.get_data(as_text=True)
+        if not body or '</head>' not in body.lower():
+            return response
+
+        lower_body = body.lower()
+        injection_parts = []
+        manifest_url = url_for('pwa_manifest')
+        apple_touch_icon_url = url_for('static', filename='apple-touch-icon.png')
+        service_worker_url = url_for('pwa_service_worker')
+
+        if 'rel="manifest"' not in lower_body:
+            injection_parts.append(f'    <link rel="manifest" href="{manifest_url}">')
+        if 'name="theme-color"' not in lower_body:
+            injection_parts.append('    <meta name="theme-color" content="#0a0a0a">')
+        if 'apple-touch-icon' not in lower_body:
+            injection_parts.append(
+                f'    <link rel="apple-touch-icon" type="image/png" href="{apple_touch_icon_url}">'
+            )
+        if 'apple-mobile-web-app-capable' not in lower_body:
+            injection_parts.append('    <meta name="apple-mobile-web-app-capable" content="yes">')
+        if 'apple-mobile-web-app-status-bar-style' not in lower_body:
+            injection_parts.append('    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">')
+        if 'apple-mobile-web-app-title' not in lower_body:
+            injection_parts.append('    <meta name="apple-mobile-web-app-title" content="Rival Gym">')
+        if 'serviceworker.register' not in lower_body:
+            injection_parts.append(
+                "    <script>\n"
+                "        if ('serviceWorker' in navigator) {\n"
+                "            window.addEventListener('load', function () {\n"
+                f"                navigator.serviceWorker.register('{service_worker_url}', {{ scope: '/' }}).catch(function () {{}});\n"
+                "            });\n"
+                "        }\n"
+                "    </script>"
+            )
+
+        if not injection_parts:
+            return response
+
+        injection = "\n".join(injection_parts) + "\n"
+        body = re.sub(r'</head>', injection + '</head>', body, count=1, flags=re.IGNORECASE)
+        response.set_data(body)
+        return response
+    except Exception:
+        return response
+
 # === Global Error Handlers for Debugging ===
 @app.before_request
 def log_request_info():
@@ -175,6 +233,11 @@ def log_request_info():
     except Exception as e:
         if not is_production:
             print(f"Error in log_request_info: {e}")
+
+
+@app.after_request
+def inject_pwa_assets(response):
+    return _inject_pwa_markup_into_html(response)
 
 @app.before_request
 def track_user_activity():
@@ -1414,6 +1477,26 @@ def set_cached(key, value, timeout=300):
     """Set cached value with timeout"""
     _cache[key] = value
     _cache_timeout[key] = datetime.now() + timedelta(seconds=timeout)
+
+
+@app.route('/manifest.webmanifest')
+def pwa_manifest():
+    """Serve the PWA manifest from the static directory."""
+    response = send_from_directory(app.static_folder, 'manifest.webmanifest')
+    response.mimetype = 'application/manifest+json'
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
+@app.route('/sw.js')
+def pwa_service_worker():
+    """Serve the root-scoped PWA service worker."""
+    response = send_from_directory(app.static_folder, 'sw.js')
+    response.mimetype = 'application/javascript'
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
 @app.route('/')
 @app.route('/home')
