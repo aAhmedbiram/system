@@ -526,9 +526,9 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_16_approved_remaining_pending_counts_displayed(self):
         subscription = self._make_active_subscription(self.member_d_id, total_sessions=2)
-        first_session = create_private_training_session_checkin(self.trainer_a_user, subscription["id"])
+        first_session = create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout A")
         approve_private_training_session(subscription["id"], first_session["id"], {"subscription_id": subscription["id"]})
-        create_private_training_session_checkin(self.trainer_a_user, subscription["id"])
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout B")
         self._login_as(self.trainer_a_user)
         response = self.client.get(f"/private-training/subscriptions/{subscription['id']}")
         html = response.data.decode()
@@ -618,7 +618,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_24_completed_subscription_cannot_generate_active_link(self):
         subscription = self._create_subscription(self.member_e_id, self.trainer_a_user_id, total_sessions=1)
-        session_row = create_private_training_session_checkin(self.trainer_a_user, subscription["id"])
+        session_row = create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout C")
         approve_private_training_session(subscription["id"], session_row["id"], {"subscription_id": subscription["id"]})
         self._login_as(self.trainer_a_user)
         response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token", follow_redirects=True)
@@ -725,7 +725,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_35_session_checkin_and_approval_flow_still_works(self):
         subscription = self._make_active_subscription(self.member_e_id, total_sessions=2)
-        session_row = create_private_training_session_checkin(self.trainer_a_user, subscription["id"])
+        session_row = create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout D")
         approve_private_training_session(subscription["id"], session_row["id"], {"subscription_id": subscription["id"]})
         counts = query_db(
             """

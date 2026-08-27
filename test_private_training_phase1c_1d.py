@@ -304,18 +304,18 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
             follow_redirects=follow_redirects,
         )
 
-    def _trainer_checkin_post(self, client, subscription_id, csrf_token=None, follow_redirects=True):
+    def _trainer_checkin_post(self, client, subscription_id, csrf_token=None, workout_name="Workout", follow_redirects=True):
         if csrf_token is None:
             csrf_token = self._csrf_from_html(client.get(f"/private-training/subscriptions/{subscription_id}").data.decode())
         return client.post(
             f"/private-training/subscriptions/{subscription_id}/check-in",
-            data={"csrf_token": csrf_token},
+            data={"csrf_token": csrf_token, "workout_name": workout_name},
             follow_redirects=follow_redirects,
         )
 
     def test_01_valid_token_opens_portal_and_displays_context(self):
         subscription = self._make_active_subscription(self.member_a_id)
-        create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        create_private_training_session_checkin(self.trainer_user, subscription["id"], "Chest")
         _, _, _, raw_token = self._generate_portal(subscription["id"])
         response = self._portal_get(raw_token)
         html = response.data.decode()
@@ -326,6 +326,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertIn("Gym Details", html)
         self.assertIn("Private Training", html)
         self.assertIn("Pending Member Approval", html)
+        self.assertIn("Workout: Chest", html)
         self.assertIn("Session History", html)
         self.assertIn("Approved At", html)
         self.assertIn("Approved Sessions: 0", html)
@@ -366,7 +367,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
 
         completed = self._make_active_subscription(self.member_e_id, total_sessions=1)
         _, _, _, completed_token = self._generate_portal(completed["id"])
-        pending = create_private_training_session_checkin(self.trainer_user, completed["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, completed["id"], "Upper Body")
         approve_private_training_session(completed["id"], pending["id"], {"subscription_id": completed["id"]})
         self.assertEqual(self._portal_get(completed_token).status_code, 410)
 
@@ -543,15 +544,18 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         subscription = self._make_active_subscription(self.member_d_id, total_sessions=2)
         trainer_client = app.test_client()
         self._login_as(trainer_client, self.trainer_user)
-        response = self._trainer_checkin_post(trainer_client, subscription["id"])
+        response = self._trainer_checkin_post(trainer_client, subscription["id"], workout_name="Leg Day")
         self.assertEqual(response.status_code, 200)
         self.assertIn("Waiting for Member Approval", response.data.decode())
+        self.assertIn("Workout: Leg Day", response.data.decode())
         pending = get_private_training_pending_session(subscription["id"])
         self.assertIsNotNone(pending)
+        self.assertEqual(pending["workout_name"], "Leg Day")
 
         _, _, _, raw_token = self._generate_portal(subscription["id"])
         portal_html = self._portal_get(raw_token).data.decode()
         self.assertIn("Pending Member Approval", portal_html)
+        self.assertIn("Workout: Leg Day", portal_html)
         self.assertIn("PTC Trainer A", portal_html)
         self.assertIn("Approve Session", portal_html)
         self.assertNotIn("Reject Session", portal_html)
@@ -579,7 +583,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertNotIn("Check-In Session", cancelled_html)
 
         completed = self._make_active_subscription(self.member_h_id, total_sessions=1)
-        pending = create_private_training_session_checkin(self.trainer_user, completed["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, completed["id"], "Full Body")
         approve_private_training_session(completed["id"], pending["id"], {"subscription_id": completed["id"]})
         completed_html = trainer_client.get(f"/private-training/subscriptions/{completed['id']}").data.decode()
         self.assertNotIn("Check-In Session", completed_html)
@@ -621,7 +625,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
 
     def test_16_public_approve_requires_csrf_and_reject_url_is_unavailable(self):
         subscription = self._make_active_subscription(self.member_b_id)
-        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Back Day")
         _, _, _, raw_token = self._generate_portal(subscription["id"])
 
         approve_response = app.test_client().post(
@@ -639,7 +643,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
 
     def test_17_approval_is_idempotent_and_final_approval_completes_subscription(self):
         subscription = self._make_active_subscription(self.member_c_id, total_sessions=1)
-        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Push Day")
         first = approve_private_training_session(subscription["id"], pending["id"], {"subscription_id": subscription["id"]})
         self.assertEqual(first["outcome"], "approved")
         second = approve_private_training_session(subscription["id"], pending["id"], {"subscription_id": subscription["id"]})
@@ -651,7 +655,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
 
     def test_18_rejection_requires_reason_and_reopens_checkin(self):
         subscription = self._make_active_subscription(self.member_d_id, total_sessions=2)
-        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Leg Day")
         with self.assertRaises(ValueError):
             reject_private_training_session(subscription["id"], pending["id"], "   ", {"subscription_id": subscription["id"]})
 
@@ -684,13 +688,13 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertNotIn("rejection_reason", portal_html)
         self.assertIn("No session history yet.", portal_html)
 
-        second = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        second = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Arms Day")
         self.assertEqual(second["status"], "PENDING_MEMBER_APPROVAL")
 
     def test_19_wrong_token_cannot_access_other_subscription_session(self):
         sub_a = self._make_active_subscription(self.member_e_id)
         sub_b = self._make_active_subscription(self.member_f_id)
-        pending = create_private_training_session_checkin(self.trainer_user, sub_a["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, sub_a["id"], "Push Pull")
         _, _, _, token_b = self._generate_portal(sub_b["id"])
         client = app.test_client()
         csrf = self._csrf_from_html(client.get(f"/private-training/member/{token_b}").data.decode())
@@ -708,7 +712,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         def do_checkin():
             barrier.wait()
             try:
-                results.append(create_private_training_session_checkin(self.trainer_user, subscription["id"]))
+                results.append(create_private_training_session_checkin(self.trainer_user, subscription["id"], "Workout Race"))
             except Exception as exc:  # noqa: BLE001
                 results.append(exc)
 
@@ -753,14 +757,14 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
 
     def test_21_reject_then_checkin_again_and_approve_reject_race(self):
         subscription = self._make_active_subscription(self.member_h_id, total_sessions=2)
-        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Recovery")
         reject_private_training_session(
             subscription["id"],
             pending["id"],
             "Trainer needs to reschedule",
             {"subscription_id": subscription["id"]},
         )
-        second = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        second = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Mobility")
         self.assertEqual(second["status"], "PENDING_MEMBER_APPROVAL")
 
         results = []

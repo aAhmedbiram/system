@@ -162,10 +162,20 @@
         </div>
 
         <div class="panel">
-            <h2>Today's Workout</h2>
+            <h2>Trainer Session Check-In</h2>
             <div class="stack">
-                {% if can_edit_today_workout %}
-                    <form class="workout-form" method="post" action="{{ url_for('private_training.save_today_workout', subscription_id=subscription.id) }}">
+                {% if pending_session %}
+                    <div class="pill warn">Waiting for Member Approval</div>
+                    <div class="meta">
+                        Pending session checked in at {{ pending_session.checked_in_at }} by {{ pending_session.trainer_display_name or pending_session.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}<br>
+                        Workout: {{ pending_session.workout_name or '-' }}
+                    </div>
+                {% elif check_in_status_message %}
+                    <div class="pill {% if can_check_in %}ok{% else %}warn{% endif %}">{{ check_in_status_message }}</div>
+                {% endif %}
+
+                {% if can_check_in %}
+                    <form class="workout-form" method="post" action="{{ url_for('private_training.check_in_subscription', subscription_id=subscription.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div>
                             <label for="workout_name">Workout Name</label>
@@ -175,43 +185,10 @@
                                 id="workout_name"
                                 name="workout_name"
                                 maxlength="255"
-                                value="{{ today_workout.workout_name if today_workout else '' }}"
                                 placeholder="Chest, Back &amp; Biceps, Push Day, Rest Day"
                                 required
                             >
                         </div>
-                        <div class="actions" style="margin-top: 0;">
-                            <button class="btn btn-primary" type="submit">Save Workout</button>
-                        </div>
-                    </form>
-                    <div class="muted">Stored for the current Cairo calendar day.</div>
-                {% else %}
-                    <div class="meta">
-                        {% if today_workout %}
-                            <strong>{{ today_workout.workout_name }}</strong>
-                        {% else %}
-                            No workout assigned for today.
-                        {% endif %}
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>Trainer Session Check-In</h2>
-            <div class="stack">
-                {% if pending_session %}
-                    <div class="pill warn">Waiting for Member Approval</div>
-                    <div class="meta">
-                        Pending session checked in at {{ pending_session.checked_in_at }} by {{ pending_session.trainer_display_name or pending_session.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}
-                    </div>
-                {% elif check_in_status_message %}
-                    <div class="pill {% if can_check_in %}ok{% else %}warn{% endif %}">{{ check_in_status_message }}</div>
-                {% endif %}
-
-                {% if can_check_in %}
-                    <form method="post" action="{{ url_for('private_training.check_in_subscription', subscription_id=subscription.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-primary" type="submit">Check-In Session</button>
                     </form>
                 {% endif %}
@@ -261,10 +238,9 @@
                             <th>#</th>
                             <th>Trainer</th>
                             <th>Checked In</th>
+                            <th>Workout</th>
                             <th>Status</th>
                             <th>Approved At</th>
-                            <th>Rejected At</th>
-                            <th>Reason</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -273,14 +249,13 @@
                             <td>{{ session_row.id }}</td>
                             <td>{{ session_row.trainer_display_name or session_row.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}</td>
                             <td>{{ session_row.checked_in_at }}</td>
+                            <td>{{ session_row.workout_name or '-' }}</td>
                             <td>{{ session_row.status }}</td>
                             <td>{{ session_row.approved_at or '-' }}</td>
-                            <td>{{ session_row.rejected_at or '-' }}</td>
-                            <td>{{ session_row.rejection_reason or '-' }}</td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7">No session history yet.</td>
+                            <td colspan="6">No session history yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

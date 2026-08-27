@@ -163,16 +163,6 @@
                         Effective Status: <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
                     </div>
                 </div>
-                <div class="card">
-                    <h2>Today's Workout</h2>
-                    <div class="meta">
-                        {% if today_workout %}
-                            <strong>{{ today_workout.workout_name }}</strong>
-                        {% else %}
-                            No workout assigned for today.
-                        {% endif %}
-                    </div>
-                </div>
             </div>
 
             <div class="panel">
@@ -182,7 +172,8 @@
                         <div class="pill warn">Pending Member Approval</div>
                         <div class="meta">
                             Checked In: {{ pending_session.checked_in_at }}<br>
-                            Trainer: {{ pending_session.trainer_display_name or pending_session.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}
+                            Trainer: {{ pending_session.trainer_display_name or pending_session.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}<br>
+                            Workout: {{ pending_session.workout_name or '-' }}
                         </div>
                         <div class="grid" style="margin-bottom: 0;">
                             <div class="card">
@@ -207,6 +198,7 @@
                             <tr>
                                 <th>Checked In</th>
                                 <th>Trainer</th>
+                                <th>Workout</th>
                                 <th>Status</th>
                                 <th>Approved At</th>
                             </tr>
@@ -216,6 +208,7 @@
                             <tr>
                                 <td>{{ session_row.checked_in_at }}</td>
                                 <td>{{ session_row.trainer_display_name or session_row.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}</td>
+                                <td>{{ session_row.workout_name or '-' }}</td>
                                 <td>
                                     <span class="pill {% if session_row.status == 'APPROVED' %}ok{% elif session_row.status == 'PENDING_MEMBER_APPROVAL' %}warn{% else %}bad{% endif %}">
                                         {{ session_row.status }}
@@ -225,7 +218,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="4">No session history yet.</td>
+                                <td colspan="5">No session history yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

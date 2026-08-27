@@ -194,9 +194,9 @@ class PrivateTrainingPhase1ATest(unittest.TestCase):
         trainer_user_id = trainer_user_id or self.trainer_a_user_id
         return self._create_subscription(member_id, trainer_user_id, total_sessions, 2, 30)
 
-    def _check_in(self, subscription_id, trainer_user=None):
+    def _check_in(self, subscription_id, trainer_user=None, workout_name="Workout"):
         trainer_user = trainer_user or self.trainer_a_user
-        return create_private_training_session_checkin(trainer_user, subscription_id)
+        return create_private_training_session_checkin(trainer_user, subscription_id, workout_name)
 
     def _approve(self, subscription_id, session_id):
         return approve_private_training_session(
@@ -445,7 +445,7 @@ class PrivateTrainingPhase1ATest(unittest.TestCase):
     def test_20_trainer_cannot_open_another_trainers_subscription(self):
         other = self._make_active_subscription(self.member_b_id, trainer_user_id=self.trainer_b_user_id)
         with self.assertRaises(PrivateTrainingForbiddenError):
-            create_private_training_session_checkin(self.trainer_a_user, other["id"])
+            create_private_training_session_checkin(self.trainer_a_user, other["id"], "Workout")
 
     def test_21_session_checkin_creates_pending(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)

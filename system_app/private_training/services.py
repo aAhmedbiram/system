@@ -26,7 +26,6 @@ from .permissions import (
 from .queries import (
     calculate_effective_subscription_status,
     get_private_training_approved_count,
-    get_private_training_daily_workout,
     get_private_training_pending_session,
     get_private_training_remaining_sessions,
     get_private_training_sessions,
@@ -38,12 +37,10 @@ from .queries import (
     lock_private_training_session,
     lock_private_training_subscription,
     lock_private_training_subscriptions_for_member,
-    upsert_private_training_daily_workout,
 )
 from .validators import (
     parse_private_date,
     validate_date_range,
-    validate_non_negative_int,
     validate_positive_int,
     validate_rejection_reason,
 )
@@ -215,7 +212,7 @@ def get_private_training_todays_workout(subscription_id: int) -> dict[str, Any] 
     return get_private_training_daily_workout(subscription_id, _current_cairo_date())
 
 
-def _normalize_daily_workout_name(workout_name: Any) -> str:
+def _normalize_workout_name(workout_name: Any) -> str:
     if workout_name is None:
         raise PrivateTrainingValidationError("workout_name is required")
     workout_text = str(workout_name).strip()
@@ -224,6 +221,10 @@ def _normalize_daily_workout_name(workout_name: Any) -> str:
     if len(workout_text) > 255:
         raise PrivateTrainingValidationError("workout_name must be 255 characters or fewer")
     return workout_text
+
+
+def _normalize_daily_workout_name(workout_name: Any) -> str:
+    return _normalize_workout_name(workout_name)
 
 
 def save_private_training_todays_workout(
@@ -238,7 +239,7 @@ def save_private_training_todays_workout(
     if not can_write_private_training_daily_workout(current_user, subscription):
         raise PrivateTrainingForbiddenError("Current user cannot edit today's workout for this subscription")
 
-    normalized_workout_name = _normalize_daily_workout_name(workout_name)
+    normalized_workout_name = _normalize_workout_name(workout_name)
     workout = upsert_private_training_daily_workout(
         subscription_id_int,
         normalized_workout_name,
@@ -480,9 +481,14 @@ def _subscription_has_pending_session(cur, subscription_id: int) -> bool:
     return cur.fetchone() is not None
 
 
-def create_private_training_session_checkin(current_user: dict[str, Any], subscription_id: Any) -> dict[str, Any]:
+def create_private_training_session_checkin(
+    current_user: dict[str, Any],
+    subscription_id: Any,
+    workout_name: Any,
+) -> dict[str, Any]:
     _require_trainer_current_user(current_user)
     subscription_id_int = validate_positive_int(subscription_id, "subscription_id")
+    normalized_workout_name = _normalize_workout_name(workout_name)
 
     def _create(cur):
         subscription = lock_private_training_subscription(cur, subscription_id_int)
@@ -512,12 +518,12 @@ def create_private_training_session_checkin(current_user: dict[str, Any], subscr
             cur.execute(
                 """
                 INSERT INTO private_training_sessions (
-                    subscription_id, trainer_user_id, status, checked_in_at
-                ) VALUES (%s, %s, 'PENDING_MEMBER_APPROVAL', CURRENT_TIMESTAMP)
+                    subscription_id, trainer_user_id, workout_name, status, checked_in_at
+                ) VALUES (%s, %s, %s, 'PENDING_MEMBER_APPROVAL', CURRENT_TIMESTAMP)
                 RETURNING id, subscription_id, trainer_user_id, checked_in_at, status,
-                          approved_at, rejected_at, rejection_reason, created_at, updated_at
+                          approved_at, rejected_at, rejection_reason, workout_name, created_at, updated_at
                 """,
-                (subscription_id_int, current_user["id"]),
+                (subscription_id_int, current_user["id"], normalized_workout_name),
             )
             session_row = cur.fetchone()
         except IntegrityError as exc:

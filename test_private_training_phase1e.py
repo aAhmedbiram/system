@@ -302,10 +302,10 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
     def test_04_cancellation_preserves_history_and_pending_rows(self):
         subscription = self._make_active_subscription(self.member_e_id, total_sessions=3)
 
-        first_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        first_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Chest")
         approve_private_training_session(subscription["id"], first_pending["id"], {"subscription_id": subscription["id"]})
 
-        second_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        second_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Back")
         reject_private_training_session(
             subscription["id"],
             second_pending["id"],
@@ -313,7 +313,7 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
             {"subscription_id": subscription["id"]},
         )
 
-        third_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        third_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Leg Day")
         token_client, portal_csrf, portal_url, raw_token = self._portal_client_and_html(subscription["id"])
         self.assertIn(raw_token, portal_url)
 
@@ -334,22 +334,26 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
         pending_row = query_db("SELECT * FROM private_training_sessions WHERE id = %s", (third_pending["id"],), one=True)
         self.assertEqual(approved_row["trainer_user_id"], self.trainer_user_id)
         self.assertEqual(approved_row["status"], "APPROVED")
+        self.assertEqual(approved_row["workout_name"], "Chest")
         self.assertEqual(rejected_row["trainer_user_id"], self.trainer_user_id)
         self.assertEqual(rejected_row["status"], "REJECTED")
+        self.assertEqual(rejected_row["workout_name"], "Back")
         self.assertEqual(rejected_row["rejection_reason"], "Trainer needs to reschedule")
         self.assertEqual(pending_row["trainer_user_id"], self.trainer_user_id)
         self.assertEqual(pending_row["status"], "PENDING_MEMBER_APPROVAL")
+        self.assertEqual(pending_row["workout_name"], "Leg Day")
 
         refreshed_client = app.test_client()
         self._login_as(refreshed_client, self.trainer_user)
         detail_html = refreshed_client.get(f"/private-training/subscriptions/{subscription['id']}").data.decode()
         self.assertIn("CANCELLED", detail_html)
         self.assertIn("REJECTED", detail_html)
-        self.assertIn("Trainer needs to reschedule", detail_html)
+        self.assertNotIn("<th>Rejected At</th>", detail_html)
+        self.assertNotIn("<th>Reason</th>", detail_html)
         self.assertNotIn("Cancel Subscription", detail_html)
 
         with self.assertRaises(PrivateTrainingCancelledError):
-            create_private_training_session_checkin(self.trainer_user, subscription["id"])
+            create_private_training_session_checkin(self.trainer_user, subscription["id"], "Workout")
 
         portal_response = token_client.get(urlparse(portal_url).path)
         self.assertEqual(portal_response.status_code, 410)
@@ -367,7 +371,7 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
 
     def test_05_completed_and_expired_cannot_cancel(self):
         completed = self._make_active_subscription(self.member_f_id, total_sessions=1)
-        pending = create_private_training_session_checkin(self.trainer_user, completed["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, completed["id"], "Upper")
         approve_private_training_session(completed["id"], pending["id"], {"subscription_id": completed["id"]})
         with self.assertRaises(PrivateTrainingCompletedError):
             cancel_private_training_subscription(self.manager_user, completed["id"])
@@ -399,7 +403,7 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
         cancel_private_training_subscription(self.super_admin_user, subscription["id"])
 
         with self.assertRaises(PrivateTrainingCancelledError):
-            create_private_training_session_checkin(self.trainer_user, subscription["id"])
+            create_private_training_session_checkin(self.trainer_user, subscription["id"], "Workout")
 
         self.assertEqual(token_client.get(urlparse(portal_url).path).status_code, 410)
 

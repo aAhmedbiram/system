@@ -62,6 +62,7 @@ def ensure_private_training_tables() -> None:
                 id SERIAL PRIMARY KEY,
                 subscription_id INTEGER NOT NULL REFERENCES private_training_subscriptions(id) ON DELETE RESTRICT,
                 trainer_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+                workout_name VARCHAR(255) NULL,
                 checked_in_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 status VARCHAR(40) NOT NULL,
                 approved_at TIMESTAMPTZ NULL,
@@ -74,6 +75,12 @@ def ensure_private_training_tables() -> None:
                     status <> 'REJECTED' OR length(btrim(COALESCE(rejection_reason, ''))) > 0
                 )
             )
+            """
+        )
+        cur.execute(
+            """
+            ALTER TABLE private_training_sessions
+            ADD COLUMN IF NOT EXISTS workout_name VARCHAR(255) NULL
             """
         )
 

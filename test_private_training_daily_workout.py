@@ -1,26 +1,22 @@
 import re
 import unittest
 from datetime import timedelta
-from unittest.mock import patch
 from urllib.parse import urlparse
 
 from psycopg2.extras import Json
 
 from system_app.app import app
-from system_app.func import get_cairo_date
 from system_app.queries import query_db
 from system_app.private_training.services import (
+    PrivateTrainingForbiddenError,
     PrivateTrainingValidationError,
     approve_private_training_session,
     cancel_private_training_subscription,
     create_private_training_session_checkin,
     create_private_training_subscription,
-    get_private_training_daily_workout,
     get_private_training_pending_session,
     get_private_training_subscription,
-    get_private_training_todays_workout,
     reject_private_training_session,
-    save_private_training_todays_workout,
 )
 
 
@@ -66,9 +62,11 @@ class PrivateTrainingDailyWorkoutTest(unittest.TestCase):
         app.config["WTF_CSRF_ENABLED"] = self._old_csrf
 
     def _today(self):
+        from system_app.func import get_cairo_date
+
         return get_cairo_date()
 
-    def _date_str(self, delta_days: int) -> str:
+    def _date_str(self, delta_days: int):
         return (self._today() + timedelta(days=delta_days)).strftime("%Y-%m-%d")
 
     def _login_as(self, client, user):
@@ -207,7 +205,16 @@ class PrivateTrainingDailyWorkoutTest(unittest.TestCase):
             one=True,
         )
 
-    def _create_subscription(self, member_id, *, trainer_user_id=None, total_sessions=2, start_offset_days=0, expiry_offset_days=30, creator=None):
+    def _create_subscription(
+        self,
+        member_id,
+        *,
+        trainer_user_id=None,
+        total_sessions=2,
+        start_offset_days=0,
+        expiry_offset_days=30,
+        creator=None,
+    ):
         creator = creator or self.manager_user
         result = create_private_training_subscription(
             creator,
@@ -245,9 +252,9 @@ class PrivateTrainingDailyWorkoutTest(unittest.TestCase):
         response = client.get(f"/private-training/subscriptions/{subscription_id}")
         return client, response
 
-    def _save_today_workout_via_route(self, client, subscription_id, csrf_token, workout_name, follow_redirects=True):
+    def _check_in_via_route(self, client, subscription_id, csrf_token, workout_name, follow_redirects=True):
         return client.post(
-            f"/private-training/subscriptions/{subscription_id}/today-workout",
+            f"/private-training/subscriptions/{subscription_id}/check-in",
             data={
                 "csrf_token": csrf_token,
                 "workout_name": workout_name,
@@ -269,224 +276,246 @@ class PrivateTrainingDailyWorkoutTest(unittest.TestCase):
         portal_url, raw_token = self._portal_url_from_html(html)
         return client, csrf, portal_url, raw_token
 
-    def test_01_trainer_can_create_todays_workout_for_own_subscription(self):
+    def _insert_legacy_approved_session_without_workout(self, subscription_id, trainer_user_id):
+        return query_db(
+            """
+            INSERT INTO private_training_sessions (
+                subscription_id, trainer_user_id, workout_name, checked_in_at, status,
+                approved_at, rejected_at, rejection_reason, created_at, updated_at
+            ) VALUES (%s, %s, NULL, CURRENT_TIMESTAMP, 'APPROVED', CURRENT_TIMESTAMP, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            RETURNING id
+            """,
+            (subscription_id, trainer_user_id),
+            commit=True,
+            one=True,
+        )
+
+    def test_01_check_in_requires_workout_name_and_creates_no_session(self):
         subscription = self._make_active_subscription(self.member_a_id)
-        client, detail = self._detail_client(self.trainer_user, subscription["id"])
-        csrf = self._csrf_from_html(detail.data.decode())
 
-        response = self._save_today_workout_via_route(client, subscription["id"], csrf, " Chest ")
-        self.assertEqual(response.status_code, 200)
-        html = response.data.decode()
-        self.assertIn("Today's Workout", html)
-        self.assertIn("Chest", html)
+        with self.assertRaises(PrivateTrainingValidationError):
+            create_private_training_session_checkin(self.trainer_user, subscription["id"], None)
+        with self.assertRaises(PrivateTrainingValidationError):
+            create_private_training_session_checkin(self.trainer_user, subscription["id"], "   ")
+        with self.assertRaises(PrivateTrainingValidationError):
+            create_private_training_session_checkin(self.trainer_user, subscription["id"], "x" * 256)
 
-        workout = get_private_training_todays_workout(subscription["id"])
-        self.assertIsNotNone(workout)
-        self.assertEqual(workout["workout_name"], "Chest")
+        rows = query_db(
+            "SELECT * FROM private_training_sessions WHERE subscription_id = %s",
+            (subscription["id"],),
+        ) or []
+        self.assertEqual(rows, [])
 
-    def test_01b_today_workout_route_requires_csrf(self):
+    def test_02_check_in_route_requires_csrf(self):
         subscription = self._make_active_subscription(self.member_b_id)
         client, _ = self._detail_client(self.trainer_user, subscription["id"])
         response = client.post(
-            f"/private-training/subscriptions/{subscription['id']}/today-workout",
+            f"/private-training/subscriptions/{subscription['id']}/check-in",
             data={"workout_name": "Chest"},
         )
         self.assertEqual(response.status_code, 400)
 
-    def test_02_same_day_update_overwrites_value_without_duplicate_row(self):
-        subscription = self._make_active_subscription(self.member_b_id)
+    def test_03_valid_workout_check_in_trims_and_persists_pending_snapshot(self):
+        subscription = self._make_active_subscription(self.member_c_id)
         client, detail = self._detail_client(self.trainer_user, subscription["id"])
         csrf = self._csrf_from_html(detail.data.decode())
 
-        self._save_today_workout_via_route(client, subscription["id"], csrf, "Push Day")
-        self._save_today_workout_via_route(client, subscription["id"], csrf, "Back & Biceps")
+        response = self._check_in_via_route(client, subscription["id"], csrf, " Chest ")
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode()
+        self.assertIn("Waiting for Member Approval", html)
+        self.assertIn("Workout: Chest", html)
+        self.assertIn("Workout", html)
+        self.assertNotIn("Rejected At", html)
+        self.assertNotIn("Reason", html)
+
+        pending = get_private_training_pending_session(subscription["id"])
+        self.assertIsNotNone(pending)
+        self.assertEqual(pending["workout_name"], "Chest")
+        counts = get_private_training_subscription(subscription["id"])
+        self.assertEqual(counts["approved_count"], 0)
+        self.assertEqual(counts["remaining_sessions"], 2)
+
+    def test_04_approval_preserves_workout_and_history_displays_it(self):
+        subscription = self._make_active_subscription(self.member_d_id, total_sessions=2)
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Leg Day")
+        approve_private_training_session(subscription["id"], pending["id"], {"subscription_id": subscription["id"]})
+
+        session_row = query_db("SELECT * FROM private_training_sessions WHERE id = %s", (pending["id"],), one=True)
+        self.assertEqual(session_row["workout_name"], "Leg Day")
+        self.assertEqual(session_row["status"], "APPROVED")
+
+        staff_html = self._detail_client(self.trainer_user, subscription["id"])[1].data.decode()
+        self.assertIn("Workout", staff_html)
+        self.assertIn("Leg Day", staff_html)
+        self.assertNotIn("Rejected At", staff_html)
+        self.assertNotIn("Reason", staff_html)
+
+        _, _, portal_url, raw_token = self._generate_portal(subscription["id"])
+        portal_html = app.test_client().get(urlparse(portal_url).path).data.decode()
+        self.assertIn("Workout", portal_html)
+        self.assertIn("Leg Day", portal_html)
+        self.assertNotIn("Rejected At", portal_html)
+        self.assertNotIn("Reason", portal_html)
+
+        subscription_row = get_private_training_subscription(subscription["id"])
+        self.assertEqual(subscription_row["approved_count"], 1)
+        self.assertEqual(subscription_row["remaining_sessions"], 1)
+
+    def test_05_same_day_second_session_preserves_its_own_workout_snapshot(self):
+        subscription = self._make_active_subscription(self.member_e_id, total_sessions=2)
+        first_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Chest")
+        approve_private_training_session(subscription["id"], first_pending["id"], {"subscription_id": subscription["id"]})
+        second_pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Cardio")
+        approve_private_training_session(subscription["id"], second_pending["id"], {"subscription_id": subscription["id"]})
 
         rows = query_db(
             """
-            SELECT id, workout_name
-            FROM private_training_daily_workouts
+            SELECT workout_name, status
+            FROM private_training_sessions
             WHERE subscription_id = %s
-              AND workout_date = %s
             ORDER BY id ASC
             """,
-            (subscription["id"], self._today()),
+            (subscription["id"],),
         ) or []
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["workout_name"], "Back & Biceps")
+        self.assertEqual([row["workout_name"] for row in rows], ["Chest", "Cardio"])
+        self.assertEqual([row["status"] for row in rows], ["APPROVED", "APPROVED"])
 
-    def test_03_unrelated_trainer_cannot_modify_another_trainer_subscription(self):
-        subscription = self._make_active_subscription(self.member_c_id)
-        client = app.test_client()
-        self._login_as(client, self.trainer_b_user)
-        trainer_page = client.get("/private-training/my-clients")
-        csrf = self._csrf_from_html(trainer_page.data.decode())
+        subscription_row = get_private_training_subscription(subscription["id"])
+        self.assertEqual(subscription_row["approved_count"], 2)
+        self.assertEqual(subscription_row["remaining_sessions"], 0)
+        self.assertEqual(subscription_row["effective_status"], "COMPLETED")
 
-        response = self._save_today_workout_via_route(client, subscription["id"], csrf, "Arms Day")
-        self.assertIn(response.status_code, (200, 302))
-        workout = get_private_training_todays_workout(subscription["id"])
-        self.assertIsNone(workout)
-
-    def test_04_view_only_user_cannot_modify_workout(self):
-        subscription = self._make_active_subscription(self.member_d_id)
-        client, detail = self._detail_client(self.viewer_user, subscription["id"])
-        csrf = self._csrf_from_html(detail.data.decode())
-
-        response = self._save_today_workout_via_route(client, subscription["id"], csrf, "Rest Day")
-        self.assertIn(response.status_code, (200, 302))
-        workout = get_private_training_todays_workout(subscription["id"])
-        self.assertIsNone(workout)
-
-    def test_05_manager_can_save_workout(self):
-        subscription = self._make_active_subscription(self.member_e_id)
-        client, detail = self._detail_client(self.manager_user, subscription["id"])
-        csrf = self._csrf_from_html(detail.data.decode())
-
-        response = self._save_today_workout_via_route(client, subscription["id"], csrf, "Leg Day")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Leg Day", response.data.decode())
-        self.assertEqual(get_private_training_todays_workout(subscription["id"])["workout_name"], "Leg Day")
-
-    def test_06_super_admin_can_save_workout(self):
+    def test_06_unrelated_trainer_and_view_only_cannot_check_in(self):
         subscription = self._make_active_subscription(self.member_f_id)
-        client, detail = self._detail_client(self.super_admin_user, subscription["id"])
-        csrf = self._csrf_from_html(detail.data.decode())
+        with self.assertRaises(PrivateTrainingForbiddenError):
+            create_private_training_session_checkin(self.trainer_b_user, subscription["id"], "Arms")
+        with self.assertRaises(PrivateTrainingForbiddenError):
+            create_private_training_session_checkin(self.viewer_user, subscription["id"], "Arms")
 
-        response = self._save_today_workout_via_route(client, subscription["id"], csrf, "Recovery Day")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Recovery Day", response.data.decode())
-        self.assertEqual(get_private_training_todays_workout(subscription["id"])["workout_name"], "Recovery Day")
+        rows = query_db("SELECT * FROM private_training_sessions WHERE subscription_id = %s", (subscription["id"],), one=True)
+        self.assertIsNone(rows)
 
-    def test_07_subscription_detail_displays_today_workout(self):
-        subscription = self._make_active_subscription(self.member_a_id, creator=self.manager_user)
-        client, detail = self._detail_client(self.trainer_user, subscription["id"])
-        csrf = self._csrf_from_html(detail.data.decode())
-        self._save_today_workout_via_route(client, subscription["id"], csrf, "Upper Body")
+    def test_07_manager_cannot_check_in_but_super_admin_can(self):
+        subscription = self._make_active_subscription(self.member_a_id)
+        with self.assertRaises(PrivateTrainingForbiddenError):
+            create_private_training_session_checkin(self.manager_user, subscription["id"], "Workout")
 
-        response = client.get(f"/private-training/subscriptions/{subscription['id']}")
-        html = response.data.decode()
-        self.assertIn("Today's Workout", html)
-        self.assertIn("Upper Body", html)
-        self.assertIn("Save Workout", html)
+        pending = create_private_training_session_checkin(self.super_admin_user, subscription["id"], "Recovery Day")
+        self.assertEqual(pending["workout_name"], "Recovery Day")
+        self.assertEqual(pending["status"], "PENDING_MEMBER_APPROVAL")
 
-    def test_08_member_portal_displays_today_workout_read_only(self):
+    def test_08_member_portal_displays_pending_workout_and_is_read_only(self):
         subscription = self._make_active_subscription(self.member_b_id)
         client, detail = self._detail_client(self.trainer_user, subscription["id"])
         csrf = self._csrf_from_html(detail.data.decode())
-        self._save_today_workout_via_route(client, subscription["id"], csrf, "Push Day")
+        self._check_in_via_route(client, subscription["id"], csrf, "Push Day")
 
         portal_client, _, portal_url, raw_token = self._generate_portal(subscription["id"])
         response = portal_client.get(urlparse(portal_url).path)
         html = response.data.decode()
-        self.assertIn("Today's Workout", html)
-        self.assertIn("Push Day", html)
+        self.assertIn("Pending Member Approval", html)
+        self.assertIn("Workout: Push Day", html)
+        self.assertIn("Approve Session", html)
+        self.assertNotIn("Reject Session", html)
         self.assertNotIn("Save Workout", html)
         self.assertNotIn("/today-workout", html)
         self.assertNotIn("<textarea", html.lower())
+        self.assertNotIn("Rejected At", html)
+        self.assertNotIn("Reason", html)
 
-    def test_09_member_portal_shows_empty_state_when_no_workout(self):
+    def test_09_staff_history_displays_workout_and_no_rejection_columns(self):
         subscription = self._make_active_subscription(self.member_c_id)
-        portal_client, _, portal_url, raw_token = self._generate_portal(subscription["id"])
-        response = portal_client.get(urlparse(portal_url).path)
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Back Day")
+        approve_private_training_session(subscription["id"], pending["id"], {"subscription_id": subscription["id"]})
+
+        response = self._detail_client(self.trainer_user, subscription["id"])[1]
         html = response.data.decode()
-        self.assertIn("Today's Workout", html)
-        self.assertIn("No workout assigned for today.", html)
+        self.assertIn("Workout", html)
+        self.assertIn("Back Day", html)
+        self.assertNotIn("Rejected At", html)
+        self.assertNotIn("Reason", html)
 
-    def test_10_blank_workout_is_rejected(self):
+    def test_10_rejected_history_stays_internal_and_hidden_from_member_portal(self):
         subscription = self._make_active_subscription(self.member_d_id)
-        with self.assertRaises(PrivateTrainingValidationError):
-            save_private_training_todays_workout(self.trainer_user, subscription["id"], "   ")
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Recovery")
+        reject_private_training_session(
+            subscription["id"],
+            pending["id"],
+            "Member requested a different time",
+            {"subscription_id": subscription["id"]},
+        )
 
-    def test_11_workout_whitespace_is_trimmed(self):
+        session_row = query_db("SELECT * FROM private_training_sessions WHERE id = %s", (pending["id"],), one=True)
+        self.assertEqual(session_row["status"], "REJECTED")
+        self.assertEqual(session_row["rejection_reason"], "Member requested a different time")
+
+        portal_client, _, portal_url, raw_token = self._generate_portal(subscription["id"])
+        html = portal_client.get(urlparse(portal_url).path).data.decode()
+        self.assertNotIn("REJECTED", html)
+        self.assertNotIn("Rejected At", html)
+        self.assertNotIn("Reason", html)
+        self.assertNotIn("rejection_reason", html.lower())
+
+    def test_11_legacy_null_workout_displays_dash(self):
         subscription = self._make_active_subscription(self.member_e_id)
-        result = save_private_training_todays_workout(self.trainer_user, subscription["id"], "   Back Day   ")
-        self.assertEqual(result["workout"]["workout_name"], "Back Day")
+        legacy_row = self._insert_legacy_approved_session_without_workout(subscription["id"], self.trainer_user_id)
 
-    def test_12_long_workout_is_rejected(self):
-        subscription = self._make_active_subscription(self.member_f_id)
-        with self.assertRaises(PrivateTrainingValidationError):
-            save_private_training_todays_workout(self.trainer_user, subscription["id"], "x" * 256)
+        staff_html = self._detail_client(self.trainer_user, subscription["id"])[1].data.decode()
+        self.assertRegex(
+            staff_html,
+            re.compile(rf"<td>\s*{legacy_row['id']}\s*</td>.*?<td>\s*-\s*</td>", re.S),
+        )
 
-    def test_13_next_cairo_day_creates_a_new_row(self):
-        subscription = self._make_active_subscription(self.member_a_id, creator=self.manager_user)
-        save_private_training_todays_workout(self.trainer_user, subscription["id"], "Chest")
+        portal_client, _, portal_url, raw_token = self._generate_portal(subscription["id"])
+        portal_html = portal_client.get(urlparse(portal_url).path).data.decode()
+        self.assertRegex(
+            portal_html,
+            re.compile(r"<td>\s*-\s*</td>", re.S),
+        )
 
-        tomorrow = self._today() + timedelta(days=1)
-        with patch("system_app.private_training.services.get_cairo_date", return_value=tomorrow):
-            save_private_training_todays_workout(self.trainer_user, subscription["id"], "Back")
+    def test_12_cancellation_and_completion_preserve_historical_workout(self):
+        cancelled_subscription = self._make_active_subscription(self.member_f_id)
 
-        today_row = get_private_training_daily_workout(subscription["id"], self._today())
-        tomorrow_row = get_private_training_daily_workout(subscription["id"], tomorrow)
-        self.assertIsNotNone(today_row)
-        self.assertIsNotNone(tomorrow_row)
-        self.assertEqual(today_row["workout_name"], "Chest")
-        self.assertEqual(tomorrow_row["workout_name"], "Back")
+        # Cancellation path
+        pending = create_private_training_session_checkin(self.trainer_user, cancelled_subscription["id"], "Upper Body")
+        approve_private_training_session(
+            cancelled_subscription["id"],
+            pending["id"],
+            {"subscription_id": cancelled_subscription["id"]},
+        )
+        cancel_private_training_subscription(self.manager_user, cancelled_subscription["id"])
+        cancelled_session = query_db("SELECT * FROM private_training_sessions WHERE id = %s", (pending["id"],), one=True)
+        self.assertEqual(cancelled_session["workout_name"], "Upper Body")
+        self.assertEqual(get_private_training_subscription(cancelled_subscription["id"])["status"], "CANCELLED")
 
-    def test_14_workout_saving_does_not_modify_counts_or_session_status(self):
-        subscription = self._make_active_subscription(self.member_b_id, total_sessions=2)
-        pending_session = create_private_training_session_checkin(self.trainer_user, subscription["id"])
-        before = get_private_training_subscription(subscription["id"])
-        pending_before = get_private_training_pending_session(subscription["id"])
+        # Completion path
+        completed = self._make_active_subscription(self.member_a_id, total_sessions=1)
+        completed_pending = create_private_training_session_checkin(self.trainer_user, completed["id"], "Lower Body")
+        approve_private_training_session(
+            completed["id"],
+            completed_pending["id"],
+            {"subscription_id": completed["id"]},
+        )
+        completed_session = query_db("SELECT * FROM private_training_sessions WHERE id = %s", (completed_pending["id"],), one=True)
+        self.assertEqual(completed_session["workout_name"], "Lower Body")
+        self.assertEqual(get_private_training_subscription(completed["id"])["status"], "COMPLETED")
 
-        save_private_training_todays_workout(self.trainer_user, subscription["id"], "Recovery")
-
-        after = get_private_training_subscription(subscription["id"])
-        pending_after = get_private_training_pending_session(subscription["id"])
-        self.assertEqual(before["approved_count"], after["approved_count"])
-        self.assertEqual(before["remaining_sessions"], after["remaining_sessions"])
-        self.assertEqual(pending_before["status"], pending_after["status"])
-        self.assertEqual(pending_session["status"], pending_after["status"])
-
-    def test_15_cancelled_subscription_keeps_historical_workout(self):
-        subscription = self._make_active_subscription(self.member_c_id)
-        save_private_training_todays_workout(self.trainer_user, subscription["id"], "Legs")
-
-        cancel_private_training_subscription(self.manager_user, subscription["id"])
-
-        workout = get_private_training_daily_workout(subscription["id"], self._today())
-        self.assertIsNotNone(workout)
-        self.assertEqual(workout["workout_name"], "Legs")
-
-    def test_16_completed_subscription_keeps_historical_workout(self):
-        subscription = self._make_active_subscription(self.member_d_id, total_sessions=1)
-        save_private_training_todays_workout(self.trainer_user, subscription["id"], "Upper")
-        checkin = create_private_training_session_checkin(self.trainer_user, subscription["id"])
-        approve_private_training_session(subscription["id"], checkin["id"], {"subscription_id": subscription["id"]})
-
-        workout = get_private_training_daily_workout(subscription["id"], self._today())
-        self.assertIsNotNone(workout)
-        self.assertEqual(workout["workout_name"], "Upper")
-        self.assertEqual(get_private_training_subscription(subscription["id"])["status"], "COMPLETED")
-
-    def test_17_old_member_reject_endpoint_still_returns_404(self):
-        subscription = self._make_active_subscription(self.member_e_id)
+    def test_13_old_member_reject_endpoint_still_returns_404(self):
+        subscription = self._make_active_subscription(self.member_b_id)
         portal_client, csrf, portal_url, raw_token = self._generate_portal(subscription["id"])
-        checkin = create_private_training_session_checkin(self.trainer_user, subscription["id"])
+        pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Boxing")
 
         response = portal_client.post(
-            f"/private-training/member/{raw_token}/sessions/{checkin['id']}/reject",
+            f"/private-training/member/{raw_token}/sessions/{pending['id']}/reject",
             data={
                 "csrf_token": csrf,
                 "rejection_reason": "Not needed",
             },
         )
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(get_private_training_pending_session(subscription["id"])["status"], "PENDING_MEMBER_APPROVAL")
+        self.assertEqual(get_private_training_pending_session(subscription["id"])["id"], pending["id"])
 
-    def test_18_rejected_history_remains_hidden_from_member_portal(self):
-        subscription = self._make_active_subscription(self.member_f_id)
-        # Create a rejected session through the shared domain service.
-        create_private_training_session_checkin(self.trainer_user, subscription["id"])
-        pending = get_private_training_pending_session(subscription["id"])
-        reject_private_training_session(
-            subscription["id"],
-            pending["id"],
-            "Member requested a pause",
-            {"subscription_id": subscription["id"]},
-        )
 
-        portal_client, _, portal_url, raw_token = self._generate_portal(subscription["id"])
-        response = portal_client.get(urlparse(portal_url).path)
-        html = response.data.decode()
-        self.assertNotIn("REJECTED", html)
-        self.assertNotIn("rejected_at", html.lower())
-        self.assertNotIn("rejection_reason", html.lower())
+if __name__ == "__main__":
+    unittest.main()
