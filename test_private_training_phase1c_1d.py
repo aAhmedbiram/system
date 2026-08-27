@@ -330,6 +330,9 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertIn("Approved Sessions: 0", html)
         self.assertIn("Remaining Sessions: 2", html)
         self.assertIn('name="csrf_token"', html)
+        self.assertIn("Approve Session", html)
+        self.assertNotIn("Reject Session", html)
+        self.assertNotIn("rejection_reason", html)
 
     def test_02_invalid_token_returns_404(self):
         response = self._portal_get("not-a-valid-token")
@@ -547,6 +550,9 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         portal_html = self._portal_get(raw_token).data.decode()
         self.assertIn("Pending Member Approval", portal_html)
         self.assertIn("PTC Trainer A", portal_html)
+        self.assertIn("Approve Session", portal_html)
+        self.assertNotIn("Reject Session", portal_html)
+        self.assertNotIn("rejection_reason", portal_html)
 
     def test_14_checkin_ui_blocks_future_expired_cancelled_completed_and_zero_remaining(self):
         trainer_client = app.test_client()
@@ -608,7 +614,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         response = anonymous_client.post(f"/private-training/subscriptions/{subscription['id']}/check-in", data={})
         self.assertEqual(response.status_code, 302)
 
-    def test_16_public_approve_and_reject_require_csrf(self):
+    def test_16_public_approve_requires_csrf_and_reject_url_is_unavailable(self):
         subscription = self._make_active_subscription(self.member_b_id)
         pending = create_private_training_session_checkin(self.trainer_user, subscription["id"])
         _, _, _, raw_token = self._generate_portal(subscription["id"])
@@ -623,7 +629,8 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
             f"/private-training/member/{raw_token}/sessions/{pending['id']}/reject",
             data={},
         )
-        self.assertEqual(reject_response.status_code, 400)
+        self.assertEqual(reject_response.status_code, 404)
+        self.assertEqual(get_private_training_pending_session(subscription["id"])["id"], pending["id"])
 
     def test_17_approval_is_idempotent_and_final_approval_completes_subscription(self):
         subscription = self._make_active_subscription(self.member_c_id, total_sessions=1)

@@ -182,17 +182,6 @@
                                     <button class="btn btn-primary" type="submit">Approve Session</button>
                                 </form>
                             </div>
-                            <div class="card">
-                                <h3>Reject</h3>
-                                <form method="post" action="{{ reject_url }}">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <label for="rejection_reason">Rejection Reason</label>
-                                    <textarea id="rejection_reason" name="rejection_reason" maxlength="1000" required placeholder="Tell the trainer why this session is rejected"></textarea>
-                                    <div class="actions" style="margin-top: 12px;">
-                                        <button class="btn btn-danger" type="submit">Reject Session</button>
-                                    </div>
-                                </form>
-                            </div>
                         </div>
                     {% else %}
                         <div class="muted">No session is waiting for approval right now.</div>

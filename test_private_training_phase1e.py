@@ -361,7 +361,7 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
             f"/private-training/member/{raw_token}/sessions/{third_pending['id']}/reject",
             data={"csrf_token": portal_csrf, "rejection_reason": "No longer needed"},
         )
-        self.assertEqual(reject_response.status_code, 410)
+        self.assertEqual(reject_response.status_code, 404)
 
     def test_05_completed_and_expired_cannot_cancel(self):
         completed = self._make_active_subscription(self.member_f_id, total_sessions=1)
@@ -409,4 +409,4 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
         self.assertEqual(token_client.post(
             f"/private-training/member/{raw_token}/sessions/1/reject",
             data={"csrf_token": portal_csrf, "rejection_reason": "irrelevant"},
-        ).status_code, 410)
+        ).status_code, 404)

@@ -14,7 +14,6 @@ from .services import (
     list_private_training_sessions,
     resolve_portal_token,
     approve_private_training_session,
-    reject_private_training_session,
 )
 
 private_training_public_bp = Blueprint("private_training_public", __name__)
@@ -80,7 +79,6 @@ def _portal_context(raw_token: str, resolved: dict):
         "portal_ended": False,
         "portal_ended_message": None,
         "approve_url": url_for("private_training_public.member_portal_approve", raw_token=raw_token, session_id=pending_session["id"]) if pending_session else None,
-        "reject_url": url_for("private_training_public.member_portal_reject", raw_token=raw_token, session_id=pending_session["id"]) if pending_session else None,
     }
 
 
@@ -112,38 +110,6 @@ def member_portal_approve(raw_token: str, session_id: int):
         flash("Session approved successfully.", "success")
         if result.get("outcome") == "already_approved":
             flash("This session was already approved.", "info")
-        return redirect(url_for("private_training_public.member_portal", raw_token=raw_token))
-    except PrivateTrainingAlreadyProcessedError:
-        flash("This session was already processed.", "error")
-        return redirect(url_for("private_training_public.member_portal", raw_token=raw_token))
-    except (PrivateTrainingForbiddenError, PrivateTrainingNotFoundError):
-        return _not_found_response()
-    except (PrivateTrainingCancelledError, PrivateTrainingCompletedError, PrivateTrainingExpiredError):
-        return _gone_response()
-    except PrivateTrainingError as exc:
-        flash(str(exc), "error")
-        return _portal_render(raw_token, resolved), 400
-
-
-@private_training_public_bp.route("/member/<raw_token>/sessions/<int:session_id>/reject", methods=["POST"])
-def member_portal_reject(raw_token: str, session_id: int):
-    resolved, response = _resolve_portal(raw_token)
-    if response:
-        return response
-
-    subscription = resolved["subscription"]
-    rejection_reason = (request.form.get("rejection_reason") or "").strip()
-    if not rejection_reason:
-        flash("rejection_reason is required", "error")
-        return _portal_render(raw_token, resolved), 400
-
-    portal_context = {"subscription_id": subscription["id"]}
-
-    try:
-        result = reject_private_training_session(subscription["id"], session_id, rejection_reason, portal_context)
-        flash("Session rejected successfully.", "success")
-        if result.get("outcome") == "already_rejected":
-            flash("This session was already rejected.", "info")
         return redirect(url_for("private_training_public.member_portal", raw_token=raw_token))
     except PrivateTrainingAlreadyProcessedError:
         flash("This session was already processed.", "error")
