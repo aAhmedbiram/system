@@ -200,7 +200,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Member</th>
+                            <th>Client</th>
                             <th>Trainer</th>
                             <th>Gym</th>
                             <th>Private</th>
@@ -216,17 +216,25 @@
                         {% for subscription in subscriptions %}
                         <tr>
                             <td>
-                                <strong>{{ subscription.member_name }}</strong><br>
-                                <span class="muted">{{ subscription.member_phone or '-' }}</span>
+                                <strong>{{ subscription.client_name or subscription.member_name }}</strong><br>
+                                <span class="muted">{{ subscription.client_phone or subscription.member_phone or '-' }}</span><br>
+                                <span class="pill {% if subscription.client_type == 'OUTCOMER' %}warn{% else %}ok{% endif %}">
+                                    {{ subscription.client_type or 'MEMBER' }}
+                                </span>
                             </td>
                             <td>
                                 {{ subscription.trainer_display_name or subscription.trainer_username }}<br>
                                 <span class="muted">ID {{ subscription.trainer_user_id }}</span>
                             </td>
                             <td>
-                                {{ subscription.gym_membership_packages or '-' }}<br>
-                                {{ subscription.gym_membership_status or '-' }}<br>
-                                {{ subscription.gym_starting_date or '-' }} - {{ subscription.gym_end_date or '-' }}
+                                {% if subscription.client_type == 'OUTCOMER' %}
+                                    <span class="pill warn">Private Only</span><br>
+                                    Not a Gym Member
+                                {% else %}
+                                    {{ subscription.gym_membership_packages or '-' }}<br>
+                                    {{ subscription.gym_membership_status or '-' }}<br>
+                                    {{ subscription.gym_starting_date or '-' }} - {{ subscription.gym_end_date or '-' }}
+                                {% endif %}
                             </td>
                             <td>
                                 Start: {{ subscription.private_start_date }}<br>

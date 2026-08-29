@@ -146,7 +146,7 @@
 
         <div class="hero">
             <h1>Private Training Subscription #{{ subscription.id }}</h1>
-            <div class="muted">{{ subscription.member_name }} with trainer {{ subscription.trainer_display_name or subscription.trainer_username }}</div>
+            <div class="muted">{{ subscription.client_name or subscription.member_name }} with trainer {{ subscription.trainer_display_name or subscription.trainer_username }}</div>
             <div class="actions">
                 <a class="btn btn-secondary" href="{{ url_for('private_training.subscription_list') }}">Back to List</a>
                 <a class="btn btn-secondary" href="{{ url_for('private_training.my_clients') }}">My Clients</a>
@@ -155,7 +155,11 @@
                 {% endif %}
                 <a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
                 {% if user_permissions.private_training_manage or user_permissions.super_admin %}
-                    <a class="btn btn-secondary" href="{{ url_for('private_training.new_subscription', member_id=subscription.member_id) }}">New Subscription</a>
+                    {% if subscription.client_type == 'OUTCOMER' %}
+                        <a class="btn btn-secondary" href="{{ url_for('private_training.new_subscription', client_type='OUTCOMER', client_name=subscription.client_name or subscription.member_name, client_phone=subscription.client_phone or subscription.member_phone) }}">New Subscription</a>
+                    {% elif subscription.member_id %}
+                        <a class="btn btn-secondary" href="{{ url_for('private_training.new_subscription', member_id=subscription.member_id) }}">New Subscription</a>
+                    {% endif %}
                 {% endif %}
                 {% if can_cancel_subscription %}
                     <form method="post" action="{{ url_for('private_training.cancel_subscription', subscription_id=subscription.id) }}" onsubmit="return confirm('Cancel this Private Training subscription?');">
@@ -168,14 +172,21 @@
 
         <div class="grid">
             <div class="card">
-                <h2>Gym Details</h2>
+                <h2>{% if subscription.client_type == 'OUTCOMER' %}Client Details{% else %}Gym Details{% endif %}</h2>
                 <div class="meta">
-                    Member: <strong>{{ subscription.member_name }}</strong><br>
-                    Phone: {{ subscription.member_phone or '-' }}<br>
-                    Package: {{ subscription.gym_membership_packages or '-' }}<br>
-                    Status: {{ subscription.gym_membership_status or '-' }}<br>
-                    Start: {{ subscription.gym_starting_date or '-' }}<br>
-                    Expiry: {{ subscription.gym_end_date or '-' }}
+                    {% if subscription.client_type == 'OUTCOMER' %}
+                        Client Type: <strong>Outcomer</strong><br>
+                        Name: <strong>{{ subscription.client_name or subscription.member_name }}</strong><br>
+                        Phone: {{ subscription.client_phone or subscription.member_phone or '-' }}<br>
+                        Gym Membership: Private Only
+                    {% else %}
+                        Member: <strong>{{ subscription.member_name }}</strong><br>
+                        Phone: {{ subscription.member_phone or '-' }}<br>
+                        Package: {{ subscription.gym_membership_packages or '-' }}<br>
+                        Status: {{ subscription.gym_membership_status or '-' }}<br>
+                        Start: {{ subscription.gym_starting_date or '-' }}<br>
+                        Expiry: {{ subscription.gym_end_date or '-' }}
+                    {% endif %}
                 </div>
             </div>
             <div class="card">

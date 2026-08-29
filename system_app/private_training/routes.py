@@ -346,7 +346,10 @@ def new_subscription():
         return redirect(url_for("private_training.subscription_list" if can_view_private_training(current_user) else "attendance_table"))
 
     member_query = request.args.get("q", "")
-    selected_member_id = request.args.get("member_id", "").strip()
+    client_type = (request.args.get("client_type", "MEMBER") or "MEMBER").strip().upper()
+    selected_member_id = request.args.get("member_id", "").strip() if client_type == "MEMBER" else ""
+    client_name = request.args.get("client_name", "").strip()
+    client_phone = request.args.get("client_phone", "").strip()
     members = _load_member_options(member_query)
     trainers = _load_trainer_options()
     return _render(
@@ -356,7 +359,11 @@ def new_subscription():
         trainers=trainers,
         selected_member_id=selected_member_id,
         member_query=member_query,
-        form_data={},
+        form_data={
+            "client_type": client_type,
+            "client_name": client_name,
+            "client_phone": client_phone,
+        },
     )
 
 
@@ -373,12 +380,16 @@ def create_subscription():
     member_query = request.form.get("member_query", "")
     members = _load_member_options(member_query)
     trainers = _load_trainer_options()
+    client_type = (request.form.get("client_type", "MEMBER") or "MEMBER").strip().upper()
     form_data = {
+        "client_type": client_type,
         "member_id": request.form.get("member_id", "").strip(),
         "trainer_user_id": request.form.get("trainer_user_id", "").strip(),
         "total_sessions": request.form.get("total_sessions", "").strip(),
         "private_start_date": request.form.get("private_start_date", "").strip(),
         "private_expiry_date": request.form.get("private_expiry_date", "").strip(),
+        "client_name": request.form.get("client_name", "").strip(),
+        "client_phone": request.form.get("client_phone", "").strip(),
     }
 
     try:
@@ -389,6 +400,9 @@ def create_subscription():
             form_data["total_sessions"],
             form_data["private_start_date"],
             form_data["private_expiry_date"],
+            client_type=form_data["client_type"],
+            client_name=form_data["client_name"],
+            client_phone=form_data["client_phone"],
         )
         subscription = result["subscription"]
         flash("Private training subscription created successfully.", "success")
@@ -400,7 +414,7 @@ def create_subscription():
             current_user=current_user,
             members=members,
             trainers=trainers,
-            selected_member_id=form_data["member_id"],
+            selected_member_id=form_data["member_id"] if form_data["client_type"] == "MEMBER" else "",
             member_query=member_query,
             form_data=form_data,
             error_message=str(exc),
@@ -422,7 +436,7 @@ def create_subscription():
             current_user=current_user,
             members=members,
             trainers=trainers,
-            selected_member_id=form_data["member_id"],
+            selected_member_id=form_data["member_id"] if form_data["client_type"] == "MEMBER" else "",
             member_query=member_query,
             form_data=form_data,
             error_message=str(exc),
@@ -437,7 +451,7 @@ def create_subscription():
             current_user=current_user,
             members=members,
             trainers=trainers,
-            selected_member_id=form_data["member_id"],
+            selected_member_id=form_data["member_id"] if form_data["client_type"] == "MEMBER" else "",
             member_query=member_query,
             form_data=form_data,
             error_message=str(exc),

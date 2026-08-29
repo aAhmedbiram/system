@@ -89,6 +89,32 @@
             border: 1px dashed rgba(255,255,255,0.18);
             color: #d7dceb;
         }
+        .toggle-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .toggle-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            cursor: pointer;
+            margin-bottom: 0;
+            color: #fff;
+            font-weight: 700;
+        }
+        .client-section {
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 14px;
+            margin-top: 8px;
+        }
+        .client-section[hidden] {
+            display: none !important;
+        }
         @media (max-width: 720px) {
             .grid, .search-row { grid-template-columns: 1fr; }
             .actions { flex-direction: column; align-items: stretch; }
@@ -99,6 +125,8 @@
             .grid { gap: 12px; }
             .search-row { gap: 12px; }
             .small { line-height: 1.5; }
+            .toggle-group { flex-direction: column; align-items: stretch; }
+            .toggle-option { width: 100%; justify-content: flex-start; }
         }
     </style>
 </head>
@@ -120,38 +148,90 @@
                 <a class="btn btn-secondary" href="{{ url_for('index') }}">Back Home</a>
             </div>
 
-            <form method="get" action="{{ url_for('private_training.new_subscription') }}">
-                <div class="search-row">
-                    <div>
-                        <label for="q">Search Members</label>
-                        <input type="text" id="q" name="q" value="{{ member_query or '' }}" placeholder="Search by member ID, name, phone, or package">
+            <div id="member-search" class="client-section" {% if (form_data.client_type or 'MEMBER') == 'OUTCOMER' %}hidden{% endif %}>
+                <form method="get" action="{{ url_for('private_training.new_subscription') }}">
+                    <div class="search-row">
+                        <div>
+                            <label for="q">Search Members</label>
+                            <input type="text" id="q" name="q" value="{{ member_query or '' }}" placeholder="Search by member ID, name, phone, or package">
+                        </div>
+                        <div>
+                            <button class="btn btn-secondary" type="submit">Search</button>
+                        </div>
                     </div>
-                    <div>
-                        <button class="btn btn-secondary" type="submit">Search</button>
-                    </div>
-                </div>
-            </form>
+                </form>
+            </div>
 
             <form method="post" action="{{ url_for('private_training.create_subscription') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="member_query" value="{{ member_query or '' }}">
                 <div class="grid">
                     <div class="full">
-                        <label for="member_id">Member</label>
-                        <select id="member_id" name="member_id" required>
-                            <option value="">Select a member</option>
-                            {% for member in members %}
-                                <option value="{{ member.id }}" {% if selected_member_id and selected_member_id|int == member.id %}selected{% endif %}>
-                                    {{ member.id }} - {{ member.name }} {% if member.phone %}({{ member.phone }}){% endif %}
-                                </option>
-                            {% endfor %}
-                        </select>
-                        {% if members %}
-                            <div class="small">Use search above to narrow the list.</div>
-                        {% else %}
-                            <div class="empty-state">No valid or active members matched your search.</div>
-                        {% endif %}
+                        <label>Client Type</label>
+                        <div class="toggle-group">
+                            <label class="toggle-option">
+                                <input type="radio" name="client_type" value="MEMBER" {% if (form_data.client_type or 'MEMBER') != 'OUTCOMER' %}checked{% endif %}>
+                                Gym Member
+                            </label>
+                            <label class="toggle-option">
+                                <input type="radio" name="client_type" value="OUTCOMER" {% if form_data.client_type == 'OUTCOMER' %}checked{% endif %}>
+                                Outcomer
+                            </label>
+                        </div>
                     </div>
+                </div>
+
+                <div id="member-fields" class="client-section" {% if (form_data.client_type or 'MEMBER') == 'OUTCOMER' %}hidden{% endif %}>
+                    <div class="grid">
+                        <div class="full">
+                            <label for="member_id">Member</label>
+                            <select id="member_id" name="member_id" {% if (form_data.client_type or 'MEMBER') != 'OUTCOMER' %}required{% endif %}>
+                                <option value="">Select a member</option>
+                                {% for member in members %}
+                                    <option value="{{ member.id }}" {% if selected_member_id and selected_member_id|int == member.id %}selected{% endif %}>
+                                        {{ member.id }} - {{ member.name }} {% if member.phone %}({{ member.phone }}){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if members %}
+                                <div class="small">Use search above to narrow the list.</div>
+                            {% else %}
+                                <div class="empty-state">No valid or active members matched your search.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div id="outcomer-fields" class="client-section" {% if (form_data.client_type or 'MEMBER') != 'OUTCOMER' %}hidden{% endif %}>
+                    <div class="grid">
+                        <div class="full">
+                            <label for="client_name">Name</label>
+                            <input
+                                type="text"
+                                id="client_name"
+                                name="client_name"
+                                value="{{ form_data.client_name or '' }}"
+                                maxlength="255"
+                                placeholder="Outcomer full name"
+                                {% if form_data.client_type == 'OUTCOMER' %}required{% endif %}
+                            >
+                        </div>
+                        <div class="full">
+                            <label for="client_phone">Phone</label>
+                            <input
+                                type="text"
+                                id="client_phone"
+                                name="client_phone"
+                                value="{{ form_data.client_phone or '' }}"
+                                maxlength="50"
+                                placeholder="Outcomer phone number"
+                                {% if form_data.client_type == 'OUTCOMER' %}required{% endif %}
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid client-section">
                     <div class="full">
                         <label for="trainer_user_id">Trainer</label>
                         {% if trainers %}
@@ -186,5 +266,53 @@
             </form>
         </div>
     </div>
+    <script>
+        (function () {
+            const memberSearch = document.getElementById('member-search');
+            const memberSection = document.getElementById('member-fields');
+            const outcomerSection = document.getElementById('outcomer-fields');
+            const memberSelect = document.getElementById('member_id');
+            const outcomerName = document.getElementById('client_name');
+            const outcomerPhone = document.getElementById('client_phone');
+            const radios = Array.from(document.querySelectorAll('input[name="client_type"]'));
+            if (!memberSearch || !memberSection || !outcomerSection || !memberSelect || !outcomerName || !outcomerPhone || !radios.length) {
+                return;
+            }
+
+            function setSectionState(section, disabled) {
+                section.querySelectorAll('input, select, button, textarea').forEach((field) => {
+                    if (field.closest('form') && field.type === 'hidden') {
+                        return;
+                    }
+                    if (field.name === 'csrf_token') {
+                        return;
+                    }
+                    if (field.type === 'radio') {
+                        return;
+                    }
+                    field.disabled = disabled;
+                });
+            }
+
+            function syncClientMode() {
+                const selected = radios.find((radio) => radio.checked);
+                const isOutcomer = selected && selected.value === 'OUTCOMER';
+                memberSearch.hidden = isOutcomer;
+                memberSection.hidden = isOutcomer;
+                outcomerSection.hidden = !isOutcomer;
+                memberSelect.required = !isOutcomer;
+                outcomerName.required = isOutcomer;
+                outcomerPhone.required = isOutcomer;
+                setSectionState(memberSection, isOutcomer);
+                setSectionState(outcomerSection, !isOutcomer);
+                memberSelect.disabled = isOutcomer;
+                outcomerName.disabled = !isOutcomer;
+                outcomerPhone.disabled = !isOutcomer;
+            }
+
+            radios.forEach((radio) => radio.addEventListener('change', syncClientMode));
+            syncClientMode();
+        })();
+    </script>
 </body>
 </html>

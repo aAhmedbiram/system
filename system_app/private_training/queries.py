@@ -40,7 +40,10 @@ def ensure_private_training_tables() -> None:
             """
             CREATE TABLE IF NOT EXISTS private_training_subscriptions (
                 id SERIAL PRIMARY KEY,
-                member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+                member_id INTEGER NULL REFERENCES members(id) ON DELETE RESTRICT,
+                client_type VARCHAR(20) NOT NULL DEFAULT 'MEMBER',
+                client_name TEXT NOT NULL,
+                client_phone TEXT NOT NULL DEFAULT '',
                 trainer_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
                 created_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
                 total_sessions INTEGER NOT NULL,
@@ -51,8 +54,89 @@ def ensure_private_training_tables() -> None:
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 CONSTRAINT chk_private_training_subscriptions_total_sessions CHECK (total_sessions > 0),
                 CONSTRAINT chk_private_training_subscriptions_dates CHECK (private_expiry_date >= private_start_date),
+                CONSTRAINT chk_private_training_subscriptions_client_type CHECK (client_type IN ('MEMBER', 'OUTCOMER')),
+                CONSTRAINT chk_private_training_subscriptions_client_identity CHECK (
+                    (client_type = 'MEMBER' AND member_id IS NOT NULL)
+                    OR (
+                        client_type = 'OUTCOMER'
+                        AND member_id IS NULL
+                        AND length(btrim(COALESCE(client_name, ''))) > 0
+                        AND length(btrim(COALESCE(client_phone, ''))) > 0
+                    )
+                ),
                 CONSTRAINT chk_private_training_subscriptions_status CHECK (status IN ('ASSIGNED', 'ACTIVE', 'COMPLETED', 'EXPIRED', 'CANCELLED'))
             )
+            """
+        )
+        cur.execute("ALTER TABLE private_training_subscriptions ADD COLUMN IF NOT EXISTS client_type VARCHAR(20)")
+        cur.execute("ALTER TABLE private_training_subscriptions ADD COLUMN IF NOT EXISTS client_name TEXT")
+        cur.execute("ALTER TABLE private_training_subscriptions ADD COLUMN IF NOT EXISTS client_phone TEXT")
+        cur.execute("ALTER TABLE private_training_subscriptions ALTER COLUMN member_id DROP NOT NULL")
+        cur.execute("ALTER TABLE private_training_subscriptions ALTER COLUMN client_type SET DEFAULT 'MEMBER'")
+        cur.execute("UPDATE private_training_subscriptions SET client_type = COALESCE(client_type, 'MEMBER')")
+        cur.execute(
+            """
+            UPDATE private_training_subscriptions s
+            SET
+                client_name = COALESCE(NULLIF(btrim(s.client_name), ''), m.name),
+                client_phone = COALESCE(NULLIF(btrim(s.client_phone), ''), COALESCE(m.phone, '')),
+                client_type = COALESCE(NULLIF(btrim(s.client_type), ''), 'MEMBER')
+            FROM members m
+            WHERE s.member_id = m.id
+            """
+        )
+        cur.execute(
+            """
+            UPDATE private_training_subscriptions
+            SET
+                client_name = COALESCE(NULLIF(btrim(client_name), ''), ''),
+                client_phone = COALESCE(NULLIF(btrim(client_phone), ''), '')
+            WHERE client_name IS NULL OR client_phone IS NULL
+            """
+        )
+        cur.execute("ALTER TABLE private_training_subscriptions ALTER COLUMN client_type SET NOT NULL")
+        cur.execute("ALTER TABLE private_training_subscriptions ALTER COLUMN client_name SET NOT NULL")
+        cur.execute("ALTER TABLE private_training_subscriptions ALTER COLUMN client_phone SET NOT NULL")
+        cur.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'chk_private_training_subscriptions_client_type'
+                ) THEN
+                    ALTER TABLE private_training_subscriptions
+                    ADD CONSTRAINT chk_private_training_subscriptions_client_type
+                    CHECK (client_type IN ('MEMBER', 'OUTCOMER'));
+                END IF;
+            END
+            $$;
+            """
+        )
+        cur.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'chk_private_training_subscriptions_client_identity'
+                ) THEN
+                    ALTER TABLE private_training_subscriptions
+                    ADD CONSTRAINT chk_private_training_subscriptions_client_identity
+                    CHECK (
+                        (client_type = 'MEMBER' AND member_id IS NOT NULL)
+                        OR (
+                            client_type = 'OUTCOMER'
+                            AND member_id IS NULL
+                            AND length(btrim(COALESCE(client_name, ''))) > 0
+                            AND length(btrim(COALESCE(client_phone, ''))) > 0
+                        )
+                    );
+                END IF;
+            END
+            $$;
             """
         )
 
@@ -127,6 +211,12 @@ def ensure_private_training_tables() -> None:
         )
         cur.execute(
             """
+            CREATE INDEX IF NOT EXISTS idx_private_training_subscriptions_client_type_phone
+            ON private_training_subscriptions(client_type, client_phone)
+            """
+        )
+        cur.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_private_training_subscriptions_expiry_date
             ON private_training_subscriptions(private_expiry_date)
             """
@@ -177,8 +267,11 @@ def _subscription_view_query(where_clause: str = "", order_clause: str = "ORDER 
     return f"""
         SELECT
             s.*,
-            m.name AS member_name,
-            m.phone AS member_phone,
+            s.client_type,
+            s.client_name,
+            s.client_phone,
+            COALESCE(s.client_name, m.name) AS member_name,
+            COALESCE(s.client_phone, m.phone) AS member_phone,
             m.email AS member_email,
             m.membership_packages AS gym_membership_packages,
             m.membership_status AS gym_membership_status,
@@ -192,7 +285,7 @@ def _subscription_view_query(where_clause: str = "", order_clause: str = "ORDER 
             COALESCE(sess.rejected_count, 0) AS rejected_count,
             COALESCE(tok.active_token_count, 0) AS active_token_count
         FROM private_training_subscriptions s
-        JOIN members m ON m.id = s.member_id
+        LEFT JOIN members m ON m.id = s.member_id
         JOIN users t ON t.id = s.trainer_user_id
         LEFT JOIN users creator ON creator.id = s.created_by_user_id
         LEFT JOIN LATERAL (
@@ -217,6 +310,11 @@ def _normalize_subscription_row(row: dict[str, Any] | None) -> dict[str, Any] | 
     if not row:
         return None
     normalized = dict(row)
+    normalized["client_type"] = str(normalized.get("client_type") or "MEMBER").upper()
+    normalized["client_name"] = normalized.get("client_name") or normalized.get("member_name") or ""
+    normalized["client_phone"] = normalized.get("client_phone") or normalized.get("member_phone") or ""
+    normalized["member_name"] = normalized.get("member_name") or normalized.get("client_name")
+    normalized["member_phone"] = normalized.get("member_phone") or normalized.get("client_phone")
     normalized["trainer_display_name"] = _display_user_name(normalized.get("trainer_username"))
     normalized["created_by_display_name"] = _display_user_name(normalized.get("created_by_username"))
     approved_count = int(normalized.get("approved_count") or 0)
@@ -429,6 +527,9 @@ def get_private_training_token_by_hash(token_hash: str) -> dict[str, Any] | None
         SELECT
             pt.*,
             s.member_id,
+            s.client_type,
+            s.client_name,
+            s.client_phone,
             s.trainer_user_id,
             s.created_by_user_id AS subscription_created_by_user_id,
             s.total_sessions,

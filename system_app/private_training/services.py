@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import re
 from datetime import datetime
 from typing import Any
 
@@ -37,6 +38,7 @@ from .queries import (
     lock_private_training_session,
     lock_private_training_subscription,
     lock_private_training_subscriptions_for_member,
+    _subscription_view_query,
 )
 from .validators import (
     parse_private_date,
@@ -100,6 +102,9 @@ class PrivateTrainingAlreadyProcessedError(PrivateTrainingConflictError):
     error_code = "session_already_processed"
 
 
+_PRIVATE_TRAINING_CLIENT_TYPES = ("MEMBER", "OUTCOMER")
+
+
 def _normalize_user(user: dict[str, Any] | None) -> dict[str, Any] | None:
     return dict(user) if user else None
 
@@ -146,6 +151,44 @@ def _load_member(member_id: int) -> dict[str, Any]:
     if not member:
         raise PrivateTrainingNotFoundError("Member not found")
     return dict(member)
+
+
+def _normalize_client_type(client_type: Any) -> str:
+    if client_type is None:
+        return "MEMBER"
+    client_type_text = str(client_type).strip().upper()
+    if client_type_text not in _PRIVATE_TRAINING_CLIENT_TYPES:
+        raise PrivateTrainingValidationError("client_type must be MEMBER or OUTCOMER")
+    return client_type_text
+
+
+def _normalize_client_name(client_name: Any, *, field_name: str = "client_name") -> str:
+    if client_name is None:
+        raise PrivateTrainingValidationError(f"{field_name} is required")
+    client_name_text = str(client_name).strip()
+    if not client_name_text:
+        raise PrivateTrainingValidationError(f"{field_name} is required")
+    if len(client_name_text) > 255:
+        raise PrivateTrainingValidationError(f"{field_name} must be 255 characters or fewer")
+    return client_name_text
+
+
+def _normalize_client_phone(client_phone: Any, *, field_name: str = "client_phone", required: bool = True) -> str:
+    if client_phone is None:
+        if required:
+            raise PrivateTrainingValidationError(f"{field_name} is required")
+        return ""
+    client_phone_text = str(client_phone).strip()
+    if required and not client_phone_text:
+        raise PrivateTrainingValidationError(f"{field_name} is required")
+    if len(client_phone_text) > 50:
+        raise PrivateTrainingValidationError(f"{field_name} must be 50 characters or fewer")
+    return client_phone_text
+
+
+def _normalize_phone_identity(client_phone: Any) -> str:
+    phone_text = str(client_phone or "")
+    return re.sub(r"\D+", "", phone_text)
 
 
 def _current_cairo_date():
@@ -260,68 +303,123 @@ def create_private_training_subscription(
     total_sessions: Any,
     private_start_date: Any,
     private_expiry_date: Any,
+    client_type: Any = "MEMBER",
+    client_name: Any = None,
+    client_phone: Any = None,
 ) -> dict[str, Any]:
     _require_managed_current_user(current_user)
 
-    member_id_int = validate_positive_int(member_id, "member_id")
+    client_type_text = _normalize_client_type(client_type)
     trainer_user_id_int = validate_positive_int(trainer_user_id, "trainer_user_id")
     total_sessions_int = validate_positive_int(total_sessions, "total_sessions")
     start_date = parse_private_date(private_start_date, "private_start_date")
     expiry_date = parse_private_date(private_expiry_date, "private_expiry_date")
     validate_date_range(start_date, expiry_date)
 
-    member = _load_member(member_id_int)
     trainer = _load_trainer_user(trainer_user_id_int)
     today = _current_cairo_date()
     if expiry_date < today:
         raise PrivateTrainingExpiredError("Cannot create an already expired private subscription")
 
     stored_status = "ACTIVE" if start_date <= today else "ASSIGNED"
+    member = None
+    member_id_int = None
+    client_name_text = ""
+    client_phone_text = ""
+
+    if client_type_text == "MEMBER":
+        member_id_int = validate_positive_int(member_id, "member_id")
+        member = _load_member(member_id_int)
+        client_name_text = _normalize_client_name(member.get("name"), field_name="client_name")
+        client_phone_text = _normalize_client_phone(member.get("phone"), field_name="client_phone", required=False)
+    else:
+        if member_id not in (None, "", 0):
+            raise PrivateTrainingValidationError("member_id must be empty for outcomer subscriptions")
+        client_name_text = _normalize_client_name(client_name)
+        client_phone_text = _normalize_client_phone(client_phone)
+        if not _normalize_phone_identity(client_phone_text):
+            raise PrivateTrainingValidationError("client_phone must contain digits")
 
     def _create(cur):
-        cur.execute("SELECT id FROM members WHERE id = %s FOR UPDATE", (member_id_int,))
-        if not cur.fetchone():
-            raise PrivateTrainingNotFoundError("Member not found")
+        if client_type_text == "MEMBER":
+            cur.execute("SELECT id FROM members WHERE id = %s FOR UPDATE", (member_id_int,))
+            if not cur.fetchone():
+                raise PrivateTrainingNotFoundError("Member not found")
 
-        cur.execute(
-            """
-            SELECT *
-            FROM private_training_subscriptions
-            WHERE member_id = %s
-            ORDER BY created_at DESC, id DESC
-            """,
-            (member_id_int,),
-        )
-        existing_rows = cur.fetchall() or []
-        for row in existing_rows:
-            row_dict = dict(row)
             cur.execute(
                 """
-                SELECT COUNT(*) FILTER (WHERE status = 'APPROVED') AS approved_count
-                FROM private_training_sessions
-                WHERE subscription_id = %s
+                SELECT *
+                FROM private_training_subscriptions
+                WHERE member_id = %s
+                ORDER BY created_at DESC, id DESC
                 """,
-                (row_dict["id"],),
+                (member_id_int,),
             )
-            counts = cur.fetchone() or {}
-            row_dict["approved_count"] = int(counts.get("approved_count") or 0)
-            if _subscription_is_live(row_dict):
-                raise PrivateTrainingSubscriptionConflictError(
-                    "Member already has an effective active private subscription",
-                    details={"existing_subscription_id": row_dict.get("id")},
+            existing_rows = cur.fetchall() or []
+            for row in existing_rows:
+                row_dict = dict(row)
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FILTER (WHERE status = 'APPROVED') AS approved_count
+                    FROM private_training_sessions
+                    WHERE subscription_id = %s
+                    """,
+                    (row_dict["id"],),
                 )
+                counts = cur.fetchone() or {}
+                row_dict["approved_count"] = int(counts.get("approved_count") or 0)
+                if _subscription_is_live(row_dict):
+                    raise PrivateTrainingSubscriptionConflictError(
+                        "Member already has an effective active private subscription",
+                        details={"existing_subscription_id": row_dict.get("id")},
+                    )
+        else:
+            normalized_phone_identity = _normalize_phone_identity(client_phone_text)
+            lock_key = f"pt_outcomer_phone:{normalized_phone_identity}"
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)", (lock_key,))
+            cur.execute(
+                """
+                SELECT *
+                FROM private_training_subscriptions
+                WHERE client_type = 'OUTCOMER'
+                  AND regexp_replace(COALESCE(client_phone, ''), '[^0-9]+', '', 'g') = %s
+                ORDER BY created_at DESC, id DESC
+                """,
+                (normalized_phone_identity,),
+            )
+            existing_rows = cur.fetchall() or []
+            for row in existing_rows:
+                row_dict = dict(row)
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FILTER (WHERE status = 'APPROVED') AS approved_count
+                    FROM private_training_sessions
+                    WHERE subscription_id = %s
+                    """,
+                    (row_dict["id"],),
+                )
+                counts = cur.fetchone() or {}
+                row_dict["approved_count"] = int(counts.get("approved_count") or 0)
+                if _subscription_is_live(row_dict):
+                    raise PrivateTrainingSubscriptionConflictError(
+                        "Outcomer already has an effective active private subscription",
+                        details={"existing_subscription_id": row_dict.get("id")},
+                    )
 
         cur.execute(
             """
             INSERT INTO private_training_subscriptions (
-                member_id, trainer_user_id, created_by_user_id,
+                member_id, client_type, client_name, client_phone, trainer_user_id, created_by_user_id,
                 total_sessions, private_start_date, private_expiry_date, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, member_id, trainer_user_id, created_by_user_id, total_sessions,
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, member_id, client_type, client_name, client_phone, trainer_user_id, created_by_user_id, total_sessions,
                       private_start_date, private_expiry_date, status, created_at, updated_at
             """,
             (
                 member_id_int,
+                client_type_text,
+                client_name_text,
+                client_phone_text,
                 trainer_user_id_int,
                 current_user["id"],
                 total_sessions_int,
@@ -342,6 +440,11 @@ def create_private_training_subscription(
     return {
         "subscription": subscription_row,
         "member": member,
+        "client": {
+            "client_type": client_type_text,
+            "client_name": client_name_text,
+            "client_phone": client_phone_text,
+        },
         "trainer": trainer,
     }
 
@@ -403,37 +506,7 @@ def list_private_clients_for_trainer(current_user: dict[str, Any]) -> list[dict[
         raise PrivateTrainingForbiddenError("Current user cannot view private training subscriptions")
 
     if is_super_user(current_user) or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW) or can_manage_private_training(current_user):
-        rows = query_db(
-            """
-            SELECT *
-            FROM (
-                SELECT
-                    s.*,
-                    m.name AS member_name,
-                    m.phone AS member_phone,
-                    m.membership_packages AS gym_membership_packages,
-                    m.membership_status AS gym_membership_status,
-                    m.starting_date AS gym_starting_date,
-                    m.end_date AS gym_end_date,
-                    t.username AS trainer_username,
-                    creator.username AS created_by_username,
-                    COALESCE(sess.approved_count, 0) AS approved_count,
-                    COALESCE(sess.pending_count, 0) AS pending_count
-                FROM private_training_subscriptions s
-                JOIN members m ON m.id = s.member_id
-                JOIN users t ON t.id = s.trainer_user_id
-                LEFT JOIN users creator ON creator.id = s.created_by_user_id
-                LEFT JOIN LATERAL (
-                    SELECT
-                        COUNT(*) FILTER (WHERE ps.status = 'APPROVED') AS approved_count,
-                        COUNT(*) FILTER (WHERE ps.status = 'PENDING_MEMBER_APPROVAL') AS pending_count
-                    FROM private_training_sessions ps
-                    WHERE ps.subscription_id = s.id
-                ) sess ON TRUE
-            ) subscription_rows
-            ORDER BY created_at DESC, id DESC
-            """
-        ) or []
+        rows = query_db(_subscription_view_query()) or []
     else:
         rows = list_private_training_subscriptions_for_trainer(current_user["id"])
     normalized_rows = []
@@ -835,6 +908,11 @@ def resolve_portal_token(raw_token: str) -> dict[str, Any]:
         "subscription": subscription,
         "member": {
             "id": token_row.get("member_id"),
+        },
+        "client": {
+            "client_type": subscription.get("client_type"),
+            "client_name": subscription.get("client_name"),
+            "client_phone": subscription.get("client_phone"),
         },
         "trainer": {
             "id": token_row.get("trainer_user_id"),

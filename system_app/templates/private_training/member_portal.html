@@ -171,13 +171,20 @@
 
             <div class="grid">
                 <div class="card">
-                    <h2>Gym Details</h2>
+                    <h2>{% if subscription.client_type == 'OUTCOMER' %}Client Details{% else %}Gym Details{% endif %}</h2>
                     <div class="meta">
-                        Member: <strong>{{ subscription.member_name }}</strong><br>
-                        Package: {{ subscription.gym_membership_packages or '-' }}<br>
-                        Status: {{ subscription.gym_membership_status or '-' }}<br>
-                        Start: {{ subscription.gym_starting_date or '-' }}<br>
-                        Expiry: {{ subscription.gym_end_date or '-' }}
+                        {% if subscription.client_type == 'OUTCOMER' %}
+                            Client Type: <strong>Outcomer</strong><br>
+                            Name: <strong>{{ subscription.client_name or subscription.member_name }}</strong><br>
+                            Phone: {{ subscription.client_phone or subscription.member_phone or '-' }}<br>
+                            Private Training: Private Only
+                        {% else %}
+                            Member: <strong>{{ subscription.member_name }}</strong><br>
+                            Package: {{ subscription.gym_membership_packages or '-' }}<br>
+                            Status: {{ subscription.gym_membership_status or '-' }}<br>
+                            Start: {{ subscription.gym_starting_date or '-' }}<br>
+                            Expiry: {{ subscription.gym_end_date or '-' }}
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card">
