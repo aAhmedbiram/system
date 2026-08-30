@@ -34,6 +34,7 @@ from .services import (
     get_private_subscription_for_trainer,
     get_private_training_pending_session,
     list_private_clients_for_trainer,
+    list_private_training_trainer_options,
     list_private_training_sessions,
     revoke_portal_token,
 )
@@ -241,14 +242,11 @@ def _load_subscription_or_redirect(current_user, subscription_id):
         return None, redirect(url_for("private_training.subscription_list"))
 
 
-def _filter_subscription_rows(rows, trainer_user_id=None, status=None):
+def _filter_subscription_rows(rows, status=None):
     filtered = []
-    trainer_user_id = str(trainer_user_id or "").strip()
     status = str(status or "").strip().upper()
     for row in rows:
         row_dict = dict(row)
-        if trainer_user_id and str(row_dict.get("trainer_user_id")) != trainer_user_id:
-            continue
         if status and str(row_dict.get("effective_status") or row_dict.get("status") or "").upper() != status:
             continue
         filtered.append(row_dict)
@@ -263,10 +261,19 @@ def _subscription_list_context(
     allow_create: bool,
     show_all_subscriptions_link: bool = False,
 ):
-    rows = list_private_clients_for_trainer(current_user)
-    trainer_user_id = request.args.get("trainer_user_id")
+    trainer_user_id = (request.args.get("trainer_user_id") or "").strip()
+    if trainer_user_id and not trainer_user_id.isdigit():
+        trainer_user_id = ""
+    client_type = (request.args.get("client_type") or "").strip().upper()
+    if client_type not in ("", "MEMBER", "OUTCOMER"):
+        client_type = ""
     status = request.args.get("status")
-    rows = _filter_subscription_rows(rows, trainer_user_id=trainer_user_id, status=status)
+    rows = list_private_clients_for_trainer(
+        current_user,
+        trainer_user_id=trainer_user_id,
+        client_type=client_type,
+    )
+    rows = _filter_subscription_rows(rows, status=status)
     return _render(
         "private_training/subscriptions_list.html",
         current_user=current_user,
@@ -275,8 +282,10 @@ def _subscription_list_context(
         allow_create=allow_create,
         show_all_subscriptions_link=show_all_subscriptions_link,
         subscriptions=rows,
+        trainer_options=list_private_training_trainer_options(current_user),
         active_filters={
             "trainer_user_id": trainer_user_id or "",
+            "client_type": client_type or "",
             "status": status or "",
         },
     )

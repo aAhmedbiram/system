@@ -451,7 +451,89 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
         self.assertIn(self._date_str(0), html)
         self.assertIn(self._date_str(30), html)
         self.assertIn(str(subscription["trainer_user_id"]), html)
+        self.assertIn('label for="trainer_user_id">Trainer Name', html)
+        self.assertIn("Ptb Trainer A", html)
+        self.assertIn("Ptb Trainer B", html)
+        self.assertIn('name="client_type"', html)
+        self.assertIn('value="OUTCOMER"', html)
         self.assertIn("table-wrap", html)
+
+    def test_09b_subscription_filters_by_trainer_status_and_client_type(self):
+        member_active_a = self._create_subscription(
+            self.member_a_id,
+            self.trainer_a_user_id,
+            total_sessions=2,
+            start_offset_days=0,
+            expiry_offset_days=30,
+        )
+        member_active_b = self._create_subscription(
+            self.member_b_id,
+            self.trainer_b_user_id,
+            total_sessions=2,
+            start_offset_days=0,
+            expiry_offset_days=30,
+        )
+        outcomer_active = create_private_training_subscription(
+            self.manager_user,
+            None,
+            self.trainer_a_user_id,
+            2,
+            self._date_str(0),
+            self._date_str(30),
+            client_type="OUTCOMER",
+            client_name="PTB Outcomer Alpha",
+            client_phone="010-555-0101",
+        )["subscription"]
+
+        self._login_as(self.manager_user)
+
+        base_response = self.client.get("/private-training/subscriptions")
+        base_html = base_response.data.decode()
+        self.assertIn("PTB Member A", base_html)
+        self.assertIn("PTB Member B", base_html)
+        self.assertIn("PTB Outcomer Alpha", base_html)
+        self.assertIn("Ptb Trainer A", base_html)
+        self.assertIn("Ptb Trainer B", base_html)
+
+        trainer_response = self.client.get(
+            "/private-training/subscriptions",
+            query_string={"trainer_user_id": self.trainer_a_user_id},
+        )
+        trainer_html = trainer_response.data.decode()
+        self.assertIn("PTB Member A", trainer_html)
+        self.assertIn("PTB Outcomer Alpha", trainer_html)
+        self.assertNotIn("PTB Member B", trainer_html)
+
+        member_response = self.client.get(
+            "/private-training/subscriptions",
+            query_string={"client_type": "MEMBER"},
+        )
+        member_html = member_response.data.decode()
+        self.assertIn("PTB Member A", member_html)
+        self.assertIn("PTB Member B", member_html)
+        self.assertNotIn("PTB Outcomer Alpha", member_html)
+
+        outcomer_response = self.client.get(
+            "/private-training/subscriptions",
+            query_string={"client_type": "OUTCOMER"},
+        )
+        outcomer_html = outcomer_response.data.decode()
+        self.assertIn("PTB Outcomer Alpha", outcomer_html)
+        self.assertNotIn("PTB Member A", outcomer_html)
+        self.assertNotIn("PTB Member B", outcomer_html)
+
+        combined_response = self.client.get(
+            "/private-training/subscriptions",
+            query_string={
+                "trainer_user_id": self.trainer_a_user_id,
+                "status": "ACTIVE",
+                "client_type": "OUTCOMER",
+            },
+        )
+        combined_html = combined_response.data.decode()
+        self.assertIn("PTB Outcomer Alpha", combined_html)
+        self.assertNotIn("PTB Member A", combined_html)
+        self.assertNotIn("PTB Member B", combined_html)
 
     def test_10_trainer_can_open_my_clients(self):
         self._create_subscription(self.member_a_id, self.trainer_a_user_id, total_sessions=2)

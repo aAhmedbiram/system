@@ -174,8 +174,15 @@
         <div class="panel">
             <form class="filters" method="get" action="{{ url_for('private_training.subscription_list' if not is_trainer_workspace else 'private_training.my_clients') }}">
                 <div>
-                    <label for="trainer_user_id">Trainer Filter</label>
-                    <input type="text" id="trainer_user_id" name="trainer_user_id" value="{{ active_filters.trainer_user_id }}" placeholder="Trainer user ID">
+                    <label for="trainer_user_id">Trainer Name</label>
+                    <select id="trainer_user_id" name="trainer_user_id">
+                        <option value="">All</option>
+                        {% for trainer in trainer_options or [] %}
+                            <option value="{{ trainer.id }}" {% if active_filters.trainer_user_id and active_filters.trainer_user_id|int == trainer.id %}selected{% endif %}>
+                                {{ trainer.display_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div>
                     <label for="status">Effective Status</label>
@@ -184,6 +191,14 @@
                         {% for value in ['ASSIGNED', 'ACTIVE', 'COMPLETED', 'EXPIRED', 'CANCELLED'] %}
                             <option value="{{ value }}" {% if active_filters.status == value %}selected{% endif %}>{{ value }}</option>
                         {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="client_type">Client Type</label>
+                    <select id="client_type" name="client_type">
+                        <option value="">All</option>
+                        <option value="MEMBER" {% if active_filters.client_type == 'MEMBER' %}selected{% endif %}>Member</option>
+                        <option value="OUTCOMER" {% if active_filters.client_type == 'OUTCOMER' %}selected{% endif %}>Outcomer</option>
                     </select>
                 </div>
                 <div>

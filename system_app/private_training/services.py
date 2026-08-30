@@ -26,6 +26,8 @@ from .permissions import (
 )
 from .queries import (
     calculate_effective_subscription_status,
+    _display_user_name,
+    _subscription_view_query,
     get_private_training_approved_count,
     get_private_training_pending_session,
     get_private_training_remaining_sessions,
@@ -38,7 +40,6 @@ from .queries import (
     lock_private_training_session,
     lock_private_training_subscription,
     lock_private_training_subscriptions_for_member,
-    _subscription_view_query,
 )
 from .validators import (
     parse_private_date,
@@ -206,6 +207,38 @@ def can_write_private_training_daily_workout(current_user: dict[str, Any] | None
         can_train_private_training(current_user)
         and subscription_row.get("trainer_user_id") == current_user.get("id")
     )
+
+
+def list_private_training_trainer_options(current_user: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    if current_user and not (
+        is_super_user(current_user)
+        or can_manage_private_training(current_user)
+        or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW)
+        or can_train_private_training(current_user)
+    ):
+        raise PrivateTrainingForbiddenError("Current user cannot view private training trainers")
+
+    rows = query_db(
+        """
+        SELECT id, username, email, permissions
+        FROM users
+        WHERE is_approved = TRUE
+        ORDER BY username ASC, id ASC
+        """,
+    ) or []
+    trainers: list[dict[str, Any]] = []
+    for row in rows:
+        row_dict = dict(row)
+        if can_train_private_training(row_dict):
+            trainers.append(
+                {
+                    "id": row_dict.get("id"),
+                    "username": row_dict.get("username"),
+                    "email": row_dict.get("email"),
+                    "display_name": _display_user_name(row_dict.get("username")) or row_dict.get("username") or f"User {row_dict.get('id')}",
+                }
+            )
+    return trainers
 
 
 def _subscription_is_live(subscription_row: dict[str, Any]) -> bool:
@@ -494,7 +527,12 @@ def cancel_private_training_subscription(current_user: dict[str, Any], subscript
     return result
 
 
-def list_private_clients_for_trainer(current_user: dict[str, Any]) -> list[dict[str, Any]]:
+def list_private_clients_for_trainer(
+    current_user: dict[str, Any],
+    *,
+    trainer_user_id: Any | None = None,
+    client_type: Any | None = None,
+) -> list[dict[str, Any]]:
     if not current_user:
         raise PrivateTrainingForbiddenError("Login required")
     if not (
@@ -505,10 +543,33 @@ def list_private_clients_for_trainer(current_user: dict[str, Any]) -> list[dict[
     ):
         raise PrivateTrainingForbiddenError("Current user cannot view private training subscriptions")
 
+    normalized_trainer_user_id = None
+    if trainer_user_id not in (None, ""):
+        normalized_trainer_user_id = validate_positive_int(trainer_user_id, "trainer_user_id")
+
+    normalized_client_type = None
+    if client_type not in (None, ""):
+        normalized_client_type = _normalize_client_type(client_type)
+
+    where_parts: list[str] = []
+    params: list[Any] = []
+
     if is_super_user(current_user) or has_private_training_permission(current_user, PRIVATE_TRAINING_VIEW) or can_manage_private_training(current_user):
-        rows = query_db(_subscription_view_query()) or []
+        pass
     else:
-        rows = list_private_training_subscriptions_for_trainer(current_user["id"])
+        where_parts.append("s.trainer_user_id = %s")
+        params.append(current_user["id"])
+
+    if normalized_trainer_user_id is not None:
+        where_parts.append("s.trainer_user_id = %s")
+        params.append(normalized_trainer_user_id)
+
+    if normalized_client_type is not None:
+        where_parts.append("s.client_type = %s")
+        params.append(normalized_client_type)
+
+    where_clause = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+    rows = query_db(_subscription_view_query(where_clause), tuple(params)) or []
     normalized_rows = []
     for row in rows:
         row_dict = dict(row)
