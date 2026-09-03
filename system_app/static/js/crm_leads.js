@@ -423,6 +423,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     tdSource.textContent = lead.source || "—";
                     row.appendChild(tdSource);
 
+                    // Campaign / Cycle
+                    const tdCampaign = document.createElement("td");
+                    tdCampaign.textContent = lead.campaign_name || "—";
+                    if (lead.campaign_name) {
+                        tdCampaign.title = lead.campaign_name;
+                    }
+                    row.appendChild(tdCampaign);
+
                     // Assigned To
                     const tdAssign = document.createElement("td");
                     tdAssign.textContent = lead.assigned_username || "Unassigned";

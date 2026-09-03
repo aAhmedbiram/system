@@ -64,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const previewTokenDebug = document.getElementById("previewTokenDebug");
 
     const previewSource = document.getElementById("previewSource");
+    const previewCampaign = document.getElementById("previewCampaign");
     const previewSelected = document.getElementById("previewSelected");
     const previewEligible = document.getElementById("previewEligible");
     const previewSkipped = document.getElementById("previewSkipped");
@@ -220,6 +221,41 @@ document.addEventListener("DOMContentLoaded", () => {
         return state.source === SOURCE_INVITATIONS ? "Invitations" : "Members";
     }
 
+    function normalizedBulkStatus(member) {
+        const raw = String((member && member.crm_status_key) || "").trim().toUpperCase();
+        if (raw) {
+            return raw;
+        }
+        if (member && member.has_active_crm_lead) {
+            return "ELIGIBLE_FOR_REFOLLOWUP";
+        }
+        return "NEW";
+    }
+
+    function isSelectableBulkMember(member) {
+        const status = normalizedBulkStatus(member);
+        return status === "NEW" || status === "ELIGIBLE_FOR_REFOLLOWUP";
+    }
+
+    function bulkStatusLabel(member) {
+        const status = normalizedBulkStatus(member);
+        const labels = {
+            NEW: "New",
+            ELIGIBLE_FOR_REFOLLOWUP: "Eligible for Re-follow-up",
+            ALREADY_IN_CURRENT_CYCLE: "Already in Current Cycle",
+            RENEWED_NOT_ELIGIBLE: "Renewed / Not Eligible"
+        };
+        return member && member.crm_status_label ? member.crm_status_label : (labels[status] || status);
+    }
+
+    function bulkStatusBadgeClass(member) {
+        const status = normalizedBulkStatus(member);
+        if (status === "NEW") return "badge-ok";
+        if (status === "ELIGIBLE_FOR_REFOLLOWUP") return "badge-info";
+        if (status === "ALREADY_IN_CURRENT_CYCLE") return "badge-warn";
+        return "badge-danger";
+    }
+
     function currentSourceInputBundle() {
         if (state.source === SOURCE_INVITATIONS) {
             return {
@@ -277,7 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const tr = document.createElement("tr");
         const headers = state.source === SOURCE_INVITATIONS
             ? ["Sel", "Friend Name", "Phone", "Email", "Inviter Name", "Used By", "Used Date"]
-            : ["Sel", "Member ID", "Name", "Phone", "Package", "End Date", "Status", "CRM"];
+            : ["Sel", "Member ID", "Name", "Phone", "Package", "End Date", "Status", "Cycle Status"];
         headers.forEach((header) => {
             const th = document.createElement("th");
             th.textContent = header;
@@ -561,6 +597,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (summary) {
             renderPreviewSummary(summary);
+        } else if (previewCampaign) {
+            previewCampaign.textContent = snapshot.campaign_name || `Campaign #${String(snapshot.campaign_id ?? "—")}`;
         }
         if (state.previewExecution) {
             renderExecutionResult(state.previewExecution);
@@ -664,6 +702,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderPreviewSummary(summary) {
         if (!summary) return;
         if (previewSource) previewSource.textContent = summary.source || "EXISTING_MEMBER";
+        if (previewCampaign) previewCampaign.textContent = summary.campaign_name || `Campaign #${String(summary.campaign_id ?? "—")}`;
         if (previewSelected) previewSelected.textContent = String(summary.selected_count ?? 0);
         if (previewEligible) previewEligible.textContent = String(summary.eligible_count ?? 0);
         if (previewSkipped) previewSkipped.textContent = String(summary.skipped_count ?? 0);
@@ -854,6 +893,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const params = new URLSearchParams();
         params.set("page", String(page));
         params.set("per_page", String(perPage));
+        if (state.previewToken && state.source === SOURCE_EXISTING_MEMBER) {
+            params.set("preview_token", state.previewToken);
+        }
         Object.entries(currentFilters()).forEach(([key, value]) => {
             if (value !== "" && value !== null && value !== undefined) {
                 params.set(key, String(value));
@@ -930,13 +972,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         items.forEach((member) => {
             const tr = document.createElement("tr");
-            const hasActiveLead = Boolean(member.has_active_crm_lead);
+            const statusKey = normalizedBulkStatus(member);
+            const statusLabel = bulkStatusLabel(member);
+            const selectable = isSelectableBulkMember(member);
             const checkboxCell = document.createElement("td");
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.value = String(member.id);
             checkbox.checked = state.allFilteredSelected || state.selectedIds.has(String(member.id));
-            checkbox.disabled = state.locked || hasActiveLead || state.allFilteredSelected;
+            checkbox.disabled = state.locked || state.allFilteredSelected || !selectable;
+            if (!selectable) {
+                checkbox.title = statusLabel;
+            }
             checkbox.addEventListener("change", () => {
                 if (checkbox.checked) {
                     state.selectedIds.add(String(member.id));
@@ -967,14 +1014,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const crmCell = document.createElement("td");
             const badge = document.createElement("span");
-            badge.className = hasActiveLead ? "badge badge-danger" : "badge badge-ok";
-            badge.textContent = hasActiveLead ? "Already in CRM" : "Available";
+            badge.className = `badge ${bulkStatusBadgeClass(member)}`;
+            badge.textContent = statusLabel;
             crmCell.appendChild(badge);
             tr.appendChild(crmCell);
 
-            if (hasActiveLead) {
+            if (!selectable) {
                 tr.classList.add("row-muted");
-                tr.title = "This member already has an active CRM lead and will be skipped by preview/execution.";
+                if (statusKey === "ALREADY_IN_CURRENT_CYCLE") {
+                    tr.title = "This member already has a lead in the current follow-up cycle and will not be duplicated.";
+                } else if (statusKey === "RENEWED_NOT_ELIGIBLE") {
+                    tr.title = "This member renewed after the selected expiry period and is not eligible for re-follow-up.";
+                }
+            } else if (statusKey === "ELIGIBLE_FOR_REFOLLOWUP") {
+                tr.title = member.crm_has_history
+                    ? "Historical CRM lead exists. Eligible for re-follow-up."
+                    : "Eligible for re-follow-up.";
             }
 
             bulkMembersTableBody.appendChild(tr);
@@ -1030,6 +1085,7 @@ document.addEventListener("DOMContentLoaded", () => {
         state.previewExecution = null;
         state.status = null;
         if (previewSource) previewSource.textContent = state.source || SOURCE_EXISTING_MEMBER;
+        if (previewCampaign) previewCampaign.textContent = "—";
         if (previewSelected) previewSelected.textContent = "0";
         if (previewEligible) previewEligible.textContent = "0";
         if (previewSkipped) previewSkipped.textContent = "0";
@@ -1313,7 +1369,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (member.candidate_key) {
                             state.selectedIds.add(String(member.candidate_key));
                         }
-                    } else if (!member.has_active_crm_lead) {
+                    } else if (isSelectableBulkMember(member)) {
                         state.selectedIds.add(String(member.id));
                     }
                 });

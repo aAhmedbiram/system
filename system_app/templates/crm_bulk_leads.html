@@ -234,6 +234,11 @@
             color: #a5d6a7;
             border: 1px solid rgba(76,175,80,0.25);
         }
+        .badge-info {
+            background: rgba(33,150,243,0.15);
+            color: #90caf9;
+            border: 1px solid rgba(33,150,243,0.25);
+        }
         .badge-warn {
             background: rgba(255, 193, 7, 0.15);
             color: #ffe082;
@@ -640,6 +645,10 @@
                         <div class="summary-box">
                             <span class="summary-label">Source</span>
                         <span id="previewSource" class="summary-value">{% if preview_summary %}{{ preview_summary.source or 'EXISTING_MEMBER' }}{% else %}EXISTING_MEMBER{% endif %}</span>
+                        </div>
+                        <div class="summary-box">
+                            <span class="summary-label">Cycle</span>
+                        <span id="previewCampaign" class="summary-value">{% if preview_summary and preview_summary.campaign_name %}{{ preview_summary.campaign_name }}{% elif preview_summary and preview_summary.campaign_id %}Campaign #{{ preview_summary.campaign_id }}{% else %}—{% endif %}</span>
                         </div>
                         <div class="summary-box">
                             <span class="summary-label">Selected</span>

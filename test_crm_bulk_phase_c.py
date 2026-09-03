@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import unittest
 
 from system_app.app import app
-from system_app.func import get_cairo_date
 from system_app.queries import query_db
 from system_app.crm import services
 from system_app.crm.services import CAIRO_TZ
@@ -165,7 +164,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
 
     def test_04_member_search_and_expiry_buckets(self):
         self.login_as('pbc_create', 48002)
-        today = get_cairo_date()
+        today = date(2026, 9, 3)
         self._member(6101, 'PBC Search Alpha', (today + timedelta(days=3)).isoformat(), phone='0100006101')
         self._member(6102, 'PBC Search Beta', (today + timedelta(days=10)).isoformat(), phone='0100006102')
         self._member(6103, 'PBC Search Gamma', (today + timedelta(days=20)).isoformat(), phone='0100006103')
@@ -173,8 +172,8 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self._member(6105, 'PBC Search July 2025', '2025-07-15', phone='0100006105')
         self._member(6106, 'PBC Search July 2026', '2026-07-15', phone='0100006106')
         self._member(6107, 'PBC Search July 2026 DT', '2026-07-15 00:00:00', phone='0100006107')
-        self._member(6108, 'PBC Search September 2026', '2026-09-25', phone='0100006108')
-        self._member(6109, 'PBC Search September 2026 Late', '2026-09-28', phone='0100006109')
+        self._member(6108, 'PBC Search October 2026', '2026-10-25', phone='0100006108')
+        self._member(6109, 'PBC Search October 2026 Late', '2026-10-28', phone='0100006109')
         self._member(6110, 'PBC Search Blank End', '   ', phone='0100006110')
         self._member(6111, 'PBC Search Invalid End', 'not-a-date', phone='0100006111')
 
@@ -242,9 +241,10 @@ class TestCRMBulkPhaseC(unittest.TestCase):
 
     def test_05_active_crm_indicator_and_preview_alignment(self):
         self.login_as('pbc_assign', 48004)
-        self._member(6201, 'PBC Align A', '2099-01-01')
-        self._member(6202, 'PBC Align B', '2099-01-01')
-        self._member(6203, 'PBC Align C', '2099-01-01')
+        expired = '2026-08-31'
+        self._member(6201, 'PBC Align A', expired)
+        self._member(6202, 'PBC Align B', expired)
+        self._member(6203, 'PBC Align C', expired)
         self._active_lead(7202, 6202)
 
         listing = self.client.get('/crm/leads/bulk/members', query_string={'view': 'all'})
@@ -259,8 +259,10 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         })
         data = preview.get_json()
         self.assertEqual(data['selected_count'], 3)
-        self.assertEqual(data['eligible_count'], 2)
-        self.assertEqual(data['skipped_reasons']['active_lead_exists'], 1)
+        self.assertEqual(data['eligible_count'], 3)
+        self.assertEqual(data['status_breakdown']['NEW'], 2)
+        self.assertEqual(data['status_breakdown']['ELIGIBLE_FOR_REFOLLOWUP'], 1)
+        self.assertNotIn('active_lead_exists', data['skipped_reasons'])
 
         snapshot = services.get_bulk_preview_snapshot(
             data['preview_token'],
@@ -270,6 +272,7 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertEqual(snapshot['selected_count'], 3)
         self.assertEqual(snapshot['assignment_plan'], [
             {"member_id": 6201, "user_id": None},
+            {"member_id": 6202, "user_id": None},
             {"member_id": 6203, "user_id": None}
         ])
 
@@ -316,9 +319,10 @@ class TestCRMBulkPhaseC(unittest.TestCase):
 
     def test_08_filtered_preview_freezes_member_ids(self):
         self.login_as('pbc_create', 48002)
-        self._member(6401, 'PBC Filter Freeze A', '2099-01-01')
-        self._member(6402, 'PBC Filter Freeze B', '2099-01-01')
-        self._member(6403, 'PBC Filter Freeze C', '2099-01-01')
+        expired = '2026-08-31'
+        self._member(6401, 'PBC Filter Freeze A', expired)
+        self._member(6402, 'PBC Filter Freeze B', expired)
+        self._member(6403, 'PBC Filter Freeze C', expired)
         self._active_lead(7402, 6402)
 
         res = self._preview({
@@ -334,8 +338,8 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         snapshot = services.get_bulk_preview_snapshot(token, {"id": 48002, "username": "pbc_create"})
         self.assertEqual(snapshot['selection']['mode'], 'filters')
         self.assertEqual(snapshot['selection']['selected_member_ids'], [6401, 6402, 6403])
-        self.assertEqual(snapshot['eligible_member_ids'], [6401, 6403])
-        self.assertEqual(snapshot['skipped_count'], 1)
+        self.assertEqual(snapshot['eligible_member_ids'], [6401, 6402, 6403])
+        self.assertEqual(snapshot['skipped_count'], 0)
 
     def test_09_equal_and_unassigned_preview_permissions(self):
         self.login_as('pbc_create', 48002)
@@ -476,8 +480,9 @@ class TestCRMBulkPhaseC(unittest.TestCase):
 
     def test_15_active_lead_members_not_duplicated(self):
         self.login_as('pbc_assign', 48004)
-        self._member(6951, 'PBC Skip A', '2099-01-01')
-        self._member(6952, 'PBC Skip B', '2099-01-01')
+        expired = '2026-08-31'
+        self._member(6951, 'PBC Skip A', expired)
+        self._member(6952, 'PBC Skip B', expired)
         self._active_lead(7452, 6952)
         preview = self._preview({
             "selection": {"mode": "ids", "member_ids": [6951, 6952]},
@@ -487,8 +492,18 @@ class TestCRMBulkPhaseC(unittest.TestCase):
         self.assertEqual(preview.status_code, 200)
         data = preview.get_json()
         self.assertEqual(data['selected_count'], 2)
-        self.assertEqual(data['eligible_count'], 1)
-        self.assertEqual(data['skipped_reasons']['active_lead_exists'], 1)
+        self.assertEqual(data['eligible_count'], 2)
+        self.assertNotIn('active_lead_exists', data['skipped_reasons'])
+
+        execute = self._execute(data['preview_token'])
+        self.assertEqual(execute.status_code, 200)
+
+        refreshed = self.client.get('/crm/leads/bulk/members', query_string={'preview_token': data['preview_token'], 'per_page': 50})
+        self.assertEqual(refreshed.status_code, 200)
+        refreshed_rows = refreshed.get_json()['items']
+        status_map = {row['id']: row['crm_status_key'] for row in refreshed_rows}
+        self.assertEqual(status_map[6951], 'ALREADY_IN_CURRENT_CYCLE')
+        self.assertEqual(status_map[6952], 'ALREADY_IN_CURRENT_CYCLE')
 
     def test_16_page_has_server_rendered_preview_hooks(self):
         self.login_as('pbc_create', 48002)

@@ -1,3 +1,8 @@
+import calendar
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+import secrets
+
 from system_app.queries import get_member
 from system_app.crm.permissions import can_view_all_leads
 from system_app.crm.permissions import CRM_ASSIGN
@@ -15,12 +20,16 @@ from system_app.crm.validators import (
 from system_app.crm import queries
 from system_app.crm.queries import run_in_transaction
 from system_app.member_services import create_member_in_transaction, renew_member_in_transaction, DuplicateMemberError
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-import secrets
 
 CAIRO_TZ = ZoneInfo("Africa/Cairo")
 BULK_PREVIEW_TOKEN_TTL_SECONDS = 900
+ACTIVE_LEAD_STAGES = {'NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL'}
+CRM_BULK_STATUS_LABELS = {
+    "NEW": "New",
+    "ELIGIBLE_FOR_REFOLLOWUP": "Eligible for Re-follow-up",
+    "ALREADY_IN_CURRENT_CYCLE": "Already in Current Cycle",
+    "RENEWED_NOT_ELIGIBLE": "Renewed / Not Eligible",
+}
 
 class CRMConflictError(Exception):
     def __init__(self, error_code, message, details=None):
@@ -85,6 +94,169 @@ def _build_assignment_plan(eligible_items, distribution_mode, assignable_users, 
 
     return assignment_plan
 
+def _parse_member_end_date(end_date_value):
+    """Parses the stored member end_date text into a date when possible."""
+    if end_date_value is None:
+        return None
+    value = str(end_date_value).strip()
+    if not value:
+        return None
+    value = value[:10]
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+def _member_end_boundary(end_date_value):
+    """Returns the inclusive end-of-day boundary for a stored expiry value."""
+    end_date = _parse_member_end_date(end_date_value)
+    if end_date is None:
+        return None
+    return datetime.combine(end_date, time.max)
+
+def _normalize_timestamp(value):
+    """Normalizes DB timestamps to naive local datetimes for ordering comparisons."""
+    if value is None:
+        return None
+    if isinstance(value, datetime) and value.tzinfo is not None:
+        return value.astimezone(CAIRO_TZ).replace(tzinfo=None)
+    return value
+
+def _member_renewed_after_expiry(end_date_value, latest_renewal_time):
+    """True when the member renewed after the frozen expiry boundary."""
+    boundary = _member_end_boundary(end_date_value)
+    renewal_time = _normalize_timestamp(latest_renewal_time)
+    if boundary is None or renewal_time is None:
+        return False
+    return renewal_time > boundary
+
+def _build_bulk_campaign_name(filters, selected_member_rows=None):
+    """Builds a stable human-readable name for a re-follow-up cycle."""
+    filters = filters or {}
+    month = filters.get('expires_month')
+    year = filters.get('expires_year')
+    if month and year:
+        try:
+            month_int = int(month)
+            month_name = calendar.month_name[month_int]
+            if month_name:
+                return f"Expired Members - {month_name} {int(year)} - Re-follow-up"
+        except (TypeError, ValueError, IndexError):
+            pass
+
+    expires_within = filters.get('expires_within')
+    if expires_within:
+        return f"Expired Members - Within {expires_within} Days - Re-follow-up"
+
+    if filters.get('view') == 'expired':
+        return "Expired Members - Re-follow-up"
+
+    if selected_member_rows:
+        first_end_date = _parse_member_end_date((selected_member_rows[0] or {}).get('end_date'))
+        if first_end_date is not None:
+            month_name = calendar.month_name[first_end_date.month]
+            return f"Expired Members - {month_name} {first_end_date.year} - Re-follow-up"
+
+    return f"CRM Follow-up Cycle - {datetime.now(CAIRO_TZ).strftime('%Y-%m-%d %H:%M')} - Re-follow-up"
+
+def _build_bulk_campaign_description(current_user, filters, selection_mode):
+    """Builds a human-readable description for the persistent cycle anchor."""
+    filters = filters or {}
+    parts = [
+        f"Bulk CRM follow-up cycle created by user {current_user.get('id')}."
+    ]
+    if selection_mode:
+        parts.append(f"Selection mode: {selection_mode}.")
+    if filters:
+        parts.append(f"Filters: {filters}.")
+    return " ".join(parts)
+
+def _classify_bulk_member_status(has_history, has_current_cycle, renewed_after_expiry):
+    """Maps member CRM state to the bulk-page status bucket."""
+    if has_current_cycle:
+        return "ALREADY_IN_CURRENT_CYCLE"
+    if renewed_after_expiry:
+        return "RENEWED_NOT_ELIGIBLE"
+    if has_history:
+        return "ELIGIBLE_FOR_REFOLLOWUP"
+    return "NEW"
+
+def _load_bulk_member_cycle_maps(member_ids, campaign_id=None):
+    """Loads bulk-member history and renewal markers in batch."""
+    history_rows = queries.get_member_history_member_ids(member_ids)
+    history_member_ids = {row['member_id'] for row in history_rows if row.get('member_id') is not None}
+
+    active_lead_rows = queries.get_active_leads_for_member_ids(member_ids)
+    active_lead_map = {row['member_id']: row['lead_id'] for row in active_lead_rows if row.get('member_id') is not None}
+
+    current_cycle_member_ids = set()
+    if campaign_id is not None:
+        cycle_rows = queries.get_member_campaign_lead_member_ids(member_ids, campaign_id)
+        current_cycle_member_ids = {
+            row['member_id']
+            for row in cycle_rows
+            if row.get('member_id') is not None
+        }
+
+    renewal_rows = queries.get_member_latest_renewal_times(member_ids)
+    latest_renewal_map = {
+        row['member_id']: row.get('latest_renewal_time')
+        for row in renewal_rows
+        if row.get('member_id') is not None
+    }
+
+    return {
+        "history_member_ids": history_member_ids,
+        "active_lead_map": active_lead_map,
+        "current_cycle_member_ids": current_cycle_member_ids,
+        "latest_renewal_map": latest_renewal_map,
+    }
+
+def _annotate_bulk_member_rows(member_rows, campaign_id=None, reference_end_dates=None):
+    """Adds CRM-cycle status metadata to member rows for the bulk workspace."""
+    member_rows = member_rows or []
+    member_ids = [row.get('id') for row in member_rows if row.get('id') is not None]
+    cycle_maps = _load_bulk_member_cycle_maps(member_ids, campaign_id)
+    reference_end_dates = reference_end_dates or {}
+
+    annotated_rows = []
+    status_counts = {
+        "NEW": 0,
+        "ELIGIBLE_FOR_REFOLLOWUP": 0,
+        "ALREADY_IN_CURRENT_CYCLE": 0,
+        "RENEWED_NOT_ELIGIBLE": 0
+    }
+    for member_row in member_rows:
+        row = dict(member_row)
+        member_id = row.get('id')
+        frozen_end_date = reference_end_dates.get(str(member_id)) if member_id is not None else None
+        if frozen_end_date is None:
+            frozen_end_date = row.get('end_date')
+        has_history = member_id in cycle_maps["history_member_ids"]
+        has_current_cycle = member_id in cycle_maps["current_cycle_member_ids"]
+        renewed_after_expiry = _member_renewed_after_expiry(
+            frozen_end_date,
+            cycle_maps["latest_renewal_map"].get(member_id)
+        )
+        status_key = _classify_bulk_member_status(
+            has_history,
+            has_current_cycle,
+            renewed_after_expiry
+        )
+        row["crm_status_key"] = status_key
+        row["crm_status_label"] = CRM_BULK_STATUS_LABELS.get(status_key, status_key)
+        row["crm_has_history"] = has_history
+        row["crm_renewed_after_expiry"] = renewed_after_expiry
+        row["crm_in_current_cycle"] = has_current_cycle
+        row["active_crm_lead_id"] = cycle_maps["active_lead_map"].get(member_id)
+        row["has_active_crm_lead"] = row["active_crm_lead_id"] is not None
+        row["crm_reference_end_date"] = frozen_end_date
+        annotated_rows.append(row)
+        if status_key in status_counts:
+            status_counts[status_key] += 1
+
+    return annotated_rows, status_counts
+
 def _store_bulk_preview_snapshot(current_user, snapshot):
     """Persists a bulk preview snapshot durably and returns its token and expiry."""
     token = secrets.token_urlsafe(32)
@@ -137,13 +309,26 @@ def claim_bulk_preview_operation(token, current_user):
         )
     return operation
 
-def list_bulk_members(current_user, page_param, per_page_param, filters):
+def list_bulk_members(current_user, page_param, per_page_param, filters, preview_token=None):
     """Returns a paginated member list for the CRM bulk selection workspace."""
     page, per_page = validate_pagination(page_param, per_page_param)
     normalized_filters = validate_bulk_member_filters(filters or {})
+    campaign_id = None
+    reference_end_dates = {}
+    if preview_token:
+        operation = _load_bulk_operation_for_user(preview_token, current_user)
+        snapshot = operation.get('snapshot') or {}
+        campaign_id = snapshot.get('campaign_id')
+        reference_end_dates = (snapshot.get('selection') or {}).get('selected_member_end_dates') or {}
+
     listing = queries.get_bulk_member_listing(normalized_filters, page, per_page)
+    annotated_items, _status_counts = _annotate_bulk_member_rows(
+        listing.get("items") or [],
+        campaign_id,
+        reference_end_dates
+    )
     return {
-        "items": listing.get("items") or [],
+        "items": annotated_items,
         "page": page,
         "per_page": per_page,
         "total_count": listing.get("total_count", 0),
@@ -377,6 +562,14 @@ def execute_bulk_member_leads(current_user, preview_token):
     operation = _load_bulk_operation_for_user(preview_token, current_user)
     snapshot = operation.get('snapshot') or {}
     assignment_plan = snapshot.get('assignment_plan') or []
+    campaign_id = snapshot.get('campaign_id')
+    selection_snapshot = snapshot.get('selection') or {}
+    frozen_end_dates = selection_snapshot.get('selected_member_end_dates') or {}
+    if campaign_id is None:
+        raise CRMConflictError(
+            "missing_campaign",
+            "Bulk preview snapshot is missing a follow-up cycle campaign."
+        )
 
     if operation.get('status') == 'COMPLETED':
         return _build_bulk_execution_response(operation)
@@ -412,9 +605,6 @@ def execute_bulk_member_leads(current_user, preview_token):
     member_rows = queries.get_members_by_ids(unique_member_ids)
     member_map = {row['id']: row for row in member_rows}
 
-    active_lead_rows = queries.get_active_leads_for_member_ids(unique_member_ids)
-    active_lead_map = {row['member_id']: row['lead_id'] for row in active_lead_rows}
-
     unique_assignee_ids = sorted({row.get('user_id') for row in assignment_plan if row.get('user_id') is not None})
     assignee_rows = queries.get_assignable_users_by_ids(unique_assignee_ids)
     assignee_map = {row['id']: row for row in assignee_rows}
@@ -429,6 +619,7 @@ def execute_bulk_member_leads(current_user, preview_token):
         "skipped_items": []
     }
     created_by_user_id = current_user.get('id')
+    current_username = current_user.get('username')
     user_create_counts = {}
     user_name_map = {}
     for assignee in snapshot.get('assignable_users') or []:
@@ -454,41 +645,147 @@ def execute_bulk_member_leads(current_user, preview_token):
                 _record_skip(member_id, "member_missing")
                 continue
 
-            if member_id in active_lead_map:
-                _record_skip(member_id, "active_lead_exists", {"existing_lead_id": active_lead_map[member_id]})
-                continue
-
             if assigned_user_id is not None and assigned_user_id not in assignee_map:
                 _record_skip(member_id, "invalid_employee", {"user_id": assigned_user_id})
                 continue
 
             try:
-                def callback(cur, member_snapshot, source, actor_id, target_user_id):
-                    return queries.create_existing_member_lead_in_transaction(
+                def callback(cur, member_snapshot, source, actor_id, target_user_id, campaign_id, campaign_name, actor_username):
+                    cur.execute(
+                        "SELECT * FROM members WHERE id = %s FOR UPDATE",
+                        (member_snapshot.get('id'),)
+                    )
+                    locked_member = cur.fetchone()
+                    if not locked_member:
+                        return {
+                            "status": "skipped",
+                            "reason": "member_missing",
+                            "details": {"member_id": member_snapshot.get('id')}
+                        }
+
+                    cur.execute(
+                        """
+                        SELECT id, stage, assigned_user_id, assigned_by_user_id, assigned_at, campaign_id
+                        FROM crm_leads
+                        WHERE member_id = %s
+                          AND campaign_id = %s
+                        ORDER BY id DESC
+                        LIMIT 1
+                        """,
+                        (locked_member['id'], campaign_id)
+                    )
+                    current_cycle_lead = cur.fetchone()
+                    if current_cycle_lead:
+                        return {
+                            "status": "skipped",
+                            "reason": "already_in_current_cycle",
+                            "details": {
+                                "member_id": locked_member['id'],
+                                "existing_lead_id": current_cycle_lead['id'],
+                                "campaign_id": campaign_id
+                            }
+                        }
+
+                    cur.execute(
+                        """
+                        SELECT MAX(renewal_time) AS latest_renewal_time
+                        FROM renewal_logs
+                        WHERE member_id = %s
+                        """,
+                        (locked_member['id'],)
+                    )
+                    renewal_row = cur.fetchone() or {}
+                    reference_end_date = frozen_end_dates.get(str(locked_member['id']))
+                    if reference_end_date is None:
+                        reference_end_date = locked_member.get('end_date')
+                    if _member_renewed_after_expiry(reference_end_date, renewal_row.get('latest_renewal_time')):
+                        return {
+                            "status": "skipped",
+                            "reason": "renewed_not_eligible",
+                            "details": {"member_id": locked_member['id']}
+                        }
+
+                    cur.execute(
+                        """
+                        SELECT id, stage, assigned_user_id, assigned_by_user_id, assigned_at, campaign_id
+                        FROM crm_leads
+                        WHERE member_id = %s
+                          AND member_id IS NOT NULL
+                          AND stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')
+                          AND is_archived = FALSE
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                        FOR UPDATE
+                        """,
+                        (locked_member['id'],)
+                    )
+                    active_lead = cur.fetchone()
+                    if active_lead:
+                        active_campaign_id = active_lead.get('campaign_id')
+                        if active_campaign_id is not None and campaign_id is not None and active_campaign_id >= campaign_id:
+                            return {
+                                "status": "skipped",
+                                "reason": "already_in_current_cycle",
+                                "details": {
+                                    "member_id": locked_member['id'],
+                                    "existing_lead_id": active_lead['id'],
+                                    "campaign_id": active_campaign_id
+                                }
+                            }
+
+                        queries.archive_lead_in_transaction(cur, active_lead['id'])
+                        queries.create_activity_in_transaction(
+                            cur,
+                            active_lead['id'],
+                            actor_id,
+                            'NOTE',
+                            note=f"Archived automatically for new follow-up cycle: {campaign_name}",
+                            result="ARCHIVED_AUTOMATICALLY_FOR_NEW_FOLLOW_UP_CYCLE",
+                            old_stage=active_lead.get('stage'),
+                            new_stage=active_lead.get('stage'),
+                            old_assigned_user_id=active_lead.get('assigned_user_id'),
+                            new_assigned_user_id=active_lead.get('assigned_user_id'),
+                            user_username_snapshot=actor_username
+                        )
+
+                    new_lead_id = queries.create_existing_member_lead_in_transaction(
                         cur,
-                        member_snapshot,
+                        locked_member,
                         source,
                         actor_id,
-                        target_user_id
+                        target_user_id,
+                        campaign_id=campaign_id
                     )
+                    return {
+                        "status": "created",
+                        "lead_id": new_lead_id,
+                        "member_id": locked_member['id'],
+                        "campaign_id": campaign_id
+                    }
 
-                queries.run_in_transaction(
+                result = queries.run_in_transaction(
                     callback,
                     member_row,
                     snapshot.get('source'),
                     created_by_user_id,
-                    assigned_user_id
+                    assigned_user_id,
+                    snapshot.get('campaign_id'),
+                    snapshot.get('campaign_name') or "CRM Follow-up Cycle",
+                    current_username
                 )
-                execution_summary["created"] += 1
-                if assigned_user_id is not None:
-                    if assigned_user_id not in user_create_counts:
-                        user_create_counts[assigned_user_id] = 0
-                    user_create_counts[assigned_user_id] += 1
+                if result.get('status') == 'created':
+                    execution_summary["created"] += 1
+                    if assigned_user_id is not None:
+                        user_create_counts[assigned_user_id] = user_create_counts.get(assigned_user_id, 0) + 1
+                    continue
+                if result.get('status') == 'skipped':
+                    _record_skip(member_id, result.get('reason', 'already_in_current_cycle'), result.get('details'))
+                    continue
             except Exception as exc:
                 pgcode = getattr(exc, 'pgcode', None)
                 constraint_name = getattr(getattr(exc, 'diag', None), 'constraint_name', None)
                 if pgcode == '23505' or constraint_name == 'idx_unique_active_member_lead':
-                    _record_skip(member_id, "active_lead_exists")
+                    _record_skip(member_id, "already_in_current_cycle")
                 elif pgcode == '23503':
                     if assigned_user_id is not None and assigned_user_id not in assignee_map:
                         _record_skip(member_id, "invalid_employee", {"user_id": assigned_user_id})
@@ -676,7 +973,8 @@ def _resolve_bulk_member_selection(selection):
         "mode": mode,
         "selected_member_ids": selected_ids,
         "excluded_member_ids": excluded_ids,
-        "missing_member_ids": missing_ids
+        "missing_member_ids": missing_ids,
+        "filters": filters if mode == 'filters' else {}
     }
 
 def _resolve_bulk_invitation_selection(selection):
@@ -775,9 +1073,6 @@ def preview_bulk_member_leads(current_user, data):
         raise CRMValidationError("invalid_distribution", str(e))
 
     if source == 'EXISTING_MEMBER':
-        if not isinstance(selection, dict):
-            raise CRMValidationError("invalid_selection", "'selection' is required and must be an object")
-
         # Equal distribution requires assignment permission. Unassigned previews do not.
         user_ids = []
         assignable_users = []
@@ -811,10 +1106,42 @@ def preview_bulk_member_leads(current_user, data):
         selected_member_ids = selection_data['selected_member_ids']
         missing_member_ids = selection_data['missing_member_ids']
 
-        active_lead_rows = queries.get_active_leads_for_member_ids(selected_member_ids)
-        active_lead_member_ids = {row['member_id'] for row in active_lead_rows}
-        eligible_member_ids = [mid for mid in selected_member_ids if mid not in active_lead_member_ids]
-        active_lead_count = len(selected_member_ids) - len(eligible_member_ids)
+        member_rows = queries.get_members_by_ids(selected_member_ids)
+        member_map = {row['id']: row for row in member_rows}
+        ordered_member_rows = [member_map[mid] for mid in selected_member_ids if mid in member_map]
+        selected_member_end_dates = {
+            str(row['id']): row.get('end_date')
+            for row in ordered_member_rows
+            if row.get('id') is not None
+        }
+
+        campaign_name = _build_bulk_campaign_name(selection_data.get('filters') or selection.get('filters') or {}, ordered_member_rows)
+        campaign_description = _build_bulk_campaign_description(
+            current_user,
+            selection_data.get('filters') or selection.get('filters') or {},
+            selected_mode
+        )
+        campaign_id = queries.create_campaign(
+            campaign_name,
+            campaign_description,
+            current_user.get('id')
+        )
+
+        annotated_rows, status_counts = _annotate_bulk_member_rows(
+            ordered_member_rows,
+            campaign_id,
+            selected_member_end_dates
+        )
+        eligible_member_ids = [
+            row['id']
+            for row in annotated_rows
+            if row['crm_status_key'] in ('NEW', 'ELIGIBLE_FOR_REFOLLOWUP')
+        ]
+        skipped_count = (
+            status_counts['ALREADY_IN_CURRENT_CYCLE']
+            + status_counts['RENEWED_NOT_ELIGIBLE']
+            + len(missing_member_ids)
+        )
 
         distribution_preview = []
         if distribution_mode == 'equal':
@@ -840,11 +1167,16 @@ def preview_bulk_member_leads(current_user, data):
 
         snapshot = {
             "source": source,
+            "campaign_id": campaign_id,
+            "campaign_name": campaign_name,
+            "campaign_description": campaign_description,
             "selection": {
                 "mode": selected_mode,
                 "selected_member_ids": selected_member_ids,
                 "missing_member_ids": missing_member_ids,
-                "excluded_member_ids": selection_data['excluded_member_ids']
+                "excluded_member_ids": selection_data['excluded_member_ids'],
+                "filters": selection_data.get('filters') or {},
+                "selected_member_end_dates": selected_member_end_dates
             },
             "distribution": {
                 "mode": distribution_mode,
@@ -853,9 +1185,10 @@ def preview_bulk_member_leads(current_user, data):
             "eligible_member_ids": eligible_member_ids,
             "selected_count": len(selected_member_ids),
             "eligible_count": len(eligible_member_ids),
-            "skipped_count": active_lead_count,
+            "skipped_count": skipped_count,
             "missing_count": len(missing_member_ids),
-            "active_lead_member_ids": sorted(active_lead_member_ids),
+            "status_breakdown": status_counts,
+            "eligible_statuses": [row['crm_status_key'] for row in annotated_rows if row['crm_status_key'] in ('NEW', 'ELIGIBLE_FOR_REFOLLOWUP')],
             "assignable_users": distribution_preview,
             "assignment_plan": assignment_plan,
             "created_by_user_id": current_user.get('id')
@@ -864,14 +1197,18 @@ def preview_bulk_member_leads(current_user, data):
         token, expires_at = _store_bulk_preview_snapshot(current_user, snapshot)
         return {
             "status": "preview",
+            "campaign_id": campaign_id,
+            "campaign_name": campaign_name,
             "selected_count": len(selected_member_ids),
             "eligible_count": len(eligible_member_ids),
-            "skipped_count": active_lead_count,
+            "skipped_count": skipped_count,
             "missing_count": len(missing_member_ids),
             "skipped_reasons": {
-                "active_lead_exists": active_lead_count,
+                "already_in_current_cycle": status_counts['ALREADY_IN_CURRENT_CYCLE'],
+                "renewed_not_eligible": status_counts['RENEWED_NOT_ELIGIBLE'],
                 "member_missing": len(missing_member_ids)
             },
+            "status_breakdown": status_counts,
             "distribution": distribution_preview if distribution_mode == 'equal' else [],
             "preview_token": token,
             "expires_in_seconds": BULK_PREVIEW_TOKEN_TTL_SECONDS

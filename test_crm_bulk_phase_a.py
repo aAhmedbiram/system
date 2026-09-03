@@ -109,6 +109,32 @@ class TestCRMBulkPhaseA(unittest.TestCase):
             archived,
         ), commit=True)
 
+    def _renew_member(self, member_id, starting_date, end_date, package='Gold', fees=1000, renewal_date=None, renewal_time=None):
+        renewal_date = renewal_date or starting_date
+        renewal_time = renewal_time or datetime.now()
+        query_db(
+            """
+            UPDATE members
+               SET starting_date = %s,
+                   end_date = %s,
+                   membership_packages = %s,
+                   membership_fees = %s,
+                   membership_status = %s
+             WHERE id = %s
+            """,
+            (starting_date, end_date, package, fees, 'VAL', member_id),
+            commit=True
+        )
+        query_db(
+            """
+            INSERT INTO renewal_logs (
+                member_id, package_name, renewal_date, renewal_time, fees, edited_by
+            ) VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (member_id, package, renewal_date, renewal_time, fees, 'pba_create'),
+            commit=True
+        )
+
     def _preview(self, payload):
         return self.client.post('/crm/leads/bulk/preview', json=payload)
 
@@ -139,12 +165,13 @@ class TestCRMBulkPhaseA(unittest.TestCase):
         })
         self.assertIn(res.status_code, [302, 403])
 
-    def test_03_ids_selection_dedup_missing_and_active_lead_exclusion(self):
+    def test_03_ids_selection_dedup_missing_and_historical_leads_are_eligible(self):
         self.login_as('pba_create', 45001)
-        self._member_data(8101, 'PBA Id Alpha', '2099-01-01', membership_packages='Gold', membership_fees=1000)
-        self._member_data(8102, 'PBA Id Beta', '2099-01-01', membership_packages='Gold', membership_fees=1000)
-        self._member_data(8103, 'PBA Id Gamma', '2099-01-01', membership_packages='Gold', membership_fees=1000)
-        self._member_data(8104, 'PBA Id Archived', '2099-01-01', membership_packages='Gold', membership_fees=1000)
+        expired = '2026-08-31'
+        self._member_data(8101, 'PBA Id Alpha', expired, membership_packages='Gold', membership_fees=1000)
+        self._member_data(8102, 'PBA Id Beta', expired, membership_packages='Gold', membership_fees=1000)
+        self._member_data(8103, 'PBA Id Gamma', expired, membership_packages='Gold', membership_fees=1000)
+        self._member_data(8104, 'PBA Id Archived', expired, membership_packages='Gold', membership_fees=1000)
         self._create_active_lead(9103, 8103, stage='NEW')
         self._create_active_lead(9104, 8104, stage='NEW', archived=True)
 
@@ -159,19 +186,26 @@ class TestCRMBulkPhaseA(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
         self.assertEqual(data['selected_count'], 4)
-        self.assertEqual(data['eligible_count'], 3)
+        self.assertEqual(data['eligible_count'], 4)
         self.assertEqual(data['missing_count'], 1)
-        self.assertEqual(data['skipped_reasons']['active_lead_exists'], 1)
         self.assertEqual(data['skipped_reasons']['member_missing'], 1)
+        self.assertEqual(data['status_breakdown']['NEW'], 2)
+        self.assertEqual(data['status_breakdown']['ELIGIBLE_FOR_REFOLLOWUP'], 2)
         self.assertEqual(data['distribution'], [])
         self.assertTrue(data['preview_token'])
+        listing = self.client.get('/crm/leads/bulk/members', query_string={'preview_token': data['preview_token'], 'per_page': 50})
+        self.assertEqual(listing.status_code, 200)
+        statuses = {row['id']: row['crm_status_key'] for row in listing.get_json()['items']}
+        self.assertEqual(statuses[8101], 'NEW')
+        self.assertEqual(statuses[8102], 'NEW')
+        self.assertEqual(statuses[8103], 'ELIGIBLE_FOR_REFOLLOWUP')
+        self.assertEqual(statuses[8104], 'ELIGIBLE_FOR_REFOLLOWUP')
         self.assertEqual(before_leads, query_db("SELECT COUNT(*) as count FROM crm_leads", one=True)['count'])
         self.assertEqual(before_activities, query_db("SELECT COUNT(*) as count FROM crm_activities", one=True)['count'])
 
     def test_04_active_stage_matrix_and_nonblocking_terminal_states(self):
         self.login_as('pba_create', 45001)
-        today = get_cairo_date()
-        future = (today + timedelta(days=30)).isoformat()
+        expired = '2026-08-31'
 
         stage_rows = [
             (8201, 'PBA Stage NEW', 'NEW', False),
@@ -184,7 +218,7 @@ class TestCRMBulkPhaseA(unittest.TestCase):
             (8208, 'PBA Stage Archived', 'NEW', True),
         ]
         for member_id, name, stage, archived in stage_rows:
-            self._member_data(member_id, name, future, membership_packages='Silver', membership_fees=750)
+            self._member_data(member_id, name, expired, membership_packages='Silver', membership_fees=750)
             self._create_active_lead(9200 + member_id, member_id, stage=stage, archived=archived)
 
         res = self._preview({
@@ -195,8 +229,79 @@ class TestCRMBulkPhaseA(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
         self.assertEqual(data['selected_count'], 8)
-        self.assertEqual(data['eligible_count'], 3)
-        self.assertEqual(data['skipped_reasons']['active_lead_exists'], 5)
+        self.assertEqual(data['eligible_count'], 8)
+        self.assertEqual(data['status_breakdown']['ELIGIBLE_FOR_REFOLLOWUP'], 8)
+        self.assertNotIn('active_lead_exists', data['skipped_reasons'])
+
+    def test_05_preview_freeze_rejects_renewed_member_and_later_cycle_can_be_eligible(self):
+        self.login_as('pba_create', 45001)
+        self._member_data(8301, 'PBA Renewed Preview', '2026-08-31', membership_packages='Gold', membership_fees=1000)
+        self._create_active_lead(9301, 8301, stage='NEW')
+
+        preview = self._preview({
+            "selection": {"mode": "ids", "member_ids": [8301]},
+            "distribution": {"mode": "unassigned"},
+            "source": "EXISTING_MEMBER"
+        })
+        self.assertEqual(preview.status_code, 200)
+        token = preview.get_json()['preview_token']
+
+        self._renew_member(
+            8301,
+            '2026-09-01',
+            '2026-09-30',
+            package='Gold',
+            fees=1000,
+            renewal_date='2026-09-01',
+            renewal_time=datetime(2026, 9, 1, 10, 0, 0)
+        )
+
+        frozen_listing = self.client.get('/crm/leads/bulk/members', query_string={'preview_token': token, 'per_page': 50})
+        self.assertEqual(frozen_listing.status_code, 200)
+        frozen_rows = frozen_listing.get_json()['items']
+        frozen_status_map = {row['id']: row['crm_status_key'] for row in frozen_rows}
+        self.assertEqual(frozen_status_map[8301], 'RENEWED_NOT_ELIGIBLE')
+
+        execute = self.client.post('/crm/leads/bulk/execute', json={"preview_token": token})
+        self.assertEqual(execute.status_code, 200)
+        execute_data = execute.get_json()
+        self.assertEqual(execute_data['created'], 0)
+        self.assertEqual(execute_data['skipped'], 1)
+        self.assertEqual(execute_data['skipped_reasons']['renewed_not_eligible'], 1)
+        self.assertEqual(
+            query_db(
+                "SELECT COUNT(*) AS count FROM crm_leads WHERE member_id = %s AND is_archived = FALSE",
+                (8301,),
+                one=True
+            )['count'],
+            1
+        )
+
+        self._member_data(8302, 'PBA Later Cycle', '2026-10-31', membership_packages='Gold', membership_fees=1000)
+        self._create_active_lead(9302, 8302, stage='FOLLOW_UP')
+        query_db(
+            """
+            INSERT INTO renewal_logs (
+                member_id, package_name, renewal_date, renewal_time, fees, edited_by
+            ) VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (8302, 'Gold', '2026-09-01', datetime(2026, 9, 1, 11, 0, 0), 1000, 'pba_create'),
+            commit=True
+        )
+        later_cycle = self._preview({
+            "selection": {"mode": "ids", "member_ids": [8302]},
+            "distribution": {"mode": "unassigned"},
+            "source": "EXISTING_MEMBER"
+        })
+        self.assertEqual(later_cycle.status_code, 200)
+        data_later_cycle = later_cycle.get_json()
+        self.assertEqual(data_later_cycle['eligible_count'], 1)
+        self.assertEqual(data_later_cycle['skipped_reasons'].get('renewed_not_eligible', 0), 0)
+        later_listing = self.client.get('/crm/leads/bulk/members', query_string={'preview_token': data_later_cycle['preview_token'], 'per_page': 50})
+        self.assertEqual(later_listing.status_code, 200)
+        later_row = later_listing.get_json()['items'][0]
+        self.assertEqual(later_row['crm_status_key'], 'ELIGIBLE_FOR_REFOLLOWUP')
+        self.assertEqual(later_row['crm_status_label'], 'Eligible for Re-follow-up')
 
     def test_05_filters_search_and_expiry_buckets(self):
         self.login_as('pba_create', 45001)
@@ -397,8 +502,8 @@ class TestCRMBulkPhaseA(unittest.TestCase):
         self._member_data(8702, 'PBA Expiry Jul 2026', '2026-07-15', membership_packages='Silver', membership_fees=700)
         self._member_data(8703, 'PBA Expiry Jun 2026', '2026-06-15', membership_packages='Silver', membership_fees=700)
         self._member_data(8704, 'PBA Expiry Jul 2026 DT', '2026-07-15 00:00:00', membership_packages='Silver', membership_fees=700)
-        self._member_data(8705, 'PBA Expiry Sep 2026', '2026-09-10', membership_packages='Silver', membership_fees=700)
-        self._member_data(8706, 'PBA Expiry Sep 2026 Late', '2026-09-25', membership_packages='Silver', membership_fees=700)
+        self._member_data(8705, 'PBA Expiry Sep 2026', '2026-09-25', membership_packages='Silver', membership_fees=700)
+        self._member_data(8706, 'PBA Expiry Oct 2026 Late', '2026-10-25', membership_packages='Silver', membership_fees=700)
         self._member_data(8707, 'PBA Expiry Blank', '   ', membership_packages='Silver', membership_fees=700)
         self._member_data(8708, 'PBA Expiry Invalid', 'not-a-date', membership_packages='Silver', membership_fees=700)
 

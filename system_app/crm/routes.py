@@ -101,6 +101,8 @@ def bulk_leads_route():
             distribution_mode = (preview_snapshot.get('distribution') or {}).get('mode')
             preview_summary = {
                 "source": preview_snapshot.get('source'),
+                "campaign_id": preview_snapshot.get('campaign_id'),
+                "campaign_name": preview_snapshot.get('campaign_name'),
                 "selected_count": preview_snapshot.get('selected_count', 0),
                 "eligible_count": preview_snapshot.get('eligible_count', 0),
                 "skipped_count": preview_snapshot.get('skipped_count', 0),
@@ -108,6 +110,7 @@ def bulk_leads_route():
                 "assignment_plan_count": len(preview_snapshot.get('assignment_plan') or []),
                 "distribution": preview_snapshot.get('assignable_users', []) if distribution_mode == 'equal' else [],
                 "distribution_mode": distribution_mode,
+                "status_breakdown": preview_snapshot.get('status_breakdown') or {},
                 "preview_token": preview_token,
                 "status": operation_state.get('status')
             }
@@ -143,6 +146,7 @@ def bulk_leads_members_route():
         'expires_within',
         'expires_month',
         'expires_year',
+        'preview_token',
         'search_id',
         'search_name',
         'search_national_id',
@@ -164,10 +168,14 @@ def bulk_leads_members_route():
             filters[key] = value
 
     try:
-        listing = services.list_bulk_members(current_user, page, per_page, filters)
+        listing = services.list_bulk_members(current_user, page, per_page, filters, filters.get('preview_token'))
         return jsonify(listing), 200
     except ValueError as e:
         return jsonify({"error": "invalid_input", "message": str(e)}), 400
+    except CRMForbiddenError as e:
+        return jsonify({"error": "forbidden", "message": str(e)}), 403
+    except CRMNotFoundError as e:
+        return jsonify({"error": "not_found", "message": str(e)}), 404
 
 @crm_routes.route('/leads/bulk/invitations', methods=['GET'])
 @login_required

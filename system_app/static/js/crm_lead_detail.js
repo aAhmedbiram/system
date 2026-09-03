@@ -73,6 +73,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // CRM Info
         document.getElementById("leadSource").textContent = lead.source || "—";
+        const campaignLabel = lead.campaign_name || (lead.campaign_id ? "Campaign #" + lead.campaign_id : "Legacy / No cycle");
+        document.getElementById("leadCampaign").textContent = campaignLabel;
         document.getElementById("leadAssignee").textContent = lead.assigned_username || "Unassigned";
         renderFollowUpVal(lead.next_follow_up_at);
         document.getElementById("leadCreated").textContent = formatDatetime(lead.created_at);

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from unittest.mock import patch
+import threading
 import unittest
 
 from psycopg2.extras import Json
@@ -246,24 +247,86 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
         self.assertEqual(data['created'], 1)
         self.assertEqual(data['skipped_reasons']['member_missing'], 1)
 
-    def test_05_active_lead_after_preview_is_skipped(self):
+    def test_05_active_lead_rolls_over_and_preserves_history(self):
         self.login_as('pb2_exec', 47001)
         member_ids = [1401, 1402]
         for member_id in member_ids:
-            self._member_data(member_id, f'PB2 Active {member_id}')
+            self._member_data(member_id, f'PB2 Active {member_id}', '2026-08-31')
+
+        old_lead_id = 91401
+        self._create_active_lead(old_lead_id, 1401, stage='FOLLOW_UP')
+        query_db(
+            """
+            UPDATE crm_leads
+               SET assigned_user_id = %s,
+                   assigned_by_user_id = %s,
+                   assigned_at = CURRENT_TIMESTAMP,
+                   notes = %s
+             WHERE id = %s
+            """,
+            (47012, 47001, 'legacy note', old_lead_id),
+            commit=True
+        )
+        queries.create_activity(old_lead_id, 47001, 'NOTE', note='Initial follow up note')
 
         token = self._preview({
             "selection": {"mode": "ids", "member_ids": member_ids},
-            "distribution": {"mode": "unassigned"},
+            "distribution": {"mode": "equal", "user_ids": [47011, 47012]},
             "source": "EXISTING_MEMBER"
-        }).get_json()['preview_token']
+        }).get_json()
+        self.assertEqual(token['selected_count'], 2)
+        self.assertEqual(token['eligible_count'], 2)
+        self.assertEqual([row['lead_count'] for row in token['distribution']], [1, 1])
 
-        self._create_active_lead(91402, 1402, stage='NEW')
-        result = self._execute(token)
+        result = self._execute(token['preview_token'])
         self.assertEqual(result.status_code, 200)
         data = result.get_json()
-        self.assertEqual(data['created'], 1)
-        self.assertEqual(data['skipped_reasons']['active_lead_exists'], 1)
+        self.assertEqual(data['created'], 2)
+        self.assertEqual(data['skipped'], 0)
+
+        old_lead = query_db(
+            "SELECT id, is_archived, assigned_user_id, assigned_by_user_id, notes, stage, campaign_id FROM crm_leads WHERE id = %s",
+            (old_lead_id,),
+            one=True
+        )
+        self.assertTrue(old_lead['is_archived'])
+        self.assertEqual(old_lead['assigned_user_id'], 47012)
+        self.assertEqual(old_lead['stage'], 'FOLLOW_UP')
+        self.assertEqual(old_lead['notes'], 'legacy note')
+        self.assertIsNone(old_lead['campaign_id'])
+
+        activity_rows = query_db(
+            "SELECT note, result FROM crm_activities WHERE lead_id = %s ORDER BY id ASC",
+            (old_lead_id,)
+        ) or []
+        activity_notes = [row['note'] for row in activity_rows]
+        self.assertIn('Initial follow up note', activity_notes)
+        self.assertTrue(any('Archived automatically for new follow-up cycle' in (row['note'] or '') for row in activity_rows))
+
+        member_leads = query_db(
+            """
+            SELECT member_id, is_archived, assigned_user_id, campaign_id
+            FROM crm_leads
+            WHERE member_id = ANY(%s)
+            ORDER BY member_id ASC, id ASC
+            """,
+            (member_ids,)
+        ) or []
+        self.assertEqual(len(member_leads), 3)
+        new_active_1401 = [row for row in member_leads if row['member_id'] == 1401 and not row['is_archived']]
+        self.assertEqual(len(new_active_1401), 1)
+        self.assertEqual(new_active_1401[0]['assigned_user_id'], 47011)
+        self.assertIsNotNone(new_active_1401[0]['campaign_id'])
+        new_active_1402 = [row for row in member_leads if row['member_id'] == 1402 and not row['is_archived']]
+        self.assertEqual(len(new_active_1402), 1)
+        self.assertEqual(new_active_1402[0]['assigned_user_id'], 47012)
+
+        refreshed = self.client.get('/crm/leads/bulk/members', query_string={'preview_token': token['preview_token'], 'per_page': 50})
+        self.assertEqual(refreshed.status_code, 200)
+        refreshed_rows = refreshed.get_json()['items']
+        status_map = {row['id']: row['crm_status_key'] for row in refreshed_rows}
+        self.assertEqual(status_map[1401], 'ALREADY_IN_CURRENT_CYCLE')
+        self.assertEqual(status_map[1402], 'ALREADY_IN_CURRENT_CYCLE')
 
     def test_06_invalid_assignee_after_preview_is_skipped(self):
         self.login_as('pb2_exec', 47001)
@@ -372,10 +435,10 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
 
         original = queries.create_existing_member_lead_in_transaction
 
-        def side_effect(cur, member_row, source, created_by_user_id, assigned_user_id=None):
+        def side_effect(cur, member_row, source, created_by_user_id, assigned_user_id=None, campaign_id=None):
             if member_row['id'] == 2002:
                 raise _FakePgError('23505', 'idx_unique_active_member_lead')
-            return original(cur, member_row, source, created_by_user_id, assigned_user_id)
+            return original(cur, member_row, source, created_by_user_id, assigned_user_id, campaign_id=campaign_id)
 
         with patch('system_app.crm.queries.create_existing_member_lead_in_transaction', side_effect=side_effect):
             result = self._execute(token)
@@ -383,7 +446,7 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
         self.assertEqual(result.status_code, 200)
         data = result.get_json()
         self.assertEqual(data['created'], 1)
-        self.assertEqual(data['skipped_reasons']['active_lead_exists'], 1)
+        self.assertEqual(data['skipped_reasons']['already_in_current_cycle'], 1)
 
     def test_12_operation_failure_keeps_prior_commits_and_marks_failed(self):
         self.login_as('pb2_exec', 47001)
@@ -399,10 +462,10 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
 
         original = queries.create_existing_member_lead_in_transaction
 
-        def fail_on_second(cur, member_row, source, created_by_user_id, assigned_user_id=None):
+        def fail_on_second(cur, member_row, source, created_by_user_id, assigned_user_id=None, campaign_id=None):
             if member_row['id'] == 2102:
                 raise RuntimeError("boom")
-            return original(cur, member_row, source, created_by_user_id, assigned_user_id)
+            return original(cur, member_row, source, created_by_user_id, assigned_user_id, campaign_id=campaign_id)
 
         with patch('system_app.crm.queries.create_existing_member_lead_in_transaction', side_effect=fail_on_second):
             result = self._execute(token)
@@ -447,6 +510,70 @@ class TestCRMBulkPhaseB2(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn(b'Preview Ready', res.data)
         self.assertIn(b'Confirm &amp; Create Leads', res.data)
+
+    def test_15_overlapping_executions_keep_single_active_lead(self):
+        self.login_as('pb2_exec', 47001)
+        member_id = 2301
+        self._member_data(member_id, 'PB2 Concurrent 2301', '2026-08-31')
+
+        preview_one = self._preview({
+            "selection": {"mode": "ids", "member_ids": [member_id]},
+            "distribution": {"mode": "unassigned"},
+            "source": "EXISTING_MEMBER"
+        })
+        preview_two = self._preview({
+            "selection": {"mode": "ids", "member_ids": [member_id]},
+            "distribution": {"mode": "unassigned"},
+            "source": "EXISTING_MEMBER"
+        })
+        token_one = preview_one.get_json()['preview_token']
+        token_two = preview_two.get_json()['preview_token']
+
+        barrier = threading.Barrier(2)
+        outcomes = {}
+
+        def _run_execution(slot, token):
+            try:
+                barrier.wait(timeout=5)
+            except Exception:
+                pass
+            try:
+                result = services.execute_bulk_member_leads(
+                    {
+                        "id": 47001,
+                        "username": "pb2_exec",
+                        "permissions": {"crm_create": True, "crm_bulk_leads": True}
+                    },
+                    token
+                )
+                outcomes[slot] = ("ok", result)
+            except Exception as exc:
+                outcomes[slot] = ("err", exc)
+
+        thread_one = threading.Thread(target=_run_execution, args=("one", token_one))
+        thread_two = threading.Thread(target=_run_execution, args=("two", token_two))
+        thread_one.start()
+        thread_two.start()
+        thread_one.join()
+        thread_two.join()
+
+        self.assertEqual(len(outcomes), 2)
+        for kind, payload in outcomes.values():
+            self.assertEqual(kind, "ok")
+            self.assertEqual(payload['status'], 'COMPLETED')
+
+        active_count = query_db(
+            """
+            SELECT COUNT(*) AS count
+            FROM crm_leads
+            WHERE member_id = %s
+              AND is_archived = FALSE
+              AND stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')
+            """,
+            (member_id,),
+            one=True
+        )['count']
+        self.assertEqual(active_count, 1)
 
 
 if __name__ == '__main__':

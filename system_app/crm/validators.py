@@ -180,6 +180,7 @@ ALLOWED_BULK_MEMBER_FILTER_KEYS = {
     'expires_within',
     'expires_month',
     'expires_year',
+    'preview_token',
     'search_id',
     'search_name',
     'search_national_id',
@@ -308,6 +309,8 @@ def validate_bulk_member_filters(filters):
         value = validate_optional_string(filters.get(key))
         if value:
             normalized[key] = value
+
+    # preview_token is transport metadata for the bulk workspace and not a search filter.
 
     return normalized
 

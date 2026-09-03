@@ -17,6 +17,17 @@ def create_lead(member_id, name, phone, email, source, notes, created_by_user_id
     res = query_db(query, (member_id, name, phone, email, source, notes, created_by_user_id), one=True, commit=True)
     return res['id'] if res else None
 
+def create_campaign(name, description, created_by_user_id, is_active=True):
+    """Creates a CRM campaign/cycle row and returns its generated ID."""
+    query = """
+        INSERT INTO crm_campaigns (
+            name, description, created_by_user_id, is_active
+        ) VALUES (%s, %s, %s, %s)
+        RETURNING id
+    """
+    res = query_db(query, (name, description, created_by_user_id, is_active), one=True, commit=True)
+    return res['id'] if res else None
+
 def _json_safe_value(value):
     """Converts DB values into JSON-safe primitives without mutating row objects."""
     if isinstance(value, (datetime, date, time)):
@@ -37,9 +48,10 @@ _INVITATION_PHONE_PATTERN = re.compile(r"^01[0125][0-9]{8}$")
 def get_lead_by_id(lead_id):
     """Retrieves a single CRM Lead by its database ID including assigned username."""
     query = """
-        SELECT l.*, u.username AS assigned_username
+        SELECT l.*, u.username AS assigned_username, c.name AS campaign_name
         FROM crm_leads l
         LEFT JOIN users u ON u.id = l.assigned_user_id
+        LEFT JOIN crm_campaigns c ON c.id = l.campaign_id
         WHERE l.id = %s
     """
     return query_db(query, (lead_id,), one=True)
@@ -472,6 +484,43 @@ def get_active_leads_for_member_ids(member_ids):
     """
     return query_db(query, (member_ids,)) or []
 
+def get_member_history_member_ids(member_ids):
+    """Returns the subset of member IDs that have any CRM lead history."""
+    if not member_ids:
+        return []
+    query = """
+        SELECT DISTINCT member_id
+        FROM crm_leads
+        WHERE member_id = ANY(%s)
+          AND member_id IS NOT NULL
+    """
+    return query_db(query, (member_ids,)) or []
+
+def get_member_campaign_lead_member_ids(member_ids, campaign_id):
+    """Returns member IDs that already have at least one lead in the supplied campaign."""
+    if not member_ids or campaign_id is None:
+        return []
+    query = """
+        SELECT DISTINCT member_id
+        FROM crm_leads
+        WHERE member_id = ANY(%s)
+          AND member_id IS NOT NULL
+          AND campaign_id = %s
+    """
+    return query_db(query, (member_ids, campaign_id)) or []
+
+def get_member_latest_renewal_times(member_ids):
+    """Returns the latest renewal_time for each member ID that has a renewal history."""
+    if not member_ids:
+        return []
+    query = """
+        SELECT member_id, MAX(renewal_time) AS latest_renewal_time
+        FROM renewal_logs
+        WHERE member_id = ANY(%s)
+        GROUP BY member_id
+    """
+    return query_db(query, (member_ids,)) or []
+
 def create_bulk_lead_operation(token, created_by_user_id, snapshot, expires_at, status='PREVIEW'):
     """Persists a bulk lead preview/execution operation durably."""
     query = """
@@ -531,14 +580,15 @@ def finalize_bulk_lead_operation(token, created_by_user_id, status, snapshot):
     """
     return query_db(query, (status, Json(snapshot), token, created_by_user_id), one=True, commit=True)
 
-def create_existing_member_lead_in_transaction(cur, member_row, source, created_by_user_id, assigned_user_id=None):
+def create_existing_member_lead_in_transaction(cur, member_row, source, created_by_user_id, assigned_user_id=None, campaign_id=None):
     """Inserts a CRM lead linked to an existing member inside an open transaction."""
     query = """
         INSERT INTO crm_leads (
             member_id, name, phone, email, source, stage,
+            campaign_id,
             assigned_user_id, assigned_by_user_id, assigned_at,
             created_by_user_id
-        ) VALUES (%s, %s, %s, %s, %s, 'NEW', %s, %s,
+        ) VALUES (%s, %s, %s, %s, %s, 'NEW', %s, %s, %s,
                   CASE WHEN %s IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
                   %s)
         RETURNING id
@@ -552,6 +602,7 @@ def create_existing_member_lead_in_transaction(cur, member_row, source, created_
             member_row.get('phone'),
             member_row.get('email'),
             source,
+            campaign_id,
             assigned_user_id,
             assigned_by_user_id,
             assigned_user_id,
@@ -699,12 +750,14 @@ def get_leads(where_clauses, args, limit, offset):
         SELECT
             l.*,
             u.username AS assigned_username,
+            c.name AS campaign_name,
             NULLIF(TRIM(m.end_date), '') AS member_end_date,
             latest_activity.latest_activity_note,
             latest_activity.latest_activity_at,
             latest_activity.latest_activity_type
         FROM crm_leads l
         LEFT JOIN users u ON u.id = l.assigned_user_id
+        LEFT JOIN crm_campaigns c ON c.id = l.campaign_id
         LEFT JOIN members m ON m.id = l.member_id
         LEFT JOIN LATERAL (
             SELECT
@@ -812,6 +865,27 @@ def create_activity(lead_id, user_id, activity_type, note=None, result=None, old
     query_db(query, (lead_id, user_id, username_snapshot, activity_type, note, result,
                      old_stage, new_stage, old_assigned_user_id, new_assigned_user_id, follow_up_at), commit=commit)
 
+def create_activity_in_transaction(cur, lead_id, user_id, activity_type, note=None, result=None, old_stage=None, new_stage=None, old_assigned_user_id=None, new_assigned_user_id=None, follow_up_at=None, user_username_snapshot=None):
+    """Logs an activity record inside an open transaction cursor."""
+    if user_username_snapshot is None and user_id:
+        u = get_user_by_id(user_id)
+        if u:
+            user_username_snapshot = u.get('username')
+
+    query = """
+        INSERT INTO crm_activities (
+            lead_id, user_id, user_username_snapshot, activity_type, note, result,
+            old_stage, new_stage, old_assigned_user_id, new_assigned_user_id, follow_up_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    cur.execute(query, (lead_id, user_id, user_username_snapshot, activity_type, note, result,
+                        old_stage, new_stage, old_assigned_user_id, new_assigned_user_id, follow_up_at))
+
+def archive_lead_in_transaction(cur, lead_id):
+    """Soft-archives a CRM lead inside an open transaction cursor."""
+    query = "UPDATE crm_leads SET is_archived = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = %s"
+    cur.execute(query, (lead_id,))
+
 def execute_transaction(operations):
     """Runs a batch of (query, args) inside a single transaction."""
     import psycopg2
@@ -910,10 +984,12 @@ def get_follow_up_leads(where_clauses, args, limit, offset, order_by_clause):
             l.stage,
             l.assigned_user_id,
             u.username AS assigned_username,
+            c.name AS campaign_name,
             l.next_follow_up_at,
             l.is_archived
         FROM crm_leads l
         LEFT JOIN users u ON u.id = l.assigned_user_id
+        LEFT JOIN crm_campaigns c ON c.id = l.campaign_id
         {where_str}
         ORDER BY {order_by_clause}
         LIMIT %s OFFSET %s
