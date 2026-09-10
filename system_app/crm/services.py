@@ -562,14 +562,6 @@ def execute_bulk_member_leads(current_user, preview_token):
     operation = _load_bulk_operation_for_user(preview_token, current_user)
     snapshot = operation.get('snapshot') or {}
     assignment_plan = snapshot.get('assignment_plan') or []
-    campaign_id = snapshot.get('campaign_id')
-    selection_snapshot = snapshot.get('selection') or {}
-    frozen_end_dates = selection_snapshot.get('selected_member_end_dates') or {}
-    if campaign_id is None:
-        raise CRMConflictError(
-            "missing_campaign",
-            "Bulk preview snapshot is missing a follow-up cycle campaign."
-        )
 
     if operation.get('status') == 'COMPLETED':
         return _build_bulk_execution_response(operation)
@@ -585,6 +577,15 @@ def execute_bulk_member_leads(current_user, preview_token):
         raise CRMConflictError(
             "invalid_source",
             "Bulk member execution only supports EXISTING_MEMBER source."
+        )
+
+    campaign_id = snapshot.get('campaign_id')
+    selection_snapshot = snapshot.get('selection') or {}
+    frozen_end_dates = selection_snapshot.get('selected_member_end_dates') or {}
+    if campaign_id is None:
+        raise CRMConflictError(
+            "missing_campaign",
+            "Bulk preview snapshot is missing a follow-up cycle campaign."
         )
 
     has_assigned_targets = any(row.get('user_id') is not None for row in assignment_plan)
