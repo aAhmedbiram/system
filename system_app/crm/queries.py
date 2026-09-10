@@ -1000,7 +1000,7 @@ def get_follow_up_leads(where_clauses, args, limit, offset, order_by_clause):
 def count_follow_up_leads(where_clauses, args):
     """Counts total lead records that match follow-up filters."""
     where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-    query = f"SELECT COUNT(*) as count FROM crm_leads {where_str}"
+    query = f"SELECT COUNT(*) as count FROM crm_leads l {where_str}"
     res = query_db(query, tuple(args), one=True)
     return res['count'] if res else 0
 

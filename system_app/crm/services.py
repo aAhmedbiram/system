@@ -1750,15 +1750,15 @@ def list_follow_ups(current_user, page_param, per_page_param, filters):
 
     # Active stage constraint: NEW, CONTACTED, FOLLOW_UP, INTERESTED, TRIAL (non-terminal)
     where_clauses = [
-        "is_archived = FALSE",
-        "stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')",
-        "next_follow_up_at IS NOT NULL"
+        "l.is_archived = FALSE",
+        "l.stage IN ('NEW', 'CONTACTED', 'FOLLOW_UP', 'INTERESTED', 'TRIAL')",
+        "l.next_follow_up_at IS NOT NULL"
     ]
     args = []
 
     # 1. Enforce visibility rules
     if not can_view_all_leads(current_user):
-        where_clauses.append("(assigned_user_id = %s OR (created_by_user_id = %s AND assigned_user_id IS NULL))")
+        where_clauses.append("(l.assigned_user_id = %s OR (l.created_by_user_id = %s AND l.assigned_user_id IS NULL))")
         args.extend([current_user['id'], current_user['id']])
 
     # 2. Cairo calendar day computations using ZoneInfo("Africa/Cairo")
@@ -1769,16 +1769,16 @@ def list_follow_ups(current_user, page_param, per_page_param, filters):
 
     # 3. Filter statuses
     status_filter = filters.get('status')
-    order_by = "next_follow_up_at ASC"  # Default ordering
+    order_by = "l.next_follow_up_at ASC"  # Default ordering
 
     if status_filter == 'today':
-        where_clauses.append("next_follow_up_at >= %s AND next_follow_up_at < %s")
+        where_clauses.append("l.next_follow_up_at >= %s AND l.next_follow_up_at < %s")
         args.extend([today_start, today_end])
     elif status_filter == 'overdue':
-        where_clauses.append("next_follow_up_at < %s")
+        where_clauses.append("l.next_follow_up_at < %s")
         args.append(now_cairo)
     elif status_filter == 'upcoming':
-        where_clauses.append("next_follow_up_at >= %s")
+        where_clauses.append("l.next_follow_up_at >= %s")
         args.append(today_end)
 
     # Fetch
