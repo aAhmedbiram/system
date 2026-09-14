@@ -6,7 +6,7 @@ except ImportError:
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from psycopg2 import IntegrityError
+from psycopg2 import IntegrityError, OperationalError, InterfaceError
 from psycopg2 import pool
 from datetime import date
 from .func import get_cairo_date
@@ -26,6 +26,14 @@ def get_database_url():
 _connection_pool = None
 _pool_lock = threading.Lock()
 
+_CONNECTION_OPTIONS = {
+    'connect_timeout': 10,
+    'keepalives': 1,
+    'keepalives_idle': 30,
+    'keepalives_interval': 10,
+    'keepalives_count': 5,
+}
+
 def get_connection_pool():
     """Get or create database connection pool"""
     global _connection_pool
@@ -37,7 +45,8 @@ def get_connection_pool():
                     _connection_pool = psycopg2.pool.ThreadedConnectionPool(
                         minconn=1,
                         maxconn=20,  # Maximum 20 connections in pool
-                        dsn=db_url
+                        dsn=db_url,
+                        **_CONNECTION_OPTIONS,
                     )
                     print("Database connection pool created successfully")
                 except Exception as e:
@@ -551,74 +560,94 @@ def create_table():
 
 # === Execute queries - Using connection pool for better performance ===
 def query_db(query, args=(), one=False, commit=False):
-    """Execute query using connection pool for better performance"""
-    pool = get_connection_pool()
-    conn = None
-    cur = None
+    """Execute a query with safe pool recovery and one safe SELECT retry."""
+    query_upper = query.lstrip().upper()
+    retryable_select = query_upper.startswith('SELECT') and not commit
+    attempts = 2 if retryable_select else 1
 
-    # Fallback to direct connection if pool fails
-    if pool is None:
+    for attempt in range(attempts):
+        connection_pool = get_connection_pool()
+        conn = None
+        cursor = None
+        pooled_connection = False
+        broken_connection = False
+
+        # A pool checkout and a direct fallback have different ownership rules.
         try:
-            db_url = get_database_url()
-            conn = psycopg2.connect(db_url)
-        except Exception as e:
-            print(f"Error creating direct connection: {e}")
-            raise e
-    else:
+            if connection_pool is not None:
+                try:
+                    conn = connection_pool.getconn()
+                    pooled_connection = True
+                except Exception:
+                    conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+            else:
+                conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+        except (OperationalError, InterfaceError):
+            if retryable_select and attempt == 0:
+                continue
+            raise
+
         try:
-            conn = pool.getconn()
-        except Exception as e:
-            print(f"Error getting connection from pool: {e}")
-            # Fallback to direct connection
-            try:
-                db_url = get_database_url()
-                conn = psycopg2.connect(db_url)
-            except Exception as fallback_error:
-                print(f"Fallback connection also failed: {fallback_error}")
-                raise fallback_error
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(query, args)
 
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(query, args)
+            if commit:
+                conn.commit()
 
-        if commit:
-            conn.commit()
-
-        # Only fetch results if the query returns rows (SELECT or INSERT/UPDATE with RETURNING)
-        query_upper = query.strip().upper()
-        if query_upper.startswith('SELECT') or 'RETURNING' in query_upper:
-            rv = cur.fetchall()
-            return (rv[0] if rv else None) if one else rv
-        else:
-            # For INSERT/UPDATE/DELETE without RETURNING, return None or empty list
+            if query_upper.startswith('SELECT') or 'RETURNING' in query_upper:
+                rows = cursor.fetchall()
+                return (rows[0] if rows else None) if one else rows
             return None if one else []
 
-    except IntegrityError as e:
-        print(f"DB Integrity Error: {e}")
-        if commit and conn:
-            conn.rollback()
-        raise ValueError("Duplicate entry (email or username already exists)")
+        except IntegrityError:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise ValueError("Duplicate entry (email or username already exists)")
 
-    except Exception as e:
-        print(f"Query Error: {e}")
-        if commit and conn:
-            conn.rollback()
-        raise e
+        except (OperationalError, InterfaceError):
+            broken_connection = True
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            if retryable_select and attempt == 0:
+                continue
+            raise
 
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            if pool:
-                # Return connection to pool
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+
+        finally:
+            if cursor:
                 try:
-                    pool.putconn(conn)
-                except Exception as e:
-                    print(f"Error returning connection to pool: {e}")
-                    conn.close()  # Close if can't return to pool
-            else:
-                # Direct connection - close it
-                conn.close()
+                    cursor.close()
+                except Exception:
+                    pass
+            if conn:
+                if pooled_connection:
+                    try:
+                        if broken_connection:
+                            connection_pool.putconn(conn, close=True)
+                        else:
+                            connection_pool.putconn(conn)
+                    except Exception:
+                        # A failed return must not hide the query result/error.
+                        try:
+                            if not broken_connection:
+                                conn.close()
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
 
 
 # === Rest of functions (as they are, because they're excellent) ===

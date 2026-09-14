@@ -1,6 +1,10 @@
 from functools import wraps
 from flask import session, flash, redirect, url_for, request
-from system_app.queries import query_db
+from system_app.app import (
+    CurrentUserLookupError,
+    _authentication_unavailable_response,
+    get_current_user,
+)
 
 # CRM Permissions List Constants
 CRM_VIEW = 'crm_view'
@@ -25,43 +29,10 @@ CRM_PERMISSIONS = {
     CRM_BULK_LEADS: "Bulk Leads"
 }
 
-def _load_permissions(permissions_val):
-    if not permissions_val:
-        return {}
-    if isinstance(permissions_val, dict):
-        return permissions_val
-    import json
-    try:
-        return json.loads(permissions_val)
-    except:
-        return {}
-
-
 def _user_requires_pending_approval(user):
     if not user:
         return False
     return bool(user.get('username') not in ['rino', 'ahmed_adel', 'malit_deng'] and not user.get('is_approved'))
-
-def get_current_user():
-    """Resolves and loads the current logged-in user with permission values."""
-    user_id = session.get('user_id')
-    if not user_id:
-        return None
-
-    user = query_db(
-        'SELECT id, username, email, is_approved, permissions FROM users WHERE id = %s',
-        (user_id,),
-        one=True,
-    )
-    if not user:
-        return None
-
-    if user.get('username') == 'rino':
-        user['permissions'] = {'super_admin': True}
-        return user
-
-    user['permissions'] = _load_permissions(user.get('permissions'))
-    return user
 
 def login_required(f):
     """Decorator to enforce user login session presence."""
@@ -70,7 +41,10 @@ def login_required(f):
         if 'user_id' not in session:
             flash('You must log in first!', 'error')
             return redirect(url_for('login'))
-        user = get_current_user()
+        try:
+            user = get_current_user()
+        except CurrentUserLookupError:
+            return _authentication_unavailable_response()
         if not user:
             session.clear()
             flash('Session expired. Please log in again.', 'error')
@@ -90,7 +64,10 @@ def crm_permission_required(permission_key):
                 flash('You must log in first!', 'error')
                 return redirect(url_for('login'))
 
-            user = get_current_user()
+            try:
+                user = get_current_user()
+            except CurrentUserLookupError:
+                return _authentication_unavailable_response()
             if not user:
                 session.clear()
                 flash('Session expired. Please log in again.', 'error')

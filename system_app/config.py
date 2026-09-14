@@ -29,7 +29,8 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
     SESSION_COOKIE_SAMESITE = 'Lax'
-    PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
+    SESSION_REFRESH_EACH_REQUEST = True
     
     # Rate Limiting
     MAX_LOGIN_ATTEMPTS = 5
@@ -85,4 +86,3 @@ def get_config():
     """Get configuration based on environment"""
     env = os.environ.get('FLASK_ENV', 'development')
     return config.get(env, config['default'])
-

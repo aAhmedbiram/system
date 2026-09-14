@@ -44,7 +44,8 @@ csrf = CSRFProtect(app)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = is_production or os.environ.get('SESSION_COOKIE_SECURE', '').lower() == 'true'
 app.config['SESSION_COOKIE_SAMESITE'] = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # 24 hour session timeout
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
 # === Enhanced Logging Configuration ===
 class RequestContextFilter(logging.Filter):
@@ -705,13 +706,22 @@ def get_default_permissions_for_username(username):
     }
 
 
-def get_current_user():
-    """Return current user dict with 'permissions' (dict) included."""
-    try:
-        user_id = session.get('user_id')
-        if not user_id:
-            return None
+class CurrentUserLookupError(RuntimeError):
+    """The authenticated user's database state could not be determined."""
 
+
+def get_current_user():
+    """Return the current user, or None only when no user row exists.
+
+    Database failures deliberately propagate as CurrentUserLookupError so
+    authentication decorators cannot mistake an infrastructure failure for an
+    expired or invalid session.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+
+    try:
         user = query_db(
             'SELECT id, username, email, is_approved, permissions FROM users WHERE id = %s',
             (user_id,),
@@ -731,11 +741,22 @@ def get_current_user():
             perms = get_default_permissions_for_username(user.get('username'))
         user['permissions'] = perms
         return user
-    except Exception as e:
-        print(f"Error in get_current_user: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
+    except Exception as exc:
+        app.logger.warning(
+            'current_user_lookup_failed user_id=%s error_type=%s',
+            user_id,
+            type(exc).__name__,
+            exc_info=True,
+        )
+        raise CurrentUserLookupError from exc
+
+
+def _authentication_unavailable_response():
+    """Return a generic retryable response without exposing database details."""
+    return jsonify({
+        'error': 'authentication_temporarily_unavailable',
+        'message': 'Authentication is temporarily unavailable. Please try again.',
+    }), 503
 
 
 def login_required(f):
@@ -745,7 +766,10 @@ def login_required(f):
         if 'user_id' not in session:
             flash('You must log in first!', 'error')
             return redirect(url_for('login'))
-        user = get_current_user()
+        try:
+            user = get_current_user()
+        except CurrentUserLookupError:
+            return _authentication_unavailable_response()
         if not user:
             session.clear()
             flash('Session expired. Please login again.', 'error')
@@ -799,7 +823,10 @@ def permission_required(permission_key):
                 flash('You must log in first!', 'error')
                 return redirect(url_for('login'))
 
-            user = get_current_user()
+            try:
+                user = get_current_user()
+            except CurrentUserLookupError:
+                return _authentication_unavailable_response()
             if not user:
                 session.clear()
                 flash('Session expired. Please log in again.', 'error')
@@ -1544,7 +1571,10 @@ def pending_approval():
         flash('You must log in first!', 'error')
         return redirect(url_for('login'))
 
-    user = get_current_user()
+    try:
+        user = get_current_user()
+    except CurrentUserLookupError:
+        return _authentication_unavailable_response()
     if not user:
         session.clear()
         flash('Session expired. Please login again.', 'error')
@@ -1643,18 +1673,17 @@ def login():
                     return redirect(url_for('pending_approval'))
 
                 return redirect(url_for(_post_login_landing_endpoint(user)))
-            # If get_current_user failed or returned None, clear session and show login
+            # A successful lookup with no row definitively invalidates the session.
             session.clear()
             flash('Session expired. Please login again.', 'info')
             return render_template('login.html')
+        except CurrentUserLookupError:
+            return _authentication_unavailable_response()
         except Exception as e:
             print(f"Error in login redirect check: {e}")
             import traceback
             traceback.print_exc()
-            # On error, clear session and show login
-            session.clear()
-            flash('Session error. Please login again.', 'error')
-            return render_template('login.html')
+            return _authentication_unavailable_response()
     
     if request.method == 'POST':
         # Get client IP for rate limiting
