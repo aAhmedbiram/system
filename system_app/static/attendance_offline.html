@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Attendance — Offline</title>
+    <style>
+        body { margin: 0; padding: 24px; background: #111; color: #fff; font: 16px Arial, sans-serif; }
+        main { max-width: 720px; margin: 0 auto; }
+        h1 { color: #4caf50; font-size: 22px; }
+        .status { padding: 12px; border: 1px solid #f9a825; border-radius: 8px; margin: 16px 0; }
+        button, input { box-sizing: border-box; padding: 11px; border-radius: 6px; }
+        input { width: 100%; background: #222; border: 1px solid #555; color: #fff; margin-bottom: 8px; }
+        button { border: 0; background: #4caf50; color: #fff; cursor: pointer; }
+        #attendance-offline-sync { width: 100%; }
+        .offline-queue { margin-top: 16px; padding: 12px; border: 1px solid #444; border-radius: 8px; }
+        .offline-operation { padding: 8px 0; border-top: 1px solid #444; }
+        .offline-operation:first-child { border-top: 0; }
+        .offline-member-results button { margin: 3px; background: #333; border: 1px solid #666; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Rival Gym — Attendance</h1>
+    <div id="attendance-offline-status" class="status" data-state="offline">
+        <span id="attendance-offline-status-text">Offline — date is provisional until synchronization</span>
+        <button id="attendance-offline-sync" type="button">Sync now</button>
+    </div>
+    <p>Connect to the internet once to prepare offline attendance. Cached members and pending attendance remain on this device.</p>
+    <input id="attendance-member-search" type="search" placeholder="Search cached members by ID or name" autocomplete="off">
+    <div id="attendance-member-results" class="offline-member-results"></div>
+    <form id="attendance-form">
+        <input id="member_id" name="member_id" type="text" inputmode="numeric" placeholder="Member ID" autocomplete="off">
+        <button type="submit">Record attendance</button>
+    </form>
+    <div id="attendance-offline-queue" class="offline-queue" hidden>
+        <h2>Offline attendance operations</h2>
+        <div id="attendance-offline-operations"></div>
+    </div>
+</main>
+<script src="/static/js/attendance_offline.js" defer></script>
+</body>
+</html>

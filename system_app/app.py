@@ -503,10 +503,17 @@ from .queries import (
     add_staff_purchase, get_staff_purchases, get_staff_statistics,
     log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total,
     create_invoice, get_invoice, get_invoice_by_number, get_all_invoices,
-    get_attendance_backup_runs
+    get_attendance_backup_runs, process_offline_attendance_operations
 )
 from .queries import delete_all_data as delete_all_data_from_db
 from .private_training import ensure_private_training_tables
+from .auth import (
+    CurrentUserLookupError,
+    _authentication_unavailable_response,
+    _load_permissions,
+    get_current_user as _shared_get_current_user,
+    get_default_permissions_for_username,
+)
 
 # ==============================================================================
 # Environment Safety Guards and Startup Print Information
@@ -609,154 +616,9 @@ if os.environ.get('RUN_SCHEDULER', '').lower() == 'true':
 
 # === Authorization Helpers & Decorators ===
 
-def _load_permissions(raw_permissions):
-    """Safely load permissions from DB (JSONB or TEXT) into a dict."""
-    if not raw_permissions:
-        perms = {}
-    elif isinstance(raw_permissions, dict):
-        perms = raw_permissions
-    else:
-        try:
-            perms = json.loads(raw_permissions)
-        except Exception:
-            perms = {}
-    
-    # Backward compatibility for invitations
-    if perms.get('invitations'):
-        if 'invitations_view' not in perms:
-            perms['invitations_view'] = True
-        if 'invitations_use' not in perms:
-            perms['invitations_use'] = True
-            
-    return perms
-
-
-def get_default_permissions_for_username(username):
-    """
-    Default permission sets:
-    - rino: super admin (access to everything)
-    - ahmed_adel: everything except delete_member, undo_action, data_management,
-                  online_users, training_templates, offers, renewal_log
-    - malit_deng: everything except undo_action, data_management, online_users,
-                  training_templates, offers, renewal_log, supplements_water,
-                  attendance_backup, delete_member
-    - others (new accounts): attendance only
-    """
-    username = (username or '').strip()
-
-    # Super admin
-    if username == 'rino':
-        return {'super_admin': True}
-
-    # Base full-access set
-    base = {
-        'index': True,
-        'attendance': True,
-        'delete_attendance': True,
-        'members_view': True,
-        'members_edit': True,
-        'delete_member': True,
-        'training_templates': True,
-        'offers': True,
-        'renewal_log': True,
-        'supplements_water': True,
-        'attendance_backup': True,
-        'undo_action': True,
-        'data_management': True,
-        'online_users': True,
-        'invoices': True,
-        'invitations': True,
-        'invitations_view': True,
-        'invitations_use': True,
-    }
-
-    if username == 'ahmed_adel':
-        perms = base.copy()
-        perms.update({
-            'delete_member': False,
-            'undo_action': False,
-            'data_management': False,
-            'online_users': False,
-            'training_templates': False,
-            'offers': False,
-            'renewal_log': False,
-            'delete_attendance': False,
-        })
-        return perms
-
-    if username == 'malit_deng':
-        perms = base.copy()
-        perms.update({
-            'delete_member': False,
-            'undo_action': False,
-            'data_management': False,
-            'online_users': False,
-            'training_templates': False,
-            'offers': False,
-            'renewal_log': False,
-            'supplements_water': False,
-            'attendance_backup': False,
-            'delete_attendance': False,
-        })
-        return perms
-
-    # Default for any new / normal account → attendance only
-    return {
-        'attendance': True,
-    }
-
-
-class CurrentUserLookupError(RuntimeError):
-    """The authenticated user's database state could not be determined."""
-
-
 def get_current_user():
-    """Return the current user, or None only when no user row exists.
-
-    Database failures deliberately propagate as CurrentUserLookupError so
-    authentication decorators cannot mistake an infrastructure failure for an
-    expired or invalid session.
-    """
-    user_id = session.get('user_id')
-    if not user_id:
-        return None
-
-    try:
-        user = query_db(
-            'SELECT id, username, email, is_approved, permissions FROM users WHERE id = %s',
-            (user_id,),
-            one=True,
-        )
-        if not user:
-            return None
-
-        # Super admin shortcut
-        if user.get('username') == 'rino':
-            user['permissions'] = {'super_admin': True}
-            return user
-
-        perms = _load_permissions(user.get('permissions'))
-        # If permissions are empty, get defaults for this username
-        if not perms:
-            perms = get_default_permissions_for_username(user.get('username'))
-        user['permissions'] = perms
-        return user
-    except Exception as exc:
-        app.logger.warning(
-            'current_user_lookup_failed user_id=%s error_type=%s',
-            user_id,
-            type(exc).__name__,
-            exc_info=True,
-        )
-        raise CurrentUserLookupError from exc
-
-
-def _authentication_unavailable_response():
-    """Return a generic retryable response without exposing database details."""
-    return jsonify({
-        'error': 'authentication_temporarily_unavailable',
-        'message': 'Authentication is temporarily unavailable. Please try again.',
-    }), 503
+    """Compatibility entry point using the app module's query function."""
+    return _shared_get_current_user(query_db)
 
 
 def login_required(f):
@@ -3315,6 +3177,136 @@ def change_password():
     return render_template('change_password.html')
 
 
+@app.route('/api/attendance/offline-snapshot', methods=['GET'])
+@permission_required('attendance')
+def attendance_offline_snapshot():
+    """Return only the member fields needed by the attendance offline UI."""
+    try:
+        members = query_db(
+            """
+            SELECT id AS member_id, name, membership_status, end_date
+            FROM members
+            ORDER BY id ASC
+            """
+        ) or []
+        response = jsonify({
+            'members': [
+                {
+                    'member_id': member['member_id'],
+                    'name': member['name'],
+                    'membership_status': member.get('membership_status'),
+                    'end_date': member.get('end_date'),
+                }
+                for member in members
+            ],
+            'snapshot_version': get_cairo_now().isoformat(),
+            'business_date': get_cairo_date().isoformat(),
+        })
+        response.headers['Cache-Control'] = 'no-store, private'
+        response.headers['Pragma'] = 'no-cache'
+        return response
+    except CurrentUserLookupError:
+        return _authentication_unavailable_response()
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        app.logger.warning('attendance_snapshot_database_failure', exc_info=True)
+        return _authentication_unavailable_response()
+    except Exception:
+        app.logger.warning('attendance_snapshot_failure', exc_info=True)
+        return _authentication_unavailable_response()
+
+
+def _offline_validation_result(operation_id):
+    return {
+        'client_operation_id': operation_id,
+        'result_code': 'validation_error',
+    }
+
+
+@app.route('/api/attendance/offline-sync', methods=['POST'])
+@permission_required('attendance')
+def attendance_offline_sync():
+    """Synchronize a bounded batch of durable offline attendance operations."""
+    if request.content_length and request.content_length > 256 * 1024:
+        return jsonify({'error': 'request_too_large'}), 413
+    if not request.is_json or request.mimetype != 'application/json':
+        return jsonify({'error': 'json_required'}), 415
+
+    payload = request.get_json(silent=True)
+    operations_payload = payload.get('operations') if isinstance(payload, dict) else None
+    if not isinstance(operations_payload, list) or not operations_payload:
+        return jsonify({'error': 'validation_error', 'results': []}), 400
+    if len(operations_payload) > 50:
+        return jsonify({'error': 'batch_too_large'}), 413
+
+    now = get_cairo_now()
+    server_business_date = get_cairo_date()
+    normalized = []
+    immediate_results = []
+    for raw_operation in operations_payload:
+        operation_id = raw_operation.get('client_operation_id') if isinstance(raw_operation, dict) else None
+        if not isinstance(operation_id, str):
+            immediate_results.append(_offline_validation_result(None))
+            continue
+        try:
+            canonical_operation_id = str(uuid.UUID(operation_id))
+            member_id = raw_operation.get('member_id')
+            if isinstance(member_id, bool) or not isinstance(member_id, int) or member_id <= 0:
+                raise ValueError
+
+            captured_raw = raw_operation.get('captured_at_device')
+            captured_at = datetime.fromisoformat(str(captured_raw).replace('Z', '+00:00'))
+            if captured_at.tzinfo is None:
+                raise ValueError
+            captured_cairo = captured_at.astimezone(now.tzinfo)
+            captured_date = captured_cairo.date()
+            requested_date = datetime.strptime(
+                str(raw_operation.get('attendance_date')), '%Y-%m-%d'
+            ).date()
+            if requested_date != captured_date:
+                raise ValueError
+            if (
+                captured_date < server_business_date - timedelta(days=2)
+                or captured_date > server_business_date + timedelta(days=1)
+                or captured_at > now + timedelta(minutes=10)
+            ):
+                raise ValueError
+
+            normalized.append({
+                'client_operation_id': canonical_operation_id,
+                'member_id': member_id,
+                'server_business_date': captured_date,
+                'attendance_time': captured_cairo.strftime('%H:%M:%S'),
+                'attendance_day': captured_cairo.strftime('%A'),
+            })
+        except (TypeError, ValueError, OverflowError):
+            immediate_results.append(_offline_validation_result(operation_id))
+
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'unauthorized'}), 401
+        results = process_offline_attendance_operations(
+            normalized,
+            current_user['id'],
+            current_user['username'],
+        ) if normalized else []
+        response = jsonify({'results': immediate_results + results})
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    except psycopg2.errors.UndefinedTable:
+        app.logger.warning('attendance_sync_feature_unavailable', exc_info=True)
+        return jsonify({
+            'error': 'offline_feature_unavailable',
+            'results': immediate_results,
+        }), 503
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        app.logger.warning('attendance_sync_database_failure', exc_info=True)
+        return jsonify({'error': 'temporary_error', 'results': immediate_results}), 503
+    except Exception:
+        app.logger.warning('attendance_sync_failure', exc_info=True)
+        return jsonify({'error': 'temporary_error', 'results': immediate_results}), 503
+
+
 @app.route('/attendance_table', methods=['GET', 'POST'])
 @login_required
 def attendance_table():
@@ -3433,13 +3425,19 @@ def attendance_table():
             return render_template("attendance_table.html", 
                                 members_data=data or [],
                                 user_permissions=user_permissions,
-                                today=today)
+                                today=today,
+                                offline_user_scope=str(session.get('user_id')))
         except Exception as e:
             print(f"Error loading attendance data: {e}")
             import traceback
             traceback.print_exc()
             flash(f"Error loading attendance: {str(e)}", "error")
-            return render_template("attendance_table.html", members_data=[], user_permissions={})
+            return render_template(
+                "attendance_table.html",
+                members_data=[],
+                user_permissions={},
+                offline_user_scope=str(session.get('user_id')),
+            )
 
     # This part handles the GET request (default view)
     try:
@@ -3468,10 +3466,16 @@ def attendance_table():
         return render_template("attendance_table.html", 
                             members_data=data or [], 
                             user_permissions=user_permissions,
-                            today=today)
+                            today=today,
+                            offline_user_scope=str(session.get('user_id')))
     except Exception as e:
         print(f"Error in attendance_table GET: {e}")
-        return render_template("attendance_table.html", members_data=[], user_permissions={})
+        return render_template(
+            "attendance_table.html",
+            members_data=[],
+            user_permissions={},
+            offline_user_scope=str(session.get('user_id')),
+        )
 
 @app.route('/delete_attendance_data', methods=['POST'])
 @login_required

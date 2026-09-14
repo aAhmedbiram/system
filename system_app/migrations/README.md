@@ -38,3 +38,13 @@ FROM pg_stat_user_indexes
 ORDER BY idx_scan DESC;
 ```
 
+## Offline Attendance Idempotency
+
+After deploying the offline attendance code, apply the durable idempotency
+table once with:
+
+```bash
+psql "$DATABASE_URL" -f system_app/migrations/add_offline_attendance_sync.sql
+```
+
+The migration is also included in `system_app/migrations/run_migrations.py`.

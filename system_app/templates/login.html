@@ -400,5 +400,9 @@
             <a class="signup" href="{{ url_for('signup') }}" role="button">{{ t.signup }}</a>
         </form>
     </div>
+    <script>
+        // A fresh login must explicitly re-establish the attendance queue scope.
+        try { localStorage.removeItem('rival-attendance-active-scope'); } catch (error) {}
+    </script>
 </body>
 </html>

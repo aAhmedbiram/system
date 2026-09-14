@@ -61,6 +61,9 @@ if __name__ == '__main__':
         success = run_migration('add_crm_bulk_lead_operations.sql')
 
     if success:
+        success = run_migration('add_offline_attendance_sync.sql')
+
+    if success:
         print("\n" + "=" * 80)
         print("✅ All migrations completed successfully!")
         print("=" * 80)

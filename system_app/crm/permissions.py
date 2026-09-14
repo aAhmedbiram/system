@@ -1,6 +1,6 @@
 from functools import wraps
 from flask import session, flash, redirect, url_for, request
-from system_app.app import (
+from system_app.auth import (
     CurrentUserLookupError,
     _authentication_unavailable_response,
     get_current_user,

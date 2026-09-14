@@ -8,7 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import IntegrityError, OperationalError, InterfaceError
 from psycopg2 import pool
-from datetime import date
+from datetime import date, datetime
 from .func import get_cairo_date
 import threading
 
@@ -562,7 +562,12 @@ def create_table():
 def query_db(query, args=(), one=False, commit=False):
     """Execute a query with safe pool recovery and one safe SELECT retry."""
     query_upper = query.lstrip().upper()
-    retryable_select = query_upper.startswith('SELECT') and not commit
+    retryable_select = (
+        query_upper.startswith('SELECT')
+        and not commit
+        and 'FOR UPDATE' not in query_upper
+        and 'FOR SHARE' not in query_upper
+    )
     attempts = 2 if retryable_select else 1
 
     for attempt in range(attempts):
@@ -639,8 +644,7 @@ def query_db(query, args=(), one=False, commit=False):
                     except Exception:
                         # A failed return must not hide the query result/error.
                         try:
-                            if not broken_connection:
-                                conn.close()
+                            conn.close()
                         except Exception:
                             pass
                 else:
@@ -648,6 +652,199 @@ def query_db(query, args=(), one=False, commit=False):
                         conn.close()
                     except Exception:
                         pass
+
+
+def _offline_replay_result(operation_id, previous):
+    """Expose the durable terminal result without turning a rejection into success."""
+    original_result_code = previous.get('result_code')
+    return {
+        'client_operation_id': operation_id,
+        'result_code': original_result_code,
+        'replayed': True,
+        'original_result_code': original_result_code,
+    }
+
+
+def process_offline_attendance_operations(operations, user_id, username):
+    """Process validated offline attendance operations in one transaction."""
+    connection_pool = get_connection_pool()
+    conn = None
+    cursor = None
+    pooled_connection = False
+    broken_connection = False
+
+    if connection_pool is not None:
+        try:
+            conn = connection_pool.getconn()
+            pooled_connection = True
+        except Exception:
+            conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+    else:
+        conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        results = []
+        for operation in operations:
+            operation_id = operation['client_operation_id']
+            cursor.execute(
+                """
+                INSERT INTO offline_attendance_operations
+                    (client_operation_id, member_id, user_id, username,
+                     server_business_date, status, result_code, created_at)
+                VALUES (%s, %s, %s, %s, %s, 'processed', 'processing', CURRENT_TIMESTAMP)
+                ON CONFLICT (client_operation_id) DO NOTHING
+                RETURNING client_operation_id
+                """,
+                (
+                    operation_id,
+                    operation['member_id'],
+                    user_id,
+                    username,
+                    operation['server_business_date'],
+                ),
+            )
+            inserted = cursor.fetchone()
+
+            if not inserted:
+                cursor.execute(
+                    """
+                    SELECT user_id, status, result_code
+                    FROM offline_attendance_operations
+                    WHERE client_operation_id = %s
+                    """,
+                    (operation_id,),
+                )
+                previous = cursor.fetchone()
+                if not previous or previous['user_id'] != user_id:
+                    results.append({
+                        'client_operation_id': operation_id,
+                        'result_code': 'unauthorized',
+                    })
+                else:
+                    results.append(_offline_replay_result(operation_id, previous))
+                continue
+
+            cursor.execute(
+                """
+                SELECT id, name, end_date, membership_status
+                FROM members
+                WHERE id = %s
+                FOR SHARE
+                """,
+                (operation['member_id'],),
+            )
+            member = cursor.fetchone()
+            result_code = 'synced'
+
+            if not member:
+                result_code = 'invalid_member'
+            else:
+                status = str(member.get('membership_status') or '').strip().upper()
+                end_date = member.get('end_date')
+                parsed_end_date = None
+                if end_date:
+                    end_date_text = str(end_date).strip()[:10]
+                    for date_format in (
+                        '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y',
+                        '%m-%d-%Y', '%d-%m-%Y', '%Y/%m/%d',
+                    ):
+                        try:
+                            parsed_end_date = datetime.strptime(end_date_text, date_format).date()
+                            break
+                        except ValueError:
+                            continue
+
+                if status in {'EX', 'EXPIRED', 'INACTIVE'} or (
+                    parsed_end_date and parsed_end_date < operation['server_business_date']
+                ):
+                    result_code = 'inactive_membership'
+                else:
+                    # Serialize same-member/day decisions even when client IDs differ.
+                    cursor.execute(
+                        'SELECT pg_advisory_xact_lock(%s, hashtext(%s))',
+                        (int(operation['member_id']), str(operation['server_business_date'])),
+                    )
+                    cursor.execute(
+                        """
+                        SELECT 1 FROM attendance
+                        WHERE member_id = %s AND attendance_date = %s
+                        LIMIT 1
+                        """,
+                        (operation['member_id'], operation['server_business_date']),
+                    )
+                    if cursor.fetchone():
+                        result_code = 'duplicate_attendance'
+                    else:
+                        cursor.execute(
+                            """
+                            INSERT INTO attendance
+                                (member_id, name, end_date, membership_status,
+                                 attendance_time, attendance_date, day)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                member['id'],
+                                member['name'],
+                                member['end_date'],
+                                member['membership_status'],
+                                operation['attendance_time'],
+                                operation['server_business_date'],
+                                operation['attendance_day'],
+                            ),
+                        )
+
+            cursor.execute(
+                """
+                UPDATE offline_attendance_operations
+                SET status = 'processed', result_code = %s, synced_at = CURRENT_TIMESTAMP
+                WHERE client_operation_id = %s
+                """,
+                (result_code, operation_id),
+            )
+            results.append({
+                'client_operation_id': operation_id,
+                'result_code': result_code,
+            })
+
+        conn.commit()
+        return results
+    except (OperationalError, InterfaceError):
+        broken_connection = True
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            if pooled_connection:
+                try:
+                    if broken_connection:
+                        connection_pool.putconn(conn, close=True)
+                    else:
+                        connection_pool.putconn(conn)
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            else:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 
 # === Rest of functions (as they are, because they're excellent) ===

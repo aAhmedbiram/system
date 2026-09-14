@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Attendance Table - Rival Gym System</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
     <style>
@@ -346,6 +347,56 @@
                 box-shadow: 0 0 12px #f44336;
             }
         }
+
+        .offline-status-area {
+            max-width: 1400px;
+            margin: 18px auto 0;
+            padding: 0 20px;
+        }
+
+        .offline-status-bar, .offline-queue {
+            background: rgba(34, 34, 34, 0.95);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 10px 14px;
+        }
+
+        .offline-status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #ddd;
+            font-size: 14px;
+        }
+
+        .offline-status-bar[data-state="offline"] { border-color: #f9a825; }
+        .offline-status-bar[data-state="error"] { border-color: #e53935; }
+        .offline-status-bar[data-state="synced"] { border-color: #4caf50; }
+        .offline-status-bar button {
+            padding: 7px 12px;
+            border: 0;
+            border-radius: 5px;
+            background: #4caf50;
+            color: #fff;
+            cursor: pointer;
+        }
+        .offline-status-bar button:disabled { opacity: .55; cursor: wait; }
+        .offline-queue { margin-top: 10px; }
+        .offline-queue h2 { margin: 0 0 8px; font-size: 16px; color: #4caf50; }
+        .offline-operation { padding: 6px 0; border-top: 1px solid #444; font-size: 13px; }
+        .offline-operation:first-child { border-top: 0; }
+        .offline-operation .pending { color: #f9a825; }
+        .offline-operation .failed { color: #ef5350; }
+        .offline-search { margin: 0 auto 12px; max-width: 1400px; padding: 0 20px; }
+        .offline-search input { width: 100%; padding: 10px; box-sizing: border-box; background: #222; border: 1px solid #444; border-radius: 6px; color: #fff; }
+        .offline-member-results { margin-top: 5px; color: #ddd; }
+        .offline-member-result { display: inline-block; margin: 3px; padding: 5px 8px; border: 1px solid #555; border-radius: 5px; cursor: pointer; }
+        .offline-member-result:hover { border-color: #4caf50; }
+        @media (max-width: 600px) {
+            .offline-status-bar { align-items: flex-start; flex-direction: column; }
+            .offline-status-bar button { width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -362,11 +413,27 @@
         <h1>Rival Gym System - Attendance Table</h1>
     </header>
 
+    <div class="offline-status-area">
+        <div id="attendance-offline-status" class="offline-status-bar" data-state="online">
+            <span id="attendance-offline-status-text">Online</span>
+            <button id="attendance-offline-sync" type="button">Sync now</button>
+        </div>
+        <div id="attendance-offline-queue" class="offline-queue" hidden>
+            <h2>Offline attendance operations</h2>
+            <div id="attendance-offline-operations"></div>
+        </div>
+    </div>
+
+    <div class="offline-search">
+        <input id="attendance-member-search" type="search" autocomplete="off" placeholder="Search cached members by ID or name">
+        <div id="attendance-member-results" class="offline-member-results" aria-live="polite"></div>
+    </div>
+
     <!-- Add form - input centered in the text -->
     <div class="add-id-form-container">
-        <form action="{{ url_for('attendance_table') }}" method="post">
+        <form id="attendance-form" action="{{ url_for('attendance_table') }}" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="text" 
+            <input type="text"
                    id="member_id" 
                    name="member_id" 
                    required 
@@ -461,10 +528,19 @@
         {% if user_permissions and (user_permissions.get('super_admin') or user_permissions.get('index')) and session.username != 'hossam_marghany' %}
         <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
         {% endif %}
-        <form action="{{ url_for('logout') }}" method="get" style="display:inline;">
+        <form id="attendance-logout-form" action="{{ url_for('logout') }}" method="get" style="display:inline;">
             <button type="submit" class="home-btn" style="background: #c62828; margin-left: 10px;">Logout</button>
         </form>
     </div>
+
+    <script>
+        window.ATTENDANCE_OFFLINE_CONFIG = {
+            userScope: {{ offline_user_scope|tojson }},
+            snapshotUrl: {{ url_for('attendance_offline_snapshot')|tojson }},
+            syncUrl: {{ url_for('attendance_offline_sync')|tojson }}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/attendance_offline.js') }}" defer></script>
 
     <!-- Auto scroll + focus -->
     <script>
