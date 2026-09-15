@@ -1,6 +1,7 @@
 import re
 from datetime import date, datetime, time
 
+import psycopg2
 from psycopg2.extras import Json
 
 from system_app.queries import query_db
@@ -926,7 +927,6 @@ def execute_transaction(operations):
 
 def run_in_transaction(callback, *args, **kwargs):
     """Acquires a pooled connection and runs a callback inside a single transaction."""
-    import psycopg2
     from psycopg2.extras import RealDictCursor
     from system_app.queries import get_connection_pool, get_database_url
 
@@ -938,22 +938,48 @@ def run_in_transaction(callback, *args, **kwargs):
         conn = pool.getconn()
 
     cur = None
+    broken_connection = False
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         result = callback(cur, *args, **kwargs)
         conn.commit()
         return result
-    except Exception as e:
-        conn.rollback()
-        raise e
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken_connection = True
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         if cur:
-            cur.close()
+            try:
+                cur.close()
+            except Exception:
+                pass
         if conn:
             if pool:
-                pool.putconn(conn)
+                try:
+                    if broken_connection:
+                        pool.putconn(conn, close=True)
+                    else:
+                        pool.putconn(conn)
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
             else:
-                conn.close()
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def get_activities(lead_id, limit, offset):
     """Fetches chronological list of activities for a lead."""

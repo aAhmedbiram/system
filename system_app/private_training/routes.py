@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
+import psycopg2
 
 from system_app.crm.permissions import get_current_user, login_required
 from system_app.func import get_cairo_date
@@ -32,6 +33,7 @@ from .services import (
     cancel_private_training_subscription,
     generate_portal_token,
     get_private_subscription_for_trainer,
+    get_private_training_subscription,
     get_private_training_pending_session,
     list_private_clients_for_trainer,
     list_private_training_trainer_options,
@@ -40,6 +42,92 @@ from .services import (
 )
 
 private_training_bp = Blueprint("private_training", __name__)
+
+
+def _checkin_wants_json() -> bool:
+    """Return true only for an explicit progressive-enhancement request."""
+    if request.headers.get("X-Requested-With", "").lower() == "xmlhttprequest":
+        return True
+    return request.accept_mimetypes["application/json"] > request.accept_mimetypes["text/html"]
+
+
+def _checkin_json_error(error_code: str, message: str, status_code: int):
+    return jsonify({"ok": False, "error": error_code, "message": message}), status_code
+
+
+def _iso_value(value):
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
+
+def _checkin_json_success(current_user, subscription, session_row):
+    sessions = list_private_training_sessions(subscription["id"])
+    return jsonify({
+        "ok": True,
+        "message": "Private training session check-in created successfully.",
+        "subscription": {
+            "id": subscription["id"],
+            "total_sessions": int(subscription.get("total_sessions") or 0),
+            "approved_sessions": int(subscription.get("approved_count") or 0),
+            "remaining_sessions": int(subscription.get("remaining_sessions") or 0),
+            "pending_sessions": int(subscription.get("pending_count") or 0),
+            "effective_status": subscription.get("effective_status"),
+        },
+        "session": {
+            "id": session_row.get("id"),
+            "trainer": session_row.get("trainer_display_name") or current_user.get("username"),
+            "checked_in_at": _iso_value(session_row.get("checked_in_at")),
+            "workout_name": session_row.get("workout_name"),
+            "status": session_row.get("status"),
+            "approved_at": _iso_value(session_row.get("approved_at")),
+        },
+        "sessions": [
+            {
+                "id": row.get("id"),
+                "trainer": row.get("trainer_display_name") or row.get("trainer_username"),
+                "checked_in_at": _iso_value(row.get("checked_in_at")),
+                "workout_name": row.get("workout_name"),
+                "status": row.get("status"),
+                "approved_at": _iso_value(row.get("approved_at")),
+            }
+            for row in sessions
+        ],
+    })
+
+
+def _checkin_exception_response(exc):
+    if isinstance(exc, PrivateTrainingValidationError):
+        return _checkin_json_error("validation_error", "Please enter a valid workout name.", 400)
+    if isinstance(exc, PrivateTrainingPendingSessionConflictError):
+        return _checkin_json_error("pending_session_exists", str(exc), 409)
+    if isinstance(exc, PrivateTrainingCancelledError):
+        return _checkin_json_error("cancelled_subscription", str(exc), 409)
+    if isinstance(exc, PrivateTrainingExpiredError):
+        return _checkin_json_error("expired_subscription", str(exc), 409)
+    if isinstance(exc, PrivateTrainingCompletedError):
+        return _checkin_json_error("no_remaining_sessions", str(exc), 409)
+    if isinstance(exc, PrivateTrainingNotFoundError):
+        return _checkin_json_error("subscription_not_found", str(exc), 404)
+    if isinstance(exc, PrivateTrainingForbiddenError):
+        return _checkin_json_error("forbidden", str(exc), 403)
+    if isinstance(exc, PrivateTrainingConflictError):
+        return _checkin_json_error("inactive_subscription", str(exc), 409)
+    return None
+
+
+def _json_login_redirect_boundary(view):
+    """Convert only login redirects to JSON; preserve all normal redirects."""
+    from functools import wraps
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        response = view(*args, **kwargs)
+        if _checkin_wants_json() and getattr(response, "status_code", None) in {301, 302, 303, 307, 308}:
+            location = response.headers.get("Location", "")
+            if location.endswith("/login") or "/login?" in location:
+                return _checkin_json_error("unauthorized", "Your session has expired. Please log in again.", 401)
+        return response
+
+    return wrapped
 
 
 def _common_context():
@@ -589,6 +677,7 @@ def cancel_subscription(subscription_id: int):
 
 
 @private_training_bp.route("/subscriptions/<int:subscription_id>/check-in", methods=["POST"])
+@_json_login_redirect_boundary
 @login_required
 def check_in_subscription(subscription_id: int):
     current_user, response = _current_user_or_redirect()
@@ -597,19 +686,46 @@ def check_in_subscription(subscription_id: int):
     workout_name = request.form.get("workout_name")
     try:
         result = create_private_training_session_checkin(current_user, subscription_id, workout_name)
+        if _checkin_wants_json():
+            subscription = get_private_training_subscription(subscription_id)
+            return _checkin_json_success(current_user, subscription, result)
         flash("Private training session check-in created successfully.", "success")
         return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
     except PrivateTrainingPendingSessionConflictError as exc:
+        if _checkin_wants_json():
+            return _checkin_exception_response(exc)
         flash(str(exc), "error")
         return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
     except (PrivateTrainingCancelledError, PrivateTrainingCompletedError, PrivateTrainingExpiredError, PrivateTrainingConflictError) as exc:
+        if _checkin_wants_json():
+            return _checkin_exception_response(exc)
         flash(str(exc), "error")
         return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
     except (PrivateTrainingForbiddenError, PrivateTrainingNotFoundError) as exc:
+        if _checkin_wants_json():
+            return _checkin_exception_response(exc)
         flash(str(exc), "error")
         if can_train_private_training(current_user):
             return redirect(url_for("private_training.my_clients"))
         return redirect(url_for("private_training.subscription_list"))
     except PrivateTrainingError as exc:
+        if _checkin_wants_json():
+            return _checkin_exception_response(exc)
         flash(str(exc), "error")
         return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        if _checkin_wants_json():
+            return _checkin_json_error(
+                "temporary_database_error",
+                "The result could not be confirmed. Check Session History before trying again.",
+                503,
+            )
+        raise
+    except psycopg2.Error:
+        if _checkin_wants_json():
+            return _checkin_json_error(
+                "temporary_database_error",
+                "The result could not be confirmed. Check Session History before trying again.",
+                503,
+            )
+        raise

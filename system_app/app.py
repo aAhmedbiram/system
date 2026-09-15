@@ -484,6 +484,26 @@ def handle_exception(e):
 def handle_csrf_error(e):
     """Handle CSRF token errors"""
     print(f"CSRF Error: {e.description}")
+    wants_json = (
+        request.path.startswith('/private-training/subscriptions/')
+        and request.path.endswith('/check-in')
+        and (
+            request.headers.get('X-Requested-With', '').lower() == 'xmlhttprequest'
+            or request.accept_mimetypes['application/json'] > request.accept_mimetypes['text/html']
+        )
+    )
+    if wants_json:
+        if 'user_id' not in session:
+            return jsonify({
+                'ok': False,
+                'error': 'unauthorized',
+                'message': 'Your session has expired. Please log in again.',
+            }), 401
+        return jsonify({
+            'ok': False,
+            'error': 'csrf_failure',
+            'message': 'Your form has expired. Refresh and try again.',
+        }), 400
     if request and request.path.startswith('/private-training/member/'):
         flash('CSRF token missing or invalid. Please try again.', 'error')
         return render_template(

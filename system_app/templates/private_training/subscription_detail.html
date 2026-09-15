@@ -14,8 +14,9 @@
             background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
             color: #fff;
             min-height: 100vh;
+            overflow-x: hidden;
         }
-        .page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .page { max-width: 1400px; width: 100%; margin: 0 auto; padding: 24px; }
         .hero, .panel, .card {
             background: rgba(20, 20, 30, 0.88);
             border: 1px solid rgba(76, 175, 80, 0.25);
@@ -99,6 +100,8 @@
             background: rgba(0,0,0,0.25);
             color: #fff;
             min-width: 0;
+            min-height: 44px;
+            font-size: 16px;
         }
         .stack { display: grid; gap: 12px; }
         .table-wrap {
@@ -131,6 +134,15 @@
             th, td { padding: 9px 8px; font-size: 14px; }
             .meta { line-height: 1.6; }
             .token-box input { font-size: 14px; }
+        }
+        @media (max-width: 600px) {
+            .page { padding: 10px; }
+            .hero, .panel, .card { padding: 12px; border-radius: 12px; }
+            .actions { gap: 8px; }
+            .meta, .muted, .pill, td, th { overflow-wrap: anywhere; word-break: break-word; }
+            .table-wrap { max-width: 100%; margin-left: -2px; margin-right: -2px; }
+            .table-wrap table { min-width: 700px; }
+            .token-box input { min-height: 44px; font-size: 16px; }
         }
     </style>
 </head>
@@ -197,10 +209,10 @@
                     Start: {{ subscription.private_start_date }}<br>
                     Expiry: {{ subscription.private_expiry_date }}<br>
                     Total Sessions: {{ subscription.total_sessions }}<br>
-                    Approved Sessions: {{ subscription.approved_count or 0 }}<br>
-                    Remaining Sessions: {{ subscription.remaining_sessions or 0 }}<br>
-                    Pending Sessions: {{ subscription.pending_count or 0 }}<br>
-                    Effective Status: <span class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
+                    Approved Sessions: <span id="private-training-approved-count" data-private-training-counter="approved">{{ subscription.approved_count or 0 }}</span><br>
+                    Remaining Sessions: <span id="private-training-remaining-count" data-private-training-counter="remaining">{{ subscription.remaining_sessions or 0 }}</span><br>
+                    Pending Sessions: <span id="private-training-pending-count" data-private-training-counter="pending">{{ subscription.pending_count or 0 }}</span><br>
+                    Effective Status: <span id="private-training-effective-status" data-private-training-status class="pill {% if subscription.effective_status == 'ACTIVE' %}ok{% elif subscription.effective_status == 'ASSIGNED' %}warn{% else %}bad{% endif %}">{{ subscription.effective_status }}</span>
                 </div>
             </div>
         </div>
@@ -218,8 +230,11 @@
                     <div class="pill {% if can_check_in %}ok{% else %}warn{% endif %}">{{ check_in_status_message }}</div>
                 {% endif %}
 
+                <div id="private-training-checkin-message" class="muted" role="status" aria-live="polite"></div>
+                <div id="private-training-checkin-error" class="flash-message error" role="alert" aria-live="assertive" hidden></div>
+
                 {% if can_check_in %}
-                    <form class="workout-form" method="post" action="{{ url_for('private_training.check_in_subscription', subscription_id=subscription.id) }}">
+                    <form id="private-training-checkin-form" class="workout-form" method="post" action="{{ url_for('private_training.check_in_subscription', subscription_id=subscription.id) }}" data-private-training-checkin-ajax="true">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div>
                             <label for="workout_name">Workout Name</label>
@@ -228,12 +243,13 @@
                                 type="text"
                                 id="workout_name"
                                 name="workout_name"
+                                data-private-training-checkin-input="true"
                                 maxlength="255"
                                 placeholder="Chest, Back &amp; Biceps, Push Day, Rest Day"
                                 required
                             >
                         </div>
-                        <button class="btn btn-primary" type="submit">Check-In Session</button>
+                        <button id="private-training-checkin-submit" class="btn btn-primary" type="submit">Check-In Session</button>
                     </form>
                 {% endif %}
 
@@ -287,9 +303,9 @@
                             <th>Approved At</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="private-training-session-history-body">
                         {% for session_row in sessions %}
-                        <tr>
+                        <tr data-private-training-session-id="{{ session_row.id }}">
                             <td>{{ session_row.id }}</td>
                             <td>{{ session_row.trainer_display_name or session_row.trainer_username or subscription.trainer_display_name or subscription.trainer_username }}</td>
                             <td>{{ session_row.checked_in_at }}</td>
@@ -317,5 +333,6 @@
             navigator.clipboard.writeText(input.value);
         }
     </script>
+    <script src="{{ url_for('static', filename='js/private_training_subscription.js') }}" defer></script>
 </body>
 </html>
