@@ -2,12 +2,6 @@
 
 const CACHE_PREFIX = 'rival-pwa-';
 const CACHE_NAME = 'rival-pwa-static-v1';
-const ATTENDANCE_CACHE_PREFIX = 'rival-attendance-shell-';
-const ATTENDANCE_CACHE_NAME = 'rival-attendance-shell-v1';
-const ATTENDANCE_SHELL_URLS = [
-  '/static/attendance_offline.html',
-  '/static/js/attendance_offline.js',
-];
 const CACHEABLE_PATHS = new Set([
   '/manifest.webmanifest',
   '/static/icon-192.png',
@@ -29,14 +23,6 @@ function isCacheableStaticRequest(request) {
   return url.origin === self.location.origin && CACHEABLE_PATHS.has(url.pathname);
 }
 
-self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(ATTENDANCE_CACHE_NAME);
-    await cache.addAll(ATTENDANCE_SHELL_URLS);
-    await self.skipWaiting();
-  })());
-});
-
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
@@ -45,14 +31,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
-    const url = new URL(request.url);
-    if (url.origin === self.location.origin && url.pathname === '/attendance_table') {
-      event.respondWith(fetch(request).catch(async () => {
-        const cache = await caches.open(ATTENDANCE_CACHE_NAME);
-        return cache.match('/static/attendance_offline.html');
-      }));
-      return;
-    }
     event.respondWith(fetch(request));
     return;
   }
@@ -79,13 +57,10 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-        .filter((cacheName) => (
-          (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) ||
-          (cacheName.startsWith(ATTENDANCE_CACHE_PREFIX) && cacheName !== ATTENDANCE_CACHE_NAME)
-        ))
+    const cacheNames = await caches.keys();
+    await Promise.all(
+      cacheNames
+        .filter((cacheName) => cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME)
         .map((cacheName) => caches.delete(cacheName))
     );
     await self.clients.claim();
