@@ -362,6 +362,13 @@
         <h1>Rival Gym System - Attendance Table</h1>
     </header>
 
+    {% if offline_enabled %}
+    <div id="attendance-offline-status" hidden role="status" aria-live="polite">
+        <strong>Offline Mode</strong>
+        <span id="attendance-offline-status-text"></span>
+    </div>
+    {% endif %}
+
     <!-- Add form - input centered in the text -->
     <div class="add-id-form-container">
         <form action="{{ url_for('attendance_table') }}" method="post">
@@ -465,6 +472,18 @@
             <button type="submit" class="home-btn" style="background: #c62828; margin-left: 10px;">Logout</button>
         </form>
     </div>
+
+    {% if offline_enabled %}
+    <script>
+        window.ATTENDANCE_OFFLINE_CONFIG = {
+            scope: {{ offline_scope|tojson }},
+            snapshotUrl: {{ url_for('attendance_offline_snapshot')|tojson }},
+            syncUrl: {{ url_for('attendance_offline_sync')|tojson }},
+            reachabilityUrl: {{ url_for('attendance_table')|tojson }}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/attendance_offline.js') }}" defer></script>
+    {% endif %}
 
     <!-- Auto scroll + focus -->
     <script>

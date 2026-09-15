@@ -8,7 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2 import IntegrityError, OperationalError, InterfaceError
 from psycopg2 import pool
-from datetime import date
+from datetime import date, datetime
 from .func import get_cairo_date
 import threading
 
@@ -900,6 +900,313 @@ def add_attendance(member_id, name, end_date, membership_status):
     except Exception as e:
         print("Error in add_attendance:", e)
         raise e
+
+
+def record_attendance_transaction(
+    member_id, *, reject_inactive_membership=False,
+    business_date=None, attendance_at=None,
+    connection=None, cursor=None, commit=True,
+):
+    """Record one attendance row under the member/Cairo-date advisory lock.
+
+    This is the single write path shared by the legacy online form and offline
+    synchronization.  The online form historically allowed an expired member
+    row to be recorded, so that behavior remains the default; offline sync can
+    opt into the existing membership validation policy explicitly.
+    """
+    from .func import get_cairo_now
+    import pytz
+
+    cairo_tz = pytz.timezone('Africa/Cairo')
+    if attendance_at is None:
+        now = get_cairo_now()
+    else:
+        if attendance_at.tzinfo is None:
+            raise ValueError('attendance_at must be timezone-aware')
+        now = attendance_at.astimezone(cairo_tz)
+    if business_date is None:
+        business_date = now.date()
+    if not isinstance(business_date, date) or isinstance(business_date, datetime):
+        raise ValueError('business_date must be a date')
+    if now.date() != business_date:
+        raise ValueError('attendance_at and business_date disagree')
+    owns_connection = connection is None
+    connection_pool = get_connection_pool() if owns_connection else None
+    conn = connection
+    pooled_connection = False
+    broken_connection = False
+
+    try:
+        if owns_connection and connection_pool is not None:
+            try:
+                conn = connection_pool.getconn()
+                pooled_connection = True
+            except Exception:
+                conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+        elif owns_connection:
+            conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+
+        if cursor is None:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            'SELECT pg_advisory_xact_lock(%s, hashtext(%s))',
+            (int(member_id), business_date.isoformat()),
+        )
+        cursor.execute(
+            '''
+            SELECT id, name, end_date, membership_status
+            FROM members
+            WHERE id = %s
+            FOR SHARE
+            ''',
+            (member_id,),
+        )
+        member = cursor.fetchone()
+        if not member:
+            if commit:
+                conn.commit()
+            return {'result_code': 'invalid_member', 'member_id': member_id}
+
+        if reject_inactive_membership:
+            status = str(member.get('membership_status') or '').strip().upper()
+            end_date_text = str(member.get('end_date') or '').strip()[:10]
+            parsed_end_date = None
+            for date_format in (
+                '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y',
+                '%m-%d-%Y', '%d-%m-%Y', '%Y/%m/%d',
+            ):
+                try:
+                    parsed_end_date = datetime.strptime(end_date_text, date_format).date()
+                    break
+                except ValueError:
+                    continue
+            if status in {'EX', 'EXPIRED', 'INACTIVE'} or (
+                parsed_end_date and parsed_end_date < business_date
+            ):
+                if commit:
+                    conn.commit()
+                return {
+                    'result_code': 'inactive_membership',
+                    'member_id': member_id,
+                    'name': member['name'],
+                }
+
+        cursor.execute(
+            '''
+            SELECT 1
+            FROM attendance
+            WHERE member_id = %s AND attendance_date = %s
+            LIMIT 1
+            ''',
+            (member_id, business_date.isoformat()),
+        )
+        if cursor.fetchone():
+            if commit:
+                conn.commit()
+            return {
+                'result_code': 'duplicate_attendance',
+                'member_id': member_id,
+                'name': member['name'],
+            }
+
+        cursor.execute(
+            '''
+            INSERT INTO attendance
+                (member_id, name, end_date, membership_status,
+                 attendance_time, attendance_date, day)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING num, attendance_time, attendance_date, day
+            ''',
+            (
+                member['id'], member['name'], member['end_date'],
+                member['membership_status'], now.strftime('%H:%M:%S'),
+                business_date.isoformat(), now.strftime('%A'),
+            ),
+        )
+        inserted = cursor.fetchone()
+        if commit:
+            conn.commit()
+        return {
+            'result_code': 'synced',
+            'member_id': member_id,
+            'name': member['name'],
+            'attendance': dict(inserted or {}),
+        }
+    except (OperationalError, InterfaceError):
+        broken_connection = True
+        if owns_connection:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        raise
+    except Exception:
+        if owns_connection:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        raise
+    finally:
+        if cursor and owns_connection:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn and owns_connection:
+            if pooled_connection:
+                try:
+                    connection_pool.putconn(conn, close=broken_connection)
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            else:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+
+def process_offline_attendance_operations(operations, user_id, username):
+    """Process a validated batch atomically with durable idempotency."""
+    connection_pool = get_connection_pool()
+    conn = None
+    cursor = None
+    pooled_connection = False
+    broken_connection = False
+
+    try:
+        if connection_pool is not None:
+            try:
+                conn = connection_pool.getconn()
+                pooled_connection = True
+            except Exception:
+                conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+        else:
+            conn = psycopg2.connect(get_database_url(), **_CONNECTION_OPTIONS)
+
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        results = []
+        batch_results = {}
+        for operation in operations:
+            operation_id = operation['client_operation_id']
+            if operation_id in batch_results:
+                replay = dict(batch_results[operation_id])
+                replay['replayed'] = True
+                results.append(replay)
+                continue
+            cursor.execute(
+                '''
+                INSERT INTO offline_attendance_operations
+                    (client_operation_id, member_id, user_id, username,
+                     server_business_date, status, result_code, created_at)
+                VALUES (%s, %s, %s, %s, %s, 'processed', 'processing', CURRENT_TIMESTAMP)
+                ON CONFLICT (client_operation_id) DO NOTHING
+                RETURNING client_operation_id
+                ''',
+                (
+                    operation_id, operation['member_id'], user_id, username,
+                    operation['server_business_date'],
+                ),
+            )
+            inserted = cursor.fetchone()
+            if not inserted:
+                cursor.execute(
+                    '''
+                    SELECT user_id, status, result_code
+                    FROM offline_attendance_operations
+                    WHERE client_operation_id = %s
+                    FOR SHARE
+                    ''',
+                    (operation_id,),
+                )
+                previous = cursor.fetchone()
+                if not previous or previous['user_id'] != user_id:
+                    result = {
+                        'client_operation_id': operation_id,
+                        'result_code': 'unauthorized',
+                    }
+                    results.append(result)
+                    batch_results[operation_id] = result
+                elif previous['status'] == 'processed':
+                    result = {
+                        'client_operation_id': operation_id,
+                        'result_code': previous['result_code'],
+                        'replayed': True,
+                    }
+                    results.append(result)
+                    batch_results[operation_id] = result
+                else:
+                    result = {
+                        'client_operation_id': operation_id,
+                        'result_code': 'temporary_error',
+                    }
+                    results.append(result)
+                    batch_results[operation_id] = result
+                continue
+
+            attendance_result = record_attendance_transaction(
+                operation['member_id'],
+                reject_inactive_membership=False,
+                business_date=operation['server_business_date'],
+                attendance_at=operation['attendance_at'],
+                connection=conn,
+                cursor=cursor,
+                commit=False,
+            )
+            result_code = attendance_result['result_code']
+            cursor.execute(
+                '''
+                UPDATE offline_attendance_operations
+                SET status = 'processed', result_code = %s, synced_at = CURRENT_TIMESTAMP
+                WHERE client_operation_id = %s AND user_id = %s
+                ''',
+                (result_code, operation_id, user_id),
+            )
+            result = {
+                'client_operation_id': operation_id,
+                'result_code': result_code,
+            }
+            results.append(result)
+            batch_results[operation_id] = result
+
+        conn.commit()
+        return results
+    except (OperationalError, InterfaceError):
+        broken_connection = True
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            if pooled_connection:
+                try:
+                    connection_pool.putconn(conn, close=broken_connection)
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            else:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 
 

@@ -17,6 +17,9 @@ from email_validator import validate_email, EmailNotValidError
 import re
 import secrets
 import uuid
+import hashlib
+import hmac
+import pytz
 import logging
 from logging.handlers import RotatingFileHandler
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -36,6 +39,12 @@ if not secret_key:
     secret_key = secrets.token_hex(32)
     print("WARNING: SECRET_KEY not set. Generated a temporary key for non-production.")
 app.secret_key = secret_key
+
+app.config['ATTENDANCE_OFFLINE_ENABLED'] = (
+    os.environ.get('ATTENDANCE_OFFLINE_ENABLED', '').strip().lower()
+    in {'1', 'true', 'yes', 'on'}
+)
+app.config['ATTENDANCE_OFFLINE_SCOPE_VERSION'] = 'v1'
 
 # Enable CSRF protection
 csrf = CSRFProtect(app)
@@ -149,6 +158,9 @@ def set_security_headers(response):
         response.headers['Pragma'] = 'no-cache'
         response.headers['X-Robots-Tag'] = 'noindex, nofollow'
         response.headers['Referrer-Policy'] = 'no-referrer'
+    if request and request.path.startswith('/api/attendance/offline-'):
+        response.headers['Cache-Control'] = 'no-store, private'
+        response.headers['Pragma'] = 'no-cache'
     return response
 
 
@@ -503,7 +515,8 @@ from .queries import (
     add_staff_purchase, get_staff_purchases, get_staff_statistics,
     log_renewal, get_renewal_logs, get_daily_totals, get_monthly_total,
     create_invoice, get_invoice, get_invoice_by_number, get_all_invoices,
-    get_attendance_backup_runs
+    get_attendance_backup_runs, record_attendance_transaction,
+    process_offline_attendance_operations,
 )
 from .queries import delete_all_data as delete_all_data_from_db
 from .private_training import ensure_private_training_tables
@@ -3315,6 +3328,216 @@ def change_password():
     return render_template('change_password.html')
 
 
+def _offline_feature_disabled_response():
+    response = jsonify({
+        'error': 'offline_feature_disabled',
+        'message': 'Offline attendance is not enabled.',
+    })
+    response.status_code = 503
+    response.headers['Cache-Control'] = 'no-store, private'
+    return response
+
+
+def _attendance_api_permission_required(f):
+    """JSON authentication/permission boundary for attendance APIs."""
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if not app.config['ATTENDANCE_OFFLINE_ENABLED']:
+            return _offline_feature_disabled_response()
+        if 'user_id' not in session:
+            response = jsonify({'error': 'unauthorized'})
+            response.status_code = 401
+            response.headers['Cache-Control'] = 'no-store, private'
+            return response
+        try:
+            user = get_current_user()
+        except CurrentUserLookupError:
+            response = jsonify({'error': 'authentication_temporarily_unavailable'})
+            response.status_code = 503
+            response.headers['Cache-Control'] = 'no-store, private'
+            return response
+        if not user:
+            response = jsonify({'error': 'unauthorized'})
+            response.status_code = 401
+            response.headers['Cache-Control'] = 'no-store, private'
+            return response
+        permissions = user.get('permissions') or {}
+        if not (
+            user.get('username') == 'rino'
+            or permissions.get('super_admin')
+            or permissions.get('attendance')
+        ):
+            response = jsonify({'error': 'forbidden'})
+            response.status_code = 403
+            response.headers['Cache-Control'] = 'no-store, private'
+            return response
+        return f(*args, **kwargs)
+    return wrapped
+
+
+def _attendance_offline_scope(user_id):
+    value = (
+        f"attendance:{app.config['ATTENDANCE_OFFLINE_SCOPE_VERSION']}:{int(user_id)}"
+    ).encode('utf-8')
+    key = app.secret_key.encode('utf-8') if isinstance(app.secret_key, str) else app.secret_key
+    return hmac.new(key, value, hashlib.sha256).hexdigest()
+
+
+@app.route('/api/attendance/offline-snapshot', methods=['GET'])
+@_attendance_api_permission_required
+def attendance_offline_snapshot():
+    if not app.config['ATTENDANCE_OFFLINE_ENABLED']:
+        return _offline_feature_disabled_response()
+    try:
+        user = get_current_user()
+        rows = query_db('''
+            SELECT a.num, a.member_id, a.name,
+                   COALESCE(m.end_date, a.end_date) AS end_date,
+                   COALESCE(m.membership_status, a.membership_status) AS membership_status,
+                   a.attendance_time, a.attendance_date, a.day, m.comment
+            FROM attendance a
+            LEFT JOIN members m ON a.member_id = m.id
+            ORDER BY a.num ASC
+        ''') or []
+        members = query_db('''
+            SELECT id AS member_id, name, membership_status, end_date
+            FROM members
+            ORDER BY id ASC
+        ''') or []
+        response = jsonify({
+            'scope': _attendance_offline_scope(user['id']),
+            'members': [
+                {
+                    'member_id': member['member_id'],
+                    'name': member['name'],
+                    'membership_status': member.get('membership_status'),
+                    'end_date': member.get('end_date'),
+                }
+                for member in members
+            ],
+            'attendance_rows': [
+                {
+                    key: row.get(key)
+                    for key in (
+                        'num', 'member_id', 'name', 'end_date',
+                        'membership_status', 'attendance_time',
+                        'attendance_date', 'day', 'comment',
+                    )
+                }
+                for row in rows
+            ],
+            'business_date': get_cairo_date().isoformat(),
+            'snapshot_timestamp': get_cairo_now().isoformat(),
+        })
+        response.headers['Cache-Control'] = 'no-store, private'
+        response.headers['Pragma'] = 'no-cache'
+        return response
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        app.logger.warning('attendance_snapshot_database_failure', exc_info=True)
+        response = jsonify({'error': 'temporary_error'})
+        response.status_code = 503
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    except Exception:
+        app.logger.warning('attendance_snapshot_failure', exc_info=True)
+        response = jsonify({'error': 'temporary_error'})
+        response.status_code = 503
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+
+
+def _offline_validation_result(operation_id):
+    return {'client_operation_id': operation_id, 'result_code': 'validation_error'}
+
+
+@app.route('/api/attendance/offline-sync', methods=['POST'])
+@csrf.exempt
+@_attendance_api_permission_required
+def attendance_offline_sync():
+    if not app.config['ATTENDANCE_OFFLINE_ENABLED']:
+        return _offline_feature_disabled_response()
+    try:
+        csrf.protect()
+    except CSRFError:
+        response = jsonify({'error': 'csrf_failure'})
+        response.status_code = 403
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    if request.content_length and request.content_length > 256 * 1024:
+        return jsonify({'error': 'request_too_large'}), 413
+    if not request.is_json or request.mimetype != 'application/json':
+        return jsonify({'error': 'json_required'}), 415
+
+    payload = request.get_json(silent=True)
+    operations_payload = payload.get('operations') if isinstance(payload, dict) else None
+    if not isinstance(operations_payload, list) or not operations_payload:
+        return jsonify({'error': 'validation_error', 'results': []}), 400
+    if len(operations_payload) > 50:
+        return jsonify({'error': 'batch_too_large'}), 413
+
+    now = get_cairo_now()
+    server_date = get_cairo_date()
+    normalized = []
+    immediate_results = []
+    for raw in operations_payload:
+        operation_id = raw.get('client_operation_id') if isinstance(raw, dict) else None
+        try:
+            canonical_id = str(uuid.UUID(operation_id))
+            member_id = raw.get('member_id')
+            if isinstance(member_id, bool) or not isinstance(member_id, int) or member_id <= 0:
+                raise ValueError
+            captured = datetime.fromisoformat(str(raw.get('captured_at_device')).replace('Z', '+00:00'))
+            if captured.tzinfo is None:
+                raise ValueError
+            # Use the named Cairo zone, rather than the current request's fixed
+            # offset.  A queued operation may have been captured under a
+            # different Cairo DST offset than the sync request.
+            captured_cairo = captured.astimezone(pytz.timezone('Africa/Cairo'))
+            captured_date = captured_cairo.date()
+            requested_date = datetime.strptime(str(raw.get('attendance_date')), '%Y-%m-%d').date()
+            if requested_date != captured_date:
+                raise ValueError
+            if (
+                captured_date < server_date - timedelta(days=2)
+                or captured_date > server_date + timedelta(days=1)
+                or captured > now + timedelta(minutes=10)
+            ):
+                raise ValueError
+            normalized.append({
+                'client_operation_id': canonical_id,
+                'member_id': member_id,
+                'server_business_date': captured_date,
+                'attendance_at': captured_cairo,
+            })
+        except (TypeError, ValueError, OverflowError):
+            immediate_results.append(_offline_validation_result(operation_id))
+
+    try:
+        user = get_current_user()
+        results = process_offline_attendance_operations(
+            normalized, user['id'], user['username']
+        ) if normalized else []
+        response = jsonify({'results': immediate_results + results})
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    except psycopg2.errors.UndefinedTable:
+        response = jsonify({'error': 'offline_feature_unavailable', 'results': immediate_results})
+        response.status_code = 503
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        response = jsonify({'error': 'temporary_error', 'results': immediate_results})
+        response.status_code = 503
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    except Exception:
+        app.logger.warning('attendance_sync_failure', exc_info=True)
+        response = jsonify({'error': 'temporary_error', 'results': immediate_results})
+        response.status_code = 503
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+
+
 @app.route('/attendance_table', methods=['GET', 'POST'])
 @login_required
 def attendance_table():
@@ -3350,52 +3573,25 @@ def attendance_table():
         else:
             member_id = int(member_id_str)
             try:
-                member = query_db(
-                    "SELECT name, end_date, membership_status FROM members WHERE id = %s", 
-                    (member_id,), one=True
-                )
-
-                if not member:
+                result = record_attendance_transaction(member_id)
+                if result['result_code'] == 'invalid_member':
                     flash(f"Member ID {member_id} not found!", "error")
+                elif result['result_code'] == 'duplicate_attendance':
+                    flash(f"{result['name']} already came today!", "success")
                 else:
-                    # Try to record attendance within try-except
-                    try:
-                        # Make sure the member hasn't already been recorded today
-                        today = get_cairo_date().strftime("%Y-%m-%d")
-                        already = query_db(
-                            "SELECT 1 FROM attendance WHERE member_id = %s AND attendance_date = %s", 
-                            (member_id, today), one=True
+                    username = session.get('username', 'Unknown')
+                    attendance_record = result.get('attendance') or {}
+                    if attendance_record:
+                        log_action(
+                            'add_attendance', member_id=member_id,
+                            member_name=result['name'],
+                            action_data={
+                                'attendance_num': attendance_record.get('num'),
+                                'attendance_date': attendance_record.get('attendance_date'),
+                                'attendance_time': attendance_record.get('attendance_time'),
+                            }, performed_by=username,
                         )
-
-                        if already:
-                            flash(f"{member['name']} already came today!", "success")
-                        else:
-                            # Log attendance addition for undo (before adding)
-                            username = session.get('username', 'Unknown')
-                            
-                            # Add attendance
-                            add_attendance(
-                                member_id,
-                                member['name'],
-                                member['end_date'],
-                                member['membership_status']
-                            )
-                            
-                            # Get the attendance record that was just added
-                            attendance_record = query_db(
-                                'SELECT * FROM attendance WHERE member_id = %s AND attendance_date = %s ORDER BY num DESC LIMIT 1',
-                                (member_id, today), one=True
-                            )
-                            if attendance_record:
-                                log_action('add_attendance', member_id=member_id, member_name=member['name'],
-                                          action_data={'attendance_num': attendance_record.get('num'),
-                                                      'attendance_date': attendance_record.get('attendance_date'),
-                                                      'attendance_time': attendance_record.get('attendance_time')},
-                                          performed_by=username)
-                            flash(f"Attendance for {member['name']} recorded successfully!", "success")
-                    except Exception as e:
-                        print("Error adding attendance:", e)
-                        flash(f"Error recording attendance: {str(e)}", "error")
+                    flash(f"Attendance for {result['name']} recorded successfully!", "success")
             except Exception as e:
                 print(f"Error querying member in attendance_table: {e}")
                 import traceback
@@ -3433,13 +3629,19 @@ def attendance_table():
             return render_template("attendance_table.html", 
                                 members_data=data or [],
                                 user_permissions=user_permissions,
-                                today=today)
+                                today=today,
+                                offline_enabled=app.config['ATTENDANCE_OFFLINE_ENABLED'],
+                                offline_scope=_attendance_offline_scope(session['user_id']))
         except Exception as e:
             print(f"Error loading attendance data: {e}")
             import traceback
             traceback.print_exc()
             flash(f"Error loading attendance: {str(e)}", "error")
-            return render_template("attendance_table.html", members_data=[], user_permissions={})
+            return render_template(
+                "attendance_table.html", members_data=[], user_permissions={},
+                offline_enabled=app.config['ATTENDANCE_OFFLINE_ENABLED'],
+                offline_scope=_attendance_offline_scope(session['user_id']),
+            )
 
     # This part handles the GET request (default view)
     try:
@@ -3468,10 +3670,16 @@ def attendance_table():
         return render_template("attendance_table.html", 
                             members_data=data or [], 
                             user_permissions=user_permissions,
-                            today=today)
+                            today=today,
+                            offline_enabled=app.config['ATTENDANCE_OFFLINE_ENABLED'],
+                            offline_scope=_attendance_offline_scope(session['user_id']))
     except Exception as e:
         print(f"Error in attendance_table GET: {e}")
-        return render_template("attendance_table.html", members_data=[], user_permissions={})
+        return render_template(
+            "attendance_table.html", members_data=[], user_permissions={},
+            offline_enabled=app.config['ATTENDANCE_OFFLINE_ENABLED'],
+            offline_scope=_attendance_offline_scope(session['user_id']),
+        )
 
 @app.route('/delete_attendance_data', methods=['POST'])
 @login_required
