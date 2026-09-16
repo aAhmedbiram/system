@@ -129,7 +129,12 @@ def _whatsapp_message(subscription, session, portal_url):
     trainer_name = clean(
         subscription.get("trainer_display_name") or subscription.get("trainer_username")
     )
-    trainer_line = f"\nالمدرب: {trainer_name}" if trainer_name else ""
+    if trainer_name:
+        if trainer_name.casefold().startswith("c."):
+            trainer_name = trainer_name[2:].strip()
+        trainer_line = f"\nالمدرب: \u200eC. {trainer_name}"
+    else:
+        trainer_line = ""
     return (
         f"مرحبًا {clean(subscription.get('client_name'))} 👋\n\n"
         "تم تسجيل جلسة الـ Private Training الخاصة بك.\n"

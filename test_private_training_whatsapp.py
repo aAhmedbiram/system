@@ -59,8 +59,18 @@ class WhatsAppMessageTests(unittest.TestCase):
             {"workout_name": "Leg Day", "trainer_display_name": "Rino"},
             "https://example.test/portal",
         )
-        self.assertIn("المدرب: Hossam", message)
+        self.assertIn("المدرب: \u200eC. Hossam", message)
+        self.assertNotIn("المدرب: \u200eC. Rino", message)
         self.assertNotIn("المدرب: Rino", message)
+
+    def test_existing_class_prefix_is_not_duplicated(self):
+        message = _whatsapp_message(
+            {"client_name": "Member", "trainer_display_name": "C. Hossam"},
+            {"workout_name": "Leg Day", "trainer_display_name": "Rino"},
+            "https://example.test/portal",
+        )
+        self.assertIn("المدرب: \u200eC. Hossam", message)
+        self.assertNotIn("C. C.", message)
 
     def test_missing_assigned_trainer_omits_the_line(self):
         message = _whatsapp_message(
