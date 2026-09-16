@@ -14,9 +14,8 @@
             background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
             color: #fff;
             min-height: 100vh;
-            overflow-x: hidden;
         }
-        .page { max-width: 1400px; width: 100%; margin: 0 auto; padding: 24px; }
+        .page { max-width: 1400px; width: 100%; min-width: 0; margin: 0 auto; padding: 24px; }
         .hero, .panel, .card {
             background: rgba(20, 20, 30, 0.88);
             border: 1px solid rgba(76, 175, 80, 0.25);
@@ -31,6 +30,7 @@
         .muted { color: #aeb4c5; }
         .meta { color: #cfe8d1; line-height: 1.7; }
         .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; align-items: stretch; }
+        .actions > *, .grid > *, .stack > * { min-width: 0; }
         .btn {
             display: inline-flex;
             align-items: center;
@@ -234,7 +234,7 @@
                 <div id="private-training-checkin-error" class="flash-message error" role="alert" aria-live="assertive" hidden></div>
 
                 {% if can_check_in %}
-                    <form id="private-training-checkin-form" class="workout-form" method="post" action="{{ url_for('private_training.check_in_subscription', subscription_id=subscription.id) }}" data-private-training-checkin-ajax="true">
+                    <form id="private-training-checkin-form" class="workout-form" method="post" action="{{ url_for('private_training.check_in_subscription', subscription_id=subscription.id) }}" data-private-training-checkin-ajax="true" data-private-training-whatsapp-enabled="{{ 'true' if private_training_whatsapp_checkin_enabled else 'false' }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div>
                             <label for="workout_name">Workout Name</label>
@@ -256,6 +256,9 @@
                 {% if not can_check_in and not pending_session and not check_in_status_message %}
                     <div class="muted">No check-in action is currently available.</div>
                 {% endif %}
+                <div id="private-training-whatsapp-fallback" class="flash-message success" role="status" hidden>
+                    <a id="private-training-whatsapp-link" class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="#">Open WhatsApp</a>
+                </div>
             </div>
         </div>
 

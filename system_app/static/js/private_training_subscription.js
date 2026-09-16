@@ -8,7 +8,20 @@
     const submitButton = form.querySelector('button[type="submit"]');
     const message = document.getElementById('private-training-checkin-message');
     const error = document.getElementById('private-training-checkin-error');
+    const fallback = document.getElementById('private-training-whatsapp-fallback');
+    const whatsappLink = document.getElementById('private-training-whatsapp-link');
+    const combinedEnabled = form.dataset.privateTrainingWhatsappEnabled === 'true';
     let inFlight = false;
+    let operationId = null;
+    let popup = null;
+
+    const definitiveErrors = new Set([
+        'validation_error', 'invalid_operation_id', 'missing_phone', 'invalid_phone',
+        'unauthorized', 'forbidden', 'subscription_not_found',
+        'inactive_subscription', 'cancelled_subscription', 'expired_subscription',
+        'no_remaining_sessions', 'pending_session_exists', 'feature_unavailable',
+        'csrf_failure',
+    ]);
 
     function showMessage(text) {
         if (!message) return;
@@ -101,9 +114,29 @@
         }
     }
 
+    function showWhatsApp(url) {
+        if (!fallback || !whatsappLink || !url) return;
+        whatsappLink.href = String(url);
+        fallback.hidden = false;
+        if (popup && !popup.closed) {
+            try { popup.location.replace(String(url)); return; } catch (_) {}
+        }
+    }
+
+    function clearOperationIfDefinitive(payload, response) {
+        const code = payload && payload.error;
+        if (response && response.status >= 500) return;
+        if (definitiveErrors.has(code)) operationId = null;
+    }
+
     async function submitAsJson(event) {
         if (inFlight) {
             event.preventDefault();
+            return;
+        }
+        if (combinedEnabled && (!window.crypto || typeof window.crypto.randomUUID !== 'function')) {
+            event.preventDefault();
+            showError('WhatsApp invitations are unavailable in this browser.');
             return;
         }
         inFlight = true;
@@ -117,10 +150,17 @@
             submitButton.textContent = 'Saving…';
         }
         showError('');
+        if (combinedEnabled) {
+            if (!operationId) operationId = window.crypto.randomUUID();
+            try { popup = window.open('about:blank', '_blank', 'noopener,noreferrer'); } catch (_) { popup = null; }
+            if (popup) { try { popup.opener = null; } catch (_) {} }
+        }
         try {
+            const body = new FormData(form);
+            if (combinedEnabled) body.append('client_operation_id', operationId);
             const response = await fetch(form.action, {
                 method: (form.method || 'POST').toUpperCase(),
-                body: new FormData(form),
+                body,
                 credentials: 'same-origin',
                 headers: {
                     'Accept': 'application/json',
@@ -130,21 +170,27 @@
             const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
             if (response.status === 401 || response.url.endsWith('/login')) {
                 showError('Your session has expired. Please log in again before checking in.');
+                if (popup && !popup.closed) { try { popup.close(); } catch (_) {} }
                 return;
             }
             if (!contentType.includes('application/json')) {
                 showError('The server returned an unexpected response. Check Session History before trying again.');
+                if (popup && !popup.closed) { try { popup.close(); } catch (_) {} }
                 return;
             }
             const payload = await response.json();
             if (!response.ok || !payload || payload.ok !== true) {
                 showError(payload && payload.message ? String(payload.message) : 'Check-in could not be completed.');
+                clearOperationIfDefinitive(payload, response);
+                if (popup && !popup.closed) { try { popup.close(); } catch (_) {} }
                 return;
             }
             applySuccess(payload, scrollX, scrollY);
             if (input) input.value = '';
+            if (combinedEnabled) showWhatsApp(payload.whatsapp && payload.whatsapp.url);
         } catch (requestError) {
             showError('The result could not be confirmed. Check Session History before trying again.');
+            if (popup && !popup.closed) { try { popup.close(); } catch (_) {} }
         } finally {
             form.removeAttribute('aria-busy');
             if (submitButton) {

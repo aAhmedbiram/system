@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for, jsonify
 import psycopg2
 
 from system_app.crm.permissions import get_current_user, login_required
@@ -28,8 +28,11 @@ from .services import (
     PrivateTrainingPendingSessionConflictError,
     PrivateTrainingSubscriptionConflictError,
     PrivateTrainingValidationError,
+    PrivateTrainingFeatureUnavailableError,
+    PrivateTrainingPhoneError,
     create_private_training_subscription,
     create_private_training_session_checkin,
+    create_private_training_checkin_invitation,
     cancel_private_training_subscription,
     generate_portal_token,
     get_private_subscription_for_trainer,
@@ -95,6 +98,12 @@ def _checkin_json_success(current_user, subscription, session_row):
 
 
 def _checkin_exception_response(exc):
+    if isinstance(exc, PrivateTrainingFeatureUnavailableError):
+        return _checkin_json_error("feature_unavailable", "WhatsApp invitations are temporarily unavailable.", 503)
+    if isinstance(exc, PrivateTrainingPhoneError):
+        return _checkin_json_error(exc.error_code, str(exc), 422)
+    if getattr(exc, "error_code", None) == "invalid_operation_id":
+        return _checkin_json_error("invalid_operation_id", "The check-in operation id is invalid.", 400)
     if isinstance(exc, PrivateTrainingValidationError):
         return _checkin_json_error("validation_error", "Please enter a valid workout name.", 400)
     if isinstance(exc, PrivateTrainingPendingSessionConflictError):
@@ -112,6 +121,45 @@ def _checkin_exception_response(exc):
     if isinstance(exc, PrivateTrainingConflictError):
         return _checkin_json_error("inactive_subscription", str(exc), 409)
     return None
+
+
+def _whatsapp_message(subscription, session, portal_url):
+    def clean(value):
+        return " ".join(str(value or "").split())
+    return (
+        f"مرحبًا {clean(subscription.get('client_name'))} 👋\n\n"
+        "تم تسجيل جلسة الـ Private Training الخاصة بك.\n"
+        f"التمرين: {clean(session.get('workout_name'))}\n"
+        f"المدرب: {clean(session.get('trainer_display_name') or subscription.get('trainer_display_name'))}\n\n"
+        "برجاء فتح الرابط التالي ومراجعة الجلسة وتأكيدها:\n"
+        f"{portal_url}\n\nRival Gym 💪"
+    )
+
+
+def _checkin_invitation_json_success(result):
+    from urllib.parse import urlencode
+    subscription = result["subscription"]
+    session = result["session"]
+    portal_url = url_for("private_training_public.member_portal", raw_token=result["raw_token"], _external=True)
+    message = _whatsapp_message(subscription, session, portal_url)
+    whatsapp_url = "https://wa.me/{}?{}".format(result["phone"], urlencode({"text": message}))
+    return jsonify({
+        "ok": True, "message": "Session created and WhatsApp invitation prepared.",
+        "replayed": bool(result.get("replayed")),
+        "subscription": {
+            "approved_sessions": int(subscription.get("approved_count") or 0),
+            "remaining_sessions": int(subscription.get("remaining_sessions") or 0),
+            "pending_sessions": int(subscription.get("pending_count") or 0),
+            "effective_status": subscription.get("effective_status"),
+        },
+        "session": {
+            "id": session.get("id"), "trainer": session.get("trainer_display_name"),
+            "checked_in_at": _iso_value(session.get("checked_in_at")),
+            "workout_name": session.get("workout_name"), "status": session.get("status"),
+            "approved_at": _iso_value(session.get("approved_at")),
+        },
+        "whatsapp": {"url": whatsapp_url},
+    })
 
 
 def _json_login_redirect_boundary(view):
@@ -584,6 +632,7 @@ def subscription_detail(subscription_id: int):
         show_generate_result=False,
         check_in_status_message=_check_in_status_message(subscription),
         can_cancel_subscription=can_cancel_subscription,
+        private_training_whatsapp_checkin_enabled=bool(current_app.config.get("PRIVATE_TRAINING_WHATSAPP_CHECKIN_ENABLED")),
         **ownership_context,
     )
 
@@ -685,6 +734,13 @@ def check_in_subscription(subscription_id: int):
         return response
     workout_name = request.form.get("workout_name")
     try:
+        if current_app.config.get("PRIVATE_TRAINING_WHATSAPP_CHECKIN_ENABLED") and _checkin_wants_json():
+            result = create_private_training_checkin_invitation(
+                current_user, subscription_id, workout_name,
+                request.form.get("client_operation_id"),
+                current_app.config.get("PRIVATE_TRAINING_PORTAL_TOKEN_SIGNING_KEY", ""),
+            )
+            return _checkin_invitation_json_success(result)
         result = create_private_training_session_checkin(current_user, subscription_id, workout_name)
         if _checkin_wants_json():
             subscription = get_private_training_subscription(subscription_id)

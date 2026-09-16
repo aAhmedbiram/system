@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import base64
+import hmac
 import secrets
 import re
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -103,6 +106,14 @@ class PrivateTrainingAlreadyProcessedError(PrivateTrainingConflictError):
     error_code = "session_already_processed"
 
 
+class PrivateTrainingFeatureUnavailableError(PrivateTrainingError):
+    error_code = "feature_unavailable"
+
+
+class PrivateTrainingPhoneError(PrivateTrainingValidationError):
+    error_code = "invalid_phone"
+
+
 _PRIVATE_TRAINING_CLIENT_TYPES = ("MEMBER", "OUTCOMER")
 
 
@@ -190,6 +201,47 @@ def _normalize_client_phone(client_phone: Any, *, field_name: str = "client_phon
 def _normalize_phone_identity(client_phone: Any) -> str:
     phone_text = str(client_phone or "")
     return re.sub(r"\D+", "", phone_text)
+
+
+def normalize_whatsapp_phone(phone: Any) -> str:
+    """Return a conservative digits-only WhatsApp destination.
+
+    Egyptian local numbers are the only numbers accepted without an explicit
+    international prefix. Other countries must use + or 00 and a conservative
+    E.164 length. The stored business phone is never changed.
+    """
+    if phone is None:
+        raise PrivateTrainingPhoneError("A client WhatsApp number is required", "missing_phone")
+    raw = str(phone).strip()
+    if not raw:
+        raise PrivateTrainingPhoneError("A client WhatsApp number is required", "missing_phone")
+    compact = re.sub(r"[\s()\-]", "", raw)
+    if not compact or not re.fullmatch(r"(?:\+|00)?[0-9]+", compact):
+        raise PrivateTrainingPhoneError("The client phone is not a valid WhatsApp mobile number")
+
+    explicit_international = compact.startswith("+") or compact.startswith("00")
+    if compact.startswith("+"):
+        digits = compact[1:]
+    elif compact.startswith("00"):
+        digits = compact[2:]
+    else:
+        digits = compact
+
+    if digits.startswith("01"):
+        if explicit_international:
+            raise PrivateTrainingPhoneError("The international phone format is invalid")
+        if not re.fullmatch(r"01[0125][0-9]{8}", digits):
+            raise PrivateTrainingPhoneError("The client phone is not a valid Egyptian mobile number")
+        return "20" + digits[1:]
+
+    if digits.startswith("20"):
+        if not re.fullmatch(r"201[0125][0-9]{8}", digits):
+            raise PrivateTrainingPhoneError("The client phone is not a valid Egyptian mobile number")
+        return digits
+
+    if not explicit_international or not (8 <= len(digits) <= 15) or digits.startswith("0"):
+        raise PrivateTrainingPhoneError("The client phone is not a valid international mobile number")
+    return digits
 
 
 def _current_cairo_date():
@@ -620,64 +672,190 @@ def _subscription_has_pending_session(cur, subscription_id: int) -> bool:
     return cur.fetchone() is not None
 
 
+def _create_checkin_locked(
+    cur, current_user: dict[str, Any], subscription_id_int: int,
+    normalized_workout_name: str, before_insert=None,
+):
+    subscription = lock_private_training_subscription(cur, subscription_id_int)
+    if not subscription:
+        raise PrivateTrainingNotFoundError("Subscription not found")
+    if not (is_super_user(current_user) or subscription.get("trainer_user_id") == current_user.get("id")):
+        raise PrivateTrainingForbiddenError("Current user cannot check in this subscription")
+
+    effective_status = get_subscription_effective_status(subscription)
+    if effective_status == "CANCELLED":
+        raise PrivateTrainingCancelledError("Subscription is cancelled")
+    if effective_status == "COMPLETED":
+        raise PrivateTrainingCompletedError("Subscription is completed")
+    if effective_status == "EXPIRED":
+        raise PrivateTrainingExpiredError("Subscription is expired")
+    if effective_status != "ACTIVE":
+        raise PrivateTrainingConflictError("Subscription is not active")
+    if int(subscription.get("approved_count") or 0) >= int(subscription.get("total_sessions") or 0):
+        raise PrivateTrainingCompletedError("Subscription has no remaining sessions")
+    if _subscription_has_pending_session(cur, subscription_id_int):
+        raise PrivateTrainingPendingSessionConflictError("A pending session already exists")
+    if before_insert is not None:
+        before_insert(subscription)
+
+    try:
+        cur.execute(
+            """
+            INSERT INTO private_training_sessions (
+                subscription_id, trainer_user_id, workout_name, status, checked_in_at
+            ) VALUES (%s, %s, %s, 'PENDING_MEMBER_APPROVAL', CURRENT_TIMESTAMP)
+            RETURNING id, subscription_id, trainer_user_id, checked_in_at, status,
+                      approved_at, rejected_at, rejection_reason, workout_name, created_at, updated_at
+            """,
+            (subscription_id_int, current_user["id"], normalized_workout_name),
+        )
+        session_row = cur.fetchone()
+    except IntegrityError as exc:
+        pgcode = getattr(exc, "pgcode", None)
+        constraint_name = getattr(getattr(exc, "diag", None), "constraint_name", None)
+        if pgcode == "23505" or constraint_name == "idx_private_training_sessions_one_pending_per_subscription":
+            raise PrivateTrainingPendingSessionConflictError("A pending session already exists") from exc
+        raise
+    return subscription, (dict(session_row) if session_row else None)
+
+
 def create_private_training_session_checkin(
-    current_user: dict[str, Any],
-    subscription_id: Any,
-    workout_name: Any,
+    current_user: dict[str, Any], subscription_id: Any, workout_name: Any,
 ) -> dict[str, Any]:
     _require_trainer_current_user(current_user)
     subscription_id_int = validate_positive_int(subscription_id, "subscription_id")
     normalized_workout_name = _normalize_workout_name(workout_name)
 
     def _create(cur):
-        subscription = lock_private_training_subscription(cur, subscription_id_int)
-        if not subscription:
-            raise PrivateTrainingNotFoundError("Subscription not found")
-        if not (is_super_user(current_user) or subscription.get("trainer_user_id") == current_user.get("id")):
-            raise PrivateTrainingForbiddenError("Current user cannot check in this subscription")
-
-        effective_status = get_subscription_effective_status(subscription)
-        if effective_status == "CANCELLED":
-            raise PrivateTrainingCancelledError("Subscription is cancelled")
-        if effective_status == "COMPLETED":
-            raise PrivateTrainingCompletedError("Subscription is completed")
-        if effective_status == "EXPIRED":
-            raise PrivateTrainingExpiredError("Subscription is expired")
-        if effective_status != "ACTIVE":
-            raise PrivateTrainingConflictError("Subscription is not active")
-
-        approved_count = int(subscription.get("approved_count") or 0)
-        if approved_count >= int(subscription.get("total_sessions") or 0):
-            raise PrivateTrainingCompletedError("Subscription has no remaining sessions")
-
-        if _subscription_has_pending_session(cur, subscription_id_int):
-            raise PrivateTrainingPendingSessionConflictError("A pending session already exists")
-
-        try:
-            cur.execute(
-                """
-                INSERT INTO private_training_sessions (
-                    subscription_id, trainer_user_id, workout_name, status, checked_in_at
-                ) VALUES (%s, %s, %s, 'PENDING_MEMBER_APPROVAL', CURRENT_TIMESTAMP)
-                RETURNING id, subscription_id, trainer_user_id, checked_in_at, status,
-                          approved_at, rejected_at, rejection_reason, workout_name, created_at, updated_at
-                """,
-                (subscription_id_int, current_user["id"], normalized_workout_name),
-            )
-            session_row = cur.fetchone()
-        except IntegrityError as exc:
-            pgcode = getattr(exc, "pgcode", None)
-            constraint_name = getattr(getattr(exc, "diag", None), "constraint_name", None)
-            if pgcode == "23505" or constraint_name == "idx_private_training_sessions_one_pending_per_subscription":
-                raise PrivateTrainingPendingSessionConflictError("A pending session already exists") from exc
-            raise
-
-        return dict(session_row) if session_row else None
+        _, session_row = _create_checkin_locked(cur, current_user, subscription_id_int, normalized_workout_name)
+        return session_row
 
     session_row = run_in_transaction(_create)
     if not session_row:
         raise PrivateTrainingError("Failed to create private training session")
     return session_row
+
+
+def _deterministic_portal_token(signing_key: str, operation_id: uuid.UUID, user_id: int, subscription_id: int, session_id: int) -> str:
+    if not signing_key or len(signing_key.encode("utf-8")) < 32:
+        raise PrivateTrainingFeatureUnavailableError("Portal invitation is not configured")
+    message = f"private-training-portal:v1:{user_id}:{subscription_id}:{session_id}:{operation_id}".encode("utf-8")
+    digest = hmac.new(signing_key.encode("utf-8"), message, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def create_private_training_checkin_invitation(
+    current_user: dict[str, Any], subscription_id: Any, workout_name: Any,
+    operation_id: Any, token_signing_key: str,
+) -> dict[str, Any]:
+    """Create a check-in and its session-bound invitation in one transaction."""
+    _require_trainer_current_user(current_user)
+    subscription_id_int = validate_positive_int(subscription_id, "subscription_id")
+    normalized_workout_name = _normalize_workout_name(workout_name)
+    try:
+        operation_uuid = uuid.UUID(str(operation_id))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise PrivateTrainingValidationError("Invalid operation id", "invalid_operation_id") from exc
+
+    # Phone validation is deliberately before the mutation transaction.
+    schema = query_db(
+        """
+        SELECT
+          to_regclass('public.private_training_checkin_operations') AS operation_table,
+          EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'private_training_portal_tokens'
+              AND column_name = 'session_id'
+          ) AS token_session_column
+        """,
+        one=True,
+    )
+    if not schema or not schema.get("operation_table") or not schema.get("token_session_column"):
+        raise PrivateTrainingFeatureUnavailableError("Invitation schema is not ready")
+    if not token_signing_key or len(token_signing_key.encode("utf-8")) < 32:
+        raise PrivateTrainingFeatureUnavailableError("Portal invitation is not configured")
+
+    def _create(cur):
+        cur.execute(
+            """
+            INSERT INTO private_training_checkin_operations
+                (client_operation_id, user_id, subscription_id, status)
+            VALUES (%s, %s, %s, 'PROCESSING')
+            ON CONFLICT (client_operation_id) DO NOTHING
+            """,
+            (str(operation_uuid), current_user["id"], subscription_id_int),
+        )
+        cur.execute(
+            """
+            SELECT * FROM private_training_checkin_operations
+            WHERE client_operation_id = %s FOR UPDATE
+            """, (str(operation_uuid),),
+        )
+        operation = cur.fetchone()
+        if not operation:
+            raise PrivateTrainingFeatureUnavailableError("Invitation operation is unavailable")
+        operation = dict(operation)
+        if operation["user_id"] != current_user["id"]:
+            raise PrivateTrainingForbiddenError("Operation does not belong to this user")
+        if int(operation["subscription_id"]) != subscription_id_int:
+            raise PrivateTrainingForbiddenError("Operation does not belong to this subscription")
+        if operation["status"] == "COMPLETED":
+            if not operation.get("session_id") or not operation.get("portal_token_id"):
+                raise PrivateTrainingFeatureUnavailableError("Invitation replay is unavailable")
+            cur.execute("SELECT * FROM private_training_sessions WHERE id = %s", (operation["session_id"],))
+            session = cur.fetchone()
+            cur.execute("SELECT * FROM private_training_portal_tokens WHERE id = %s AND revoked_at IS NULL", (operation["portal_token_id"],))
+            token = cur.fetchone()
+            if not session or not token or token.get("session_id") != operation["session_id"]:
+                raise PrivateTrainingFeatureUnavailableError("Invitation replay is unavailable")
+            raw_token = _deterministic_portal_token(token_signing_key, operation_uuid, current_user["id"], subscription_id_int, int(session["id"]))
+            if not hmac.compare_digest(str(token["token_hash"]).strip(), hashlib.sha256(raw_token.encode()).hexdigest()):
+                raise PrivateTrainingFeatureUnavailableError("Invitation replay is unavailable")
+            locked_subscription = lock_private_training_subscription(cur, subscription_id_int)
+            if not locked_subscription:
+                raise PrivateTrainingNotFoundError("Subscription not found")
+            whatsapp_phone = normalize_whatsapp_phone(locked_subscription.get("client_phone"))
+            session = dict(session)
+            session["trainer_display_name"] = locked_subscription.get("trainer_display_name") if locked_subscription else None
+            return {"subscription": locked_subscription, "session": session, "raw_token": raw_token, "phone": whatsapp_phone, "replayed": True}
+
+        phone_holder = {}
+        def validate_locked_phone(locked_subscription):
+            phone_holder["value"] = normalize_whatsapp_phone(locked_subscription.get("client_phone"))
+        subscription, session = _create_checkin_locked(
+            cur, current_user, subscription_id_int, normalized_workout_name,
+            before_insert=validate_locked_phone,
+        )
+        raw_token = _deterministic_portal_token(token_signing_key, operation_uuid, current_user["id"], subscription_id_int, int(session["id"]))
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        cur.execute("UPDATE private_training_portal_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE subscription_id = %s AND revoked_at IS NULL", (subscription_id_int,))
+        cur.execute(
+            """
+            INSERT INTO private_training_portal_tokens (subscription_id, session_id, token_hash, created_by_user_id)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, subscription_id, session_id, token_hash, created_by_user_id, created_at
+            """,
+            (subscription_id_int, session["id"], token_hash, current_user["id"]),
+        )
+        token = cur.fetchone()
+        if not token:
+            raise PrivateTrainingFeatureUnavailableError("Invitation could not be created")
+        cur.execute(
+            """
+            UPDATE private_training_checkin_operations
+            SET session_id = %s, portal_token_id = %s, status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP
+            WHERE client_operation_id = %s
+            """, (session["id"], token["id"], str(operation_uuid)),
+        )
+        subscription = lock_private_training_subscription(cur, subscription_id_int)
+        session["trainer_display_name"] = subscription.get("trainer_display_name") if subscription else None
+        return {"subscription": subscription, "session": session, "raw_token": raw_token, "phone": phone_holder["value"], "replayed": False}
+
+    result = run_in_transaction(_create)
+    if not result or not result.get("session"):
+        raise PrivateTrainingError("Failed to create private training invitation")
+    return result
 
 
 def approve_private_training_session(
@@ -702,6 +880,9 @@ def approve_private_training_session(
             raise PrivateTrainingNotFoundError("Session not found")
         if session_row.get("subscription_id") != subscription_id_int:
             raise PrivateTrainingForbiddenError("Session does not belong to this subscription")
+        bound_session_id = portal_authorization_context.get("session_id")
+        if bound_session_id is not None and validate_positive_int(bound_session_id, "portal_session_id") != session_id_int:
+            raise PrivateTrainingForbiddenError("Portal authorization does not match this session")
 
         if session_row.get("status") == "APPROVED":
             return {
@@ -966,6 +1147,7 @@ def resolve_portal_token(raw_token: str) -> dict[str, Any]:
 
     return {
         "token_hash": token_hash,
+        "session_id": token_row.get("session_id"),
         "subscription": subscription,
         "member": {
             "id": token_row.get("member_id"),

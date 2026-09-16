@@ -70,11 +70,17 @@ def _resolve_portal(raw_token: str):
 def _portal_context(raw_token: str, resolved: dict):
     subscription = resolved["subscription"]
     all_sessions = list_private_training_sessions(subscription["id"])
+    bound_session_id = resolved.get("session_id")
+    if bound_session_id is not None:
+        all_sessions = [session for session in all_sessions if session.get("id") == bound_session_id]
     sessions = [session for session in all_sessions if session.get("status") != "REJECTED"]
     pending_session = get_private_training_pending_session(subscription["id"])
+    if bound_session_id is not None and (not pending_session or pending_session.get("id") != bound_session_id):
+        pending_session = None
     return {
         "raw_token": raw_token,
         "subscription": subscription,
+        "session_id": resolved.get("session_id"),
         "pending_session": pending_session,
         "sessions": sessions,
         "portal_ended": False,
@@ -104,7 +110,7 @@ def member_portal_approve(raw_token: str, session_id: int):
         return response
 
     subscription = resolved["subscription"]
-    portal_context = {"subscription_id": subscription["id"]}
+    portal_context = {"subscription_id": subscription["id"], "session_id": resolved.get("session_id")}
 
     try:
         result = approve_private_training_session(subscription["id"], session_id, portal_context)

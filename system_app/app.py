@@ -45,6 +45,13 @@ app.config['ATTENDANCE_OFFLINE_ENABLED'] = (
     in {'1', 'true', 'yes', 'on'}
 )
 app.config['ATTENDANCE_OFFLINE_SCOPE_VERSION'] = 'v1'
+app.config['PRIVATE_TRAINING_WHATSAPP_CHECKIN_ENABLED'] = (
+    os.environ.get('PRIVATE_TRAINING_WHATSAPP_CHECKIN_ENABLED', '').strip().lower()
+    in {'1', 'true', 'yes', 'on'}
+)
+app.config['PRIVATE_TRAINING_PORTAL_TOKEN_SIGNING_KEY'] = os.environ.get(
+    'PRIVATE_TRAINING_PORTAL_TOKEN_SIGNING_KEY', ''
+).strip()
 
 # Enable CSRF protection
 csrf = CSRFProtect(app)

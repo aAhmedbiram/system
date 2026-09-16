@@ -21,6 +21,10 @@ class LocalPrivateTrainingServer:
         self.checkin_count = 0
         self.session_id = 25
         self.slow = False
+        self.whatsapp_enabled = False
+        self.ambiguous_once = False
+        self.operations = {}
+        self.received_operations = []
         self._configure_routes()
         self.server = make_server("127.0.0.1", 0, self.app)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -100,6 +104,7 @@ class LocalPrivateTrainingServer:
                 show_generate_result=False,
                 generated_portal_url=None,
                 sessions=self._sessions(),
+                private_training_whatsapp_checkin_enabled=self.whatsapp_enabled,
             )
 
         @self.app.route(
@@ -109,39 +114,48 @@ class LocalPrivateTrainingServer:
         )
         @self.csrf.exempt
         def check_in():
-            self.checkin_count += 1
+            operation_id = request.form.get("client_operation_id")
+            if operation_id:
+                self.received_operations.append(operation_id)
             workout = request.form.get("workout_name", "")
+            if self.slow:
+                time.sleep(0.5)
+            if self.whatsapp_enabled and operation_id in self.operations:
+                payload = dict(self.operations[operation_id])
+                payload["replayed"] = True
+                return jsonify(payload)
+            self.checkin_count += 1
             if workout == "bad":
                 return jsonify(
                     ok=False,
                     error="validation_error",
                     message="Please enter a valid workout name.",
                 ), 400
-            if self.slow:
-                time.sleep(0.5)
             self.session_id += 1
             session_row = {
-                "id": self.session_id,
-                "trainer": "Trainer One",
-                "checked_in_at": "2026-09-15T18:19:07+00:00",
-                "workout_name": workout,
-                "status": "PENDING_MEMBER_APPROVAL",
-                "approved_at": None,
+                "id": self.session_id, "trainer": "Trainer One",
+                "checked_in_at": "2026-09-15T18:19:07+00:00", "workout_name": workout,
+                "status": "PENDING_MEMBER_APPROVAL", "approved_at": None,
             }
-            return jsonify(
-                ok=True,
-                message="Private training session check-in created successfully.",
-                subscription={
-                    "id": 21,
-                    "total_sessions": 37,
-                    "approved_sessions": 1,
-                    "remaining_sessions": 36,
-                    "pending_sessions": 1,
-                    "effective_status": "ACTIVE",
-                },
-                session=session_row,
-                sessions=[session_row],
-            )
+            payload = {
+                "ok": True,
+                "message": "Session created and WhatsApp invitation prepared." if self.whatsapp_enabled else "Private training session check-in created successfully.",
+                "replayed": False,
+                "subscription": {"id": 21, "total_sessions": 37, "approved_sessions": 1, "remaining_sessions": 36, "pending_sessions": 1, "effective_status": "ACTIVE"},
+                "session": session_row,
+                "sessions": [session_row],
+            }
+            if self.whatsapp_enabled:
+                from urllib.parse import urlencode
+                import urllib.parse
+                portal = f"{self.url}/private-training/member/test-token"
+                text = "مرحبًا Long Test Client Name 👋\n\nتم تسجيل جلسة الـ Private Training الخاصة بك.\nالتمرين: {}\nالمدرب: Trainer One With A Long Name\n\nبرجاء فتح الرابط التالي ومراجعة الجلسة وتأكيدها:\n{}\n\nRival Gym 💪".format(workout, portal)
+                payload["whatsapp"] = {"url": "https://wa.me/2010012345678?" + urlencode({"text": text})}
+                self.operations[operation_id] = dict(payload)
+                if self.ambiguous_once:
+                    self.ambiguous_once = False
+                    return jsonify(ok=False, error="temporary_database_error", message="The result could not be confirmed. Check Session History before trying again."), 503
+            return jsonify(payload)
 
     def _subscription(self):
         return {
@@ -203,9 +217,16 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
         self.fixture.checkin_count = 0
         self.fixture.session_id = 25
         self.fixture.slow = False
+        self.fixture.whatsapp_enabled = False
+        self.fixture.ambiguous_once = False
+        self.fixture.operations = {}
+        self.fixture.received_operations = []
 
     def open_at(self, width, height):
         self.driver.set_window_size(width, height)
+        self.driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", {
+            "width": width, "height": height, "deviceScaleFactor": 1, "mobile": False,
+        })
         self.driver.get(f"{self.fixture.url}/private-training/subscriptions/21")
         time.sleep(0.25)
 
@@ -307,6 +328,81 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
             len(driver.find_elements(By.CSS_SELECTOR, 'form[action*="/portal-token"]')),
             2,
         )
+
+    def test_feature_enabled_real_template_whatsapp_success_and_same_uuid_replay(self):
+        from selenium.webdriver.common.by import By
+        from urllib.parse import parse_qs, unquote, urlparse
+
+        self.fixture.whatsapp_enabled = True
+        self.fixture.ambiguous_once = True
+        driver = self.driver
+        self.open_at(390, 844)
+        form = driver.find_element(By.ID, "private-training-checkin-form")
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", form)
+        original_url = driver.current_url
+        original_navigation_count = driver.execute_script("return performance.getEntriesByType('navigation').length")
+        original_scroll = driver.execute_script("return window.scrollY")
+        driver.find_element(By.ID, "workout_name").send_keys("Arabic Test & Legs")
+        driver.find_element(By.ID, "private-training-checkin-submit").click()
+        deadline = time.time() + 4
+        while len(self.fixture.received_operations) < 1 and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(len(self.fixture.received_operations), 1)
+        first_operation = self.fixture.received_operations[0]
+        self.assertTrue(first_operation)
+        self.assertEqual(driver.find_element(By.ID, "workout_name").get_attribute("value"), "Arabic Test & Legs")
+        while not driver.find_element(By.ID, "private-training-checkin-error").text and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertIn("Check Session History", driver.find_element(By.ID, "private-training-checkin-error").text)
+        self.assertEqual(self.fixture.checkin_count, 1)
+
+        driver.find_element(By.ID, "private-training-checkin-submit").click()
+        deadline = time.time() + 4
+        while not driver.find_element(By.ID, "private-training-checkin-form").get_attribute("hidden") and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(self.fixture.received_operations, [first_operation, first_operation])
+        self.assertEqual(self.fixture.checkin_count, 1)
+        self.assertEqual(driver.current_url, original_url)
+        self.assertEqual(driver.execute_script("return performance.getEntriesByType('navigation').length"), original_navigation_count)
+        self.assertLessEqual(abs(driver.execute_script("return window.scrollY") - original_scroll), 16)
+        self.assertEqual(driver.find_element(By.ID, "workout_name").get_attribute("value"), "")
+        fallback = driver.find_element(By.ID, "private-training-whatsapp-link")
+        whatsapp_url = fallback.get_attribute("href")
+        parsed = urlparse(whatsapp_url)
+        self.assertEqual(parsed.netloc, "wa.me")
+        self.assertEqual(parsed.path, "/2010012345678")
+        decoded_message = parse_qs(parsed.query)["text"][0]
+        self.assertIn("مرحبًا Long Test Client Name", decoded_message)
+        self.assertIn("Arabic Test & Legs", decoded_message)
+        self.assertIn("Trainer One With A Long Name", decoded_message)
+        self.assertIn("/private-training/member/test-token", decoded_message)
+        self.assertNotIn("subscription", decoded_message.lower())
+        self.assertNotIn("session_id", decoded_message.lower())
+        self.assertIn("noopener", fallback.get_attribute("rel"))
+        self.assertIn("noreferrer", fallback.get_attribute("rel"))
+
+    def test_feature_enabled_popup_failure_keeps_fallback_without_resubmit(self):
+        from selenium.webdriver.common.by import By
+
+        self.fixture.whatsapp_enabled = True
+        driver = self.driver
+        self.open_at(390, 844)
+        driver.execute_script("window.open = () => null;")
+        driver.find_element(By.ID, "workout_name").send_keys("Popup Fallback")
+        driver.find_element(By.ID, "private-training-checkin-submit").click()
+        deadline = time.time() + 4
+        while self.fixture.checkin_count < 1 and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(self.fixture.checkin_count, 1)
+        while not driver.find_element(By.ID, "private-training-whatsapp-fallback").is_displayed() and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertTrue(driver.find_element(By.ID, "private-training-whatsapp-fallback").is_displayed())
+        first_url = driver.find_element(By.ID, "private-training-whatsapp-link").get_attribute("href")
+        driver.find_element(By.ID, "private-training-whatsapp-link").click()
+        time.sleep(0.2)
+        self.assertEqual(self.fixture.checkin_count, 1)
+        self.assertEqual(driver.current_url, f"{self.fixture.url}/private-training/subscriptions/21")
+        self.assertEqual(driver.find_element(By.ID, "private-training-whatsapp-link").get_attribute("href"), first_url)
 
 
 if __name__ == "__main__":

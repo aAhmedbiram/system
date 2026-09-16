@@ -38,3 +38,13 @@ FROM pg_stat_user_indexes
 ORDER BY idx_scan DESC;
 ```
 
+## Private Training Check-In Invitations
+
+`add_private_training_checkin_invitations.sql` is an additive migration for the
+feature-flagged private-training Check-In + portal invitation workflow. It adds
+an optional session binding to portal tokens and the PostgreSQL idempotency table.
+Apply it to the intended isolated/test database first, then to production only
+through the normal reviewed migration process. The application does not apply it
+automatically. Set `PRIVATE_TRAINING_PORTAL_TOKEN_SIGNING_KEY` to a dedicated,
+strong secret before enabling the feature; rotating it invalidates deterministic
+replay of prior combined-operation links unless a versioned key strategy is added.
