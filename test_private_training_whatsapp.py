@@ -10,6 +10,7 @@ import uuid
 # their pre-existing behavior.
 import system_app.app  # noqa: F401
 
+from system_app.private_training.routes import _whatsapp_message
 from system_app.private_training.services import (
     PrivateTrainingPhoneError,
     _deterministic_portal_token,
@@ -49,6 +50,23 @@ class DeterministicTokenTests(unittest.TestCase):
     def test_weak_key_is_rejected(self):
         with self.assertRaises(Exception):
             _deterministic_portal_token("weak", uuid.uuid4(), 1, 2, 3)
+
+
+class WhatsAppMessageTests(unittest.TestCase):
+    def test_assigned_trainer_is_used_not_checkin_user(self):
+        message = _whatsapp_message(
+            {"client_name": "Member", "trainer_display_name": "Hossam"},
+            {"workout_name": "Leg Day", "trainer_display_name": "Rino"},
+            "https://example.test/portal",
+        )
+        self.assertIn("المدرب: Hossam", message)
+        self.assertNotIn("المدرب: Rino", message)
+
+    def test_missing_assigned_trainer_omits_the_line(self):
+        message = _whatsapp_message(
+            {"client_name": "Member"}, {"workout_name": "Leg Day"}, "https://example.test/portal"
+        )
+        self.assertNotIn("المدرب:", message)
 
 
 if __name__ == "__main__":

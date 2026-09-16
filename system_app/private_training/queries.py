@@ -571,10 +571,16 @@ def get_active_private_training_token(subscription_id: int) -> dict[str, Any] | 
 def lock_private_training_subscription(cur: RealDictCursor, subscription_id: int) -> dict[str, Any] | None:
     cur.execute(
         """
-        SELECT *
-        FROM private_training_subscriptions
-        WHERE id = %s
-        FOR UPDATE
+        SELECT
+            s.*,
+            t.username AS trainer_username,
+            t.email AS trainer_email,
+            creator.username AS created_by_username
+        FROM private_training_subscriptions s
+        JOIN users t ON t.id = s.trainer_user_id
+        LEFT JOIN users creator ON creator.id = s.created_by_user_id
+        WHERE s.id = %s
+        FOR UPDATE OF s
         """,
         (subscription_id,),
     )

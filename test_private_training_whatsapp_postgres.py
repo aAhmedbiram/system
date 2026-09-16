@@ -70,13 +70,13 @@ class PrivateTrainingInvitationPostgresTests(unittest.TestCase):
             """INSERT INTO users (id, username, email, password, is_approved, permissions)
                VALUES (%s, %s, %s, 'test', TRUE, %s)
                ON CONFLICT (id) DO UPDATE SET permissions = EXCLUDED.permissions, is_approved = TRUE""",
-            (self.user_id, "pg_pt_trainer", "pg_pt_trainer@test.local", Json({"private_training_trainer": True})), commit=True,
+            (self.user_id, "Hossam", "pg_pt_trainer@test.local", Json({"private_training_trainer": True})), commit=True,
         )
         self.query_db(
             """INSERT INTO users (id, username, email, password, is_approved, permissions)
                VALUES (%s, %s, %s, 'test', TRUE, %s)
                ON CONFLICT (id) DO UPDATE SET permissions = EXCLUDED.permissions, is_approved = TRUE""",
-            (self.other_user_id, "pg_pt_other", "pg_pt_other@test.local", Json({"private_training_trainer": True})), commit=True,
+            (self.other_user_id, "Rino", "pg_pt_other@test.local", Json({"private_training_trainer": True})), commit=True,
         )
         self.query_db(
             """INSERT INTO members (id, name, phone, membership_status, starting_date, end_date)
@@ -90,8 +90,8 @@ class PrivateTrainingInvitationPostgresTests(unittest.TestCase):
                VALUES (%s, 'MEMBER', 'PG WhatsApp Member', '01012345678', %s, 3, %s, %s, 'ACTIVE') RETURNING id""",
             (self.member_id, self.user_id, self.today - timedelta(days=1), self.today + timedelta(days=30)), one=True, commit=True,
         )["id"]
-        self.user = {"id": self.user_id, "username": "pg_pt_trainer", "is_approved": True, "permissions": {"private_training_trainer": True}}
-        self.other_user = {"id": self.other_user_id, "username": "pg_pt_other", "is_approved": True, "permissions": {"private_training_trainer": True}}
+        self.user = {"id": self.user_id, "username": "Hossam", "is_approved": True, "permissions": {"private_training_trainer": True}}
+        self.other_user = {"id": self.other_user_id, "username": "Rino", "is_approved": True, "permissions": {"private_training_trainer": True}}
 
     def tearDown(self):
         with psycopg2.connect(TEST_DATABASE_URL) as conn:
@@ -111,6 +111,7 @@ class PrivateTrainingInvitationPostgresTests(unittest.TestCase):
         first = self.create(operation=operation)
         second = self.create(operation=operation)
         self.assertFalse(first["replayed"])
+        self.assertEqual(first["session"]["trainer_display_name"], "Hossam")
         self.assertTrue(second["replayed"])
         self.assertEqual(first["session"]["id"], second["session"]["id"])
         self.assertEqual(first["raw_token"], second["raw_token"])

@@ -126,11 +126,15 @@ def _checkin_exception_response(exc):
 def _whatsapp_message(subscription, session, portal_url):
     def clean(value):
         return " ".join(str(value or "").split())
+    trainer_name = clean(
+        subscription.get("trainer_display_name") or subscription.get("trainer_username")
+    )
+    trainer_line = f"\nالمدرب: {trainer_name}" if trainer_name else ""
     return (
         f"مرحبًا {clean(subscription.get('client_name'))} 👋\n\n"
         "تم تسجيل جلسة الـ Private Training الخاصة بك.\n"
         f"التمرين: {clean(session.get('workout_name'))}\n"
-        f"المدرب: {clean(session.get('trainer_display_name') or subscription.get('trainer_display_name'))}\n\n"
+        f"{trainer_line}\n\n"
         "برجاء فتح الرابط التالي ومراجعة الجلسة وتأكيدها:\n"
         f"{portal_url}\n\nRival Gym 💪"
     )
