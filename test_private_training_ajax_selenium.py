@@ -23,6 +23,7 @@ class LocalPrivateTrainingServer:
         self.slow = False
         self.whatsapp_enabled = False
         self.ambiguous_once = False
+        self.invalid_whatsapp_url = False
         self.operations = {}
         self.received_operations = []
         self._configure_routes()
@@ -151,6 +152,8 @@ class LocalPrivateTrainingServer:
                 portal = f"{self.url}/private-training/member/test-token"
                 text = "مرحبًا Long Test Client Name 👋\n\nتم تسجيل جلسة الـ Private Training الخاصة بك.\nالتمرين: {}\nالمدرب: Trainer One With A Long Name\n\nبرجاء فتح الرابط التالي ومراجعة الجلسة وتأكيدها:\n{}\n\nRival Gym 💪".format(workout, portal)
                 payload["whatsapp"] = {"url": "https://wa.me/2010012345678?" + urlencode({"text": text})}
+                if self.invalid_whatsapp_url:
+                    payload["whatsapp"]["url"] = "http://not-whatsapp.test/insecure"
                 self.operations[operation_id] = dict(payload)
                 if self.ambiguous_once:
                     self.ambiguous_once = False
@@ -219,6 +222,7 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
         self.fixture.slow = False
         self.fixture.whatsapp_enabled = False
         self.fixture.ambiguous_once = False
+        self.fixture.invalid_whatsapp_url = False
         self.fixture.operations = {}
         self.fixture.received_operations = []
 
@@ -331,7 +335,7 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
 
     def test_feature_enabled_real_template_whatsapp_success_and_same_uuid_replay(self):
         from selenium.webdriver.common.by import By
-        from urllib.parse import parse_qs, unquote, urlparse
+        from urllib.parse import parse_qs, urlparse
 
         self.fixture.whatsapp_enabled = True
         self.fixture.ambiguous_once = True
@@ -339,7 +343,8 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
         self.open_at(390, 844)
         form = driver.find_element(By.ID, "private-training-checkin-form")
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", form)
-        original_url = driver.current_url
+        original_handles = list(driver.window_handles)
+        driver.execute_script("window.__privateTrainingNavigationRecorder = url => { window.__recordedWhatsAppUrl = url; };")
         original_navigation_count = driver.execute_script("return performance.getEntriesByType('navigation').length")
         original_scroll = driver.execute_script("return window.scrollY")
         driver.find_element(By.ID, "workout_name").send_keys("Arabic Test & Legs")
@@ -358,16 +363,18 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
 
         driver.find_element(By.ID, "private-training-checkin-submit").click()
         deadline = time.time() + 4
-        while not driver.find_element(By.ID, "private-training-checkin-form").get_attribute("hidden") and time.time() < deadline:
+        while not driver.execute_script("return Boolean(window.__recordedWhatsAppUrl)") and time.time() < deadline:
             time.sleep(0.05)
         self.assertEqual(self.fixture.received_operations, [first_operation, first_operation])
         self.assertEqual(self.fixture.checkin_count, 1)
-        self.assertEqual(driver.current_url, original_url)
+        whatsapp_url = driver.execute_script("return window.__recordedWhatsAppUrl")
+        self.assertEqual(list(driver.window_handles), original_handles)
+        self.assertEqual(driver.current_url, f"{self.fixture.url}/private-training/subscriptions/21")
         self.assertEqual(driver.execute_script("return performance.getEntriesByType('navigation').length"), original_navigation_count)
         self.assertLessEqual(abs(driver.execute_script("return window.scrollY") - original_scroll), 16)
         self.assertEqual(driver.find_element(By.ID, "workout_name").get_attribute("value"), "")
         fallback = driver.find_element(By.ID, "private-training-whatsapp-link")
-        whatsapp_url = fallback.get_attribute("href")
+        self.assertEqual(fallback.get_attribute("href"), whatsapp_url)
         parsed = urlparse(whatsapp_url)
         self.assertEqual(parsed.netloc, "wa.me")
         self.assertEqual(parsed.path, "/2010012345678")
@@ -378,16 +385,15 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
         self.assertIn("/private-training/member/test-token", decoded_message)
         self.assertNotIn("subscription", decoded_message.lower())
         self.assertNotIn("session_id", decoded_message.lower())
-        self.assertIn("noopener", fallback.get_attribute("rel"))
-        self.assertIn("noreferrer", fallback.get_attribute("rel"))
+        self.assertNotIn("subscription", decoded_message.lower())
 
-    def test_feature_enabled_popup_failure_keeps_fallback_without_resubmit(self):
+    def test_feature_enabled_navigation_keeps_fallback_without_resubmit(self):
         from selenium.webdriver.common.by import By
 
         self.fixture.whatsapp_enabled = True
+        self.fixture.invalid_whatsapp_url = True
         driver = self.driver
         self.open_at(390, 844)
-        driver.execute_script("window.open = () => null;")
         driver.find_element(By.ID, "workout_name").send_keys("Popup Fallback")
         driver.find_element(By.ID, "private-training-checkin-submit").click()
         deadline = time.time() + 4
@@ -403,6 +409,8 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
         self.assertEqual(self.fixture.checkin_count, 1)
         self.assertEqual(driver.current_url, f"{self.fixture.url}/private-training/subscriptions/21")
         self.assertEqual(driver.find_element(By.ID, "private-training-whatsapp-link").get_attribute("href"), first_url)
+        self.assertEqual(len(driver.window_handles), 1)
+        self.assertEqual(driver.current_url, f"{self.fixture.url}/private-training/subscriptions/21")
 
 
 if __name__ == "__main__":
