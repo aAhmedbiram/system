@@ -30,6 +30,7 @@
 
         a { color: #b9dcff; }
         .page { width: min(1180px, 100%); margin: 0 auto; padding: 24px 16px 48px; }
+        .page.workflow-page { width: min(1680px, 100%); }
         .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
         h1 { margin: 0; color: #70d774; font-size: clamp(1.55rem, 4vw, 2.25rem); }
         .back-link { min-height: 44px; display: inline-flex; align-items: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: 9px; text-decoration: none; }
@@ -44,32 +45,47 @@
         .error, .empty { border-radius: 10px; padding: 16px; color: var(--text); background: rgba(239, 83, 80, .16); border: 1px solid rgba(239, 83, 80, .45); }
         .empty { background: rgba(66, 165, 245, .13); border-color: rgba(66, 165, 245, .35); }
         .cards { display: grid; gap: 12px; }
-        .renewal-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 16px; background: var(--panel-soft); border: 1px solid var(--line); border-radius: 12px; }
-        .member-title { margin: 0 0 6px; font-size: 1.1rem; overflow-wrap: anywhere; }
+        .renewal-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; min-width: 0; padding: 16px; background: var(--panel-soft); border: 1px solid var(--line); border-radius: 12px; }
+        .member-title { margin: 0 0 6px; font-size: 1.1rem; overflow-wrap: anywhere; word-break: normal; }
         .member-id, .detail, .table-note { color: var(--muted); }
         .details { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; }
-        .badge { display: inline-flex; align-items: center; width: fit-content; padding: 5px 9px; border-radius: 999px; font-size: .82rem; font-weight: 700; }
+        .badge { display: inline-flex; align-items: center; width: fit-content; padding: 5px 9px; border-radius: 999px; font-size: .82rem; font-weight: 700; white-space: nowrap; }
         .badge-upcoming { color: #06110a; background: #81c784; }
         .badge-due-soon { color: #261a00; background: var(--orange); }
         .badge-urgent { color: #fff; background: #e57373; }
         .badge-expired { color: #fff; background: var(--red); }
-        .table-wrap { display: none; overflow-x: auto; max-width: 100%; }
-        table { width: 100%; border-collapse: collapse; }
+        .table-wrap { display: none; max-width: 100%; }
+        table { width: 100%; border-collapse: collapse; table-layout: auto; }
         th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
         th { color: var(--muted); font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
-        td { overflow-wrap: anywhere; }
+        td { min-width: 0; overflow-wrap: normal; }
+        .member-cell { min-width: 190px; white-space: normal; }
+        .package-cell { max-width: 240px; white-space: normal; overflow-wrap: anywhere; }
+        .nowrap-cell, .workflow-badge, .owner-badge { white-space: nowrap; }
         .pagination { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 20px; }
         .pagination a, .pagination span { min-height: 44px; display: inline-flex; align-items: center; padding: 9px 13px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
         .pagination .current { color: #06110a; background: #70d774; font-weight: 700; }
         .workflow-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; }
+        .workflow-badge, .owner-badge { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: rgba(66, 165, 245, .12); }
         .assignment-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 12px; }
         .assignment-form label { min-width: 180px; flex: 1 1 180px; }
         .assignment-form select { min-width: 0; }
         :focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
         @media (min-width: 760px) {
-            .table-wrap { display: block; }
-            .cards { display: none; }
+            .page:not(.workflow-page) .table-wrap { display: block; }
+            .page:not(.workflow-page) .cards { display: none; }
+        }
+
+        @media (min-width: 1400px) {
+            .workflow-page .table-wrap { display: block; }
+            .workflow-page .cards { display: none; }
+            .workflow-page .table-wrap { overflow: visible; }
+            .workflow-page th, .workflow-page td { padding-left: 9px; padding-right: 9px; }
+            .workflow-page .action-cell { min-width: 260px; }
+            .workflow-page .table-wrap .assignment-form { display: grid; grid-template-columns: minmax(130px, 1fr) auto; gap: 6px; margin-top: 8px; }
+            .workflow-page .table-wrap .assignment-form label { min-width: 0; }
+            .workflow-page .table-wrap .member-link { min-height: 40px; padding: 8px 12px; }
         }
 
         @media (max-width: 600px) {
@@ -77,13 +93,17 @@
             .topbar { align-items: flex-start; flex-direction: column; }
             .filters { grid-template-columns: 1fr; }
             .filters button { width: 100%; }
-            .renewal-card { grid-template-columns: 1fr; }
+            .renewal-card { grid-template-columns: minmax(0, 1fr); }
             .member-link { width: 100%; }
+            .workflow-meta { gap: 8px; }
+            .assignment-form { width: 100%; }
+            .assignment-form label { min-width: 0; width: 100%; }
+            .assignment-form button { width: 100%; }
         }
     </style>
 </head>
 <body>
-<main class="page">
+<main class="page{% if workflow_enabled %} workflow-page{% endif %}">
     <div class="topbar">
         <h1>Renewal Command Center</h1>
         <a class="back-link" href="{{ url_for('index') }}">← Back Home</a>
@@ -145,7 +165,7 @@
                             <div class="member-id">Member ID: {{ item.id }}</div>
                             <div class="details">
                                 <span class="badge badge-{{ item.urgency|lower|replace('_', '-') }}">{{ item.urgency|replace('_', ' ')|title }}</span>
-                                <span class="detail">End date: {{ item.membership_end_date }}</span>
+                                <span class="detail nowrap-cell">End date: {{ item.membership_end_date }}</span>
                                 <span class="detail">
                                     {% if item.days_remaining > 0 %}{{ item.days_remaining }} days remaining
                                     {% elif item.days_remaining == 0 %}Expires today
@@ -155,8 +175,8 @@
                                 {% if item.membership_status %}<span class="detail">Status: {{ item.membership_status }}</span>{% endif %}
                                 {% if workflow_enabled %}
                                 <div class="workflow-meta">
-                                    <span class="detail">Workflow: {{ item.operational_status }}</span>
-                                    <span class="detail">Owner: {{ item.owner_username or 'Unassigned' }}</span>
+                                    <span class="workflow-badge">Workflow: {{ item.operational_status }}</span>
+                                    <span class="owner-badge">Owner: {{ item.owner_username or 'Unassigned' }}</span>
                                 </div>
                                 {% endif %}
                             </div>
@@ -191,14 +211,14 @@
                         <tbody>
                         {% for item in items %}
                             <tr>
-                                <td>{{ item.name or 'Unnamed member' }}<br><span class="member-id">#{{ item.id }}</span></td>
-                                <td>{{ item.membership_packages or '—' }}</td>
-                                <td>{{ item.membership_end_date }}</td>
-                                <td>{% if item.days_remaining > 0 %}+{{ item.days_remaining }}{% else %}{{ item.days_remaining }}{% endif %}</td>
+                                <td class="member-cell">{{ item.name or 'Unnamed member' }}<br><span class="member-id">#{{ item.id }}</span></td>
+                                <td class="package-cell">{{ item.membership_packages or '—' }}</td>
+                                <td class="nowrap-cell">{{ item.membership_end_date }}</td>
+                                <td class="nowrap-cell">{% if item.days_remaining > 0 %}+{{ item.days_remaining }}{% else %}{{ item.days_remaining }}{% endif %}</td>
                                 <td><span class="badge badge-{{ item.urgency|lower|replace('_', '-') }}">{{ item.urgency|replace('_', ' ')|title }}</span></td>
-                                <td>{{ item.membership_status or '—' }}</td>
-                                {% if workflow_enabled %}<td>{{ item.operational_status }}</td><td>{{ item.owner_username or 'Unassigned' }}</td>{% endif %}
-                                <td>
+                                <td class="nowrap-cell">{{ item.membership_status or '—' }}</td>
+                                {% if workflow_enabled %}<td><span class="workflow-badge">{{ item.operational_status }}</span></td><td><span class="owner-badge">{{ item.owner_username or 'Unassigned' }}</span></td>{% endif %}
+                                <td class="action-cell">
                                     <a class="member-link" href="{{ url_for(member_url_endpoint, member_id=item.id) }}">Open member</a>
                                     {% if workflow_enabled and assignment_allowed %}
                                     <form class="assignment-form" method="post" action="{{ url_for('renewal.assign_case', filter=queue_filter, status=workflow_status_filter, owner=owner_filter, search=search, page=page) }}">
@@ -228,9 +248,15 @@
 
     {% if total_pages > 1 %}
     <nav class="pagination" aria-label="Renewal queue pages">
-        {% if page > 1 %}<a href="{{ url_for('renewal.renewal_center', page=page - 1, filter=queue_filter, search=search) }}">Previous</a>{% endif %}
+        {% if page > 1 %}
+            {% if workflow_enabled %}<a href="{{ url_for('renewal.renewal_center', page=page - 1, filter=queue_filter, status=workflow_status_filter, owner=owner_filter, search=search) }}">Previous</a>
+            {% else %}<a href="{{ url_for('renewal.renewal_center', page=page - 1, filter=queue_filter, search=search) }}">Previous</a>{% endif %}
+        {% endif %}
         <span class="current" aria-current="page">Page {{ page }} of {{ total_pages }}</span>
-        {% if page < total_pages %}<a href="{{ url_for('renewal.renewal_center', page=page + 1, filter=queue_filter, search=search) }}">Next</a>{% endif %}
+        {% if page < total_pages %}
+            {% if workflow_enabled %}<a href="{{ url_for('renewal.renewal_center', page=page + 1, filter=queue_filter, status=workflow_status_filter, owner=owner_filter, search=search) }}">Next</a>
+            {% else %}<a href="{{ url_for('renewal.renewal_center', page=page + 1, filter=queue_filter, search=search) }}">Next</a>{% endif %}
+        {% endif %}
     </nav>
     {% endif %}
 </main>

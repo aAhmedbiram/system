@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -386,6 +387,88 @@ def test_workflow_template_contains_only_guarded_assignment_ui():
     assert "renewal.assign_case" in template
     assert "method=\"post\"" in template.lower()
     assert "csrf_token()" in template
+
+
+def test_workflow_template_uses_wide_desktop_layout_and_compact_responsive_controls():
+    template = (ROOT / "system_app/templates/renewal_center.html").read_text(encoding="utf-8")
+    assert 'class="page{% if workflow_enabled %} workflow-page{% endif %}"' in template
+    assert ".page.workflow-page { width: min(1680px, 100%); }" in template
+    assert "@media (min-width: 760px)" in template
+    assert "@media (min-width: 1400px)" in template
+    assert ".page:not(.workflow-page) .table-wrap" in template
+    assert ".workflow-page .table-wrap" in template
+    assert "@media (min-width: 1100px)" not in template
+    assert "workflow-page .cards" in template
+    assert "class=\"member-cell\"" in template
+    assert "class=\"nowrap-cell\"" in template
+    assert "class=\"workflow-badge\"" in template
+    assert "class=\"owner-badge\"" in template
+    assert "class=\"action-cell\"" in template
+    assert ".workflow-page .table-wrap { overflow: visible; }" in template
+    assert "min-height: 44px" in template
+
+
+def test_phase1a_and_manager_workflow_have_equivalent_eligible_ids(monkeypatch):
+    from system_app.renewal.queries import get_renewal_queue, get_renewal_workflow_queue
+
+    phase1a_rows = [
+        {
+            "id": member_id,
+            "name": "Same Name",
+            "membership_packages": "1 Month",
+            "end_date": "2026-09-20",
+            "membership_status": "ACTIVE",
+            "membership_end_date": date(2026, 9, 20),
+            "days_remaining": 3,
+            "urgency": "URGENT",
+        }
+        for member_id in (7, 9)
+    ]
+    workflow_rows = [dict(row, case_id=None, owner_user_id=None, owner_username=None,
+                          operational_status="UNASSIGNED", version=0, next_follow_up_at=None)
+                     for row in phase1a_rows]
+    calls = []
+
+    def fake_query_db(query, params=(), one=False):
+        calls.append(query)
+        if one:
+            return {"count": 2}
+        return workflow_rows if "renewal_cases" in query else phase1a_rows
+
+    monkeypatch.setattr("system_app.renewal.queries.query_db", fake_query_db)
+    rows_a, count_a = get_renewal_queue(today=date(2026, 9, 17), page=1, per_page=25)
+    rows_w, count_w = get_renewal_workflow_queue(
+        today=date(2026, 9, 17), page=1, per_page=25, manager=True
+    )
+
+    assert count_a == count_w == 2
+    assert [row["id"] for row in rows_a] == [row["id"] for row in rows_w] == [7, 9]
+    assert all(row["operational_status"] == "UNASSIGNED" for row in rows_w)
+    workflow_sql = "\n".join(calls[2:])
+    assert "LEFT JOIN renewal_cases" in workflow_sql
+    assert "renewal_case.cycle_end_date = eligible.membership_end_date" in workflow_sql
+    assert "ORDER BY renewal_result.membership_end_date ASC, renewal_result.id ASC" in workflow_sql
+
+
+def test_workflow_join_is_current_cycle_only_and_does_not_duplicate_members(monkeypatch):
+    from system_app.renewal.queries import get_renewal_workflow_queue
+
+    calls = []
+
+    def fake_query_db(query, params=(), one=False):
+        calls.append((query, params, one))
+        if one:
+            return {"count": 1}
+        return [{"id": 7, "operational_status": "UNASSIGNED", "owner_user_id": None}]
+
+    monkeypatch.setattr("system_app.renewal.queries.query_db", fake_query_db)
+    rows, total = get_renewal_workflow_queue(today=date(2026, 9, 17), manager=True)
+    assert total == 1
+    assert [row["id"] for row in rows] == [7]
+    assert "LEFT JOIN renewal_cases" in calls[0][0]
+    assert "renewal_case.member_id = eligible.id" in calls[0][0]
+    assert "renewal_case.cycle_end_date = eligible.membership_end_date" in calls[0][0]
+    assert "INNER JOIN renewal_cases" not in calls[0][0]
 
 
 def test_renewal_transaction_returns_healthy_pooled_connection_once(monkeypatch):

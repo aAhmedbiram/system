@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -34,14 +35,18 @@ def renewal_db():
                 sql.SQL("SET search_path TO {}, public") .format(sql.Identifier(schema_name))
             )
             cur.execute(
-                "CREATE TABLE members (id SERIAL PRIMARY KEY, name TEXT NOT NULL)"
+                "CREATE TABLE members ("
+                "id SERIAL PRIMARY KEY, name TEXT NOT NULL, end_date TEXT, "
+                "membership_status TEXT, membership_packages TEXT)"
             )
             cur.execute(
                 """CREATE TABLE users (
                     id SERIAL PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
                     email TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL
+                    password TEXT NOT NULL,
+                    is_approved BOOLEAN DEFAULT FALSE,
+                    permissions JSONB
                 )"""
             )
             migration = Path(__file__).parent / "system_app/migrations/add_renewal_workflow.sql"
@@ -175,6 +180,68 @@ def test_migration_is_executed_twice_in_the_isolated_schema(renewal_db):
             ("renewal_cases", "renewal_follow_ups", "renewal_assignment_events"),
         )
         assert cur.fetchone()[0] == 3
+
+
+def test_phase1a_and_manager_workflow_execute_equivalent_eligible_sets(renewal_db, monkeypatch):
+    from system_app.func import get_cairo_date
+    from system_app.renewal import queries as renewal_queries
+
+    conn = _connection(renewal_db)
+    today = get_cairo_date()
+    eligible_dates = {
+        920001: today + timedelta(days=5),
+        920002: today + timedelta(days=10),
+        920003: today - timedelta(days=4),
+        920004: today + timedelta(days=31),
+    }
+    with conn.cursor() as cur:
+        for member_id, end_date in eligible_dates.items():
+            value = "not-an-iso-date" if member_id == 920005 else end_date.isoformat()
+            cur.execute(
+                "INSERT INTO members (id, name, end_date, membership_status, membership_packages) "
+                "VALUES (%s, %s, %s, 'ACTIVE', '1 Month')",
+                (member_id, f"Member {member_id}", value),
+            )
+        cur.execute(
+            "INSERT INTO members (id, name, end_date, membership_status, membership_packages) "
+            "VALUES (920005, 'Malformed', 'not-an-iso-date', 'ACTIVE', '1 Month')"
+        )
+        cur.execute(
+            "INSERT INTO users (id, username, email, password, is_approved, permissions) "
+            "VALUES (920001, 'workflow-owner', 'workflow-owner@test.invalid', 'test', TRUE, '{}'::jsonb)"
+        )
+        cur.execute(
+            "INSERT INTO renewal_cases (member_id, cycle_end_date, owner_user_id) "
+            "VALUES (920002, %s, 920001), (920003, %s, NULL)",
+            (eligible_dates[920002], eligible_dates[920003] - timedelta(days=30)),
+        )
+    conn.commit()
+
+    def isolated_query_db(query, params=(), one=False):
+        from psycopg2.extras import RealDictCursor
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+        return (dict(rows[0]) if rows else None) if one else [dict(row) for row in rows]
+
+    monkeypatch.setattr(renewal_queries, "query_db", isolated_query_db)
+    rows_a, count_a = renewal_queries.get_renewal_queue(today=today, page=1, per_page=100)
+    rows_w, count_w = renewal_queries.get_renewal_workflow_queue(
+        today=today, page=1, per_page=100, manager=True
+    )
+
+    assert count_a == count_w == 3
+    assert {row["id"] for row in rows_a} == {920001, 920002, 920003}
+    assert {row["id"] for row in rows_w} == {920001, 920002, 920003}
+    assert len(rows_w) == len({row["id"] for row in rows_w}) == 3
+    no_case = next(row for row in rows_w if row["id"] == 920001)
+    assert no_case["operational_status"] == "UNASSIGNED"
+    current_case = next(row for row in rows_w if row["id"] == 920002)
+    assert current_case["case_id"] is not None
+    assert current_case["owner_username"] == "workflow-owner"
+    historical_only = next(row for row in rows_w if row["id"] == 920003)
+    assert historical_only["case_id"] is None
 
 
 def test_cycle_and_operation_uniqueness(renewal_db):
