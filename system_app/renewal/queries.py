@@ -122,17 +122,19 @@ def get_renewal_queue(
     where_clause, where_args = _where_clause(normalized_filter, normalized_search)
 
     count_query = f"""
-        {_base_cte()}
         SELECT COUNT(*) AS count
-        FROM eligible_members
-        WHERE {where_clause}
+        FROM (
+            {_base_cte()}
+            SELECT id
+            FROM eligible_members
+            WHERE {where_clause}
+        ) AS renewal_result
     """
     count_args = _base_params(business_date) + where_args
     count_row = query_db(count_query, tuple(count_args), one=True) or {}
     total_count = int(count_row.get("count") or 0)
 
     query = f"""
-        {_base_cte()}
         SELECT
             id,
             name,
@@ -142,8 +144,20 @@ def get_renewal_queue(
             membership_end_date,
             days_remaining,
             urgency
-        FROM eligible_members
-        WHERE {where_clause}
+        FROM (
+            {_base_cte()}
+            SELECT
+                id,
+                name,
+                membership_packages,
+                end_date,
+                membership_status,
+                membership_end_date,
+                days_remaining,
+                urgency
+            FROM eligible_members
+            WHERE {where_clause}
+        ) AS renewal_result
         ORDER BY membership_end_date ASC, id ASC
         LIMIT %s OFFSET %s
     """

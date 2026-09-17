@@ -76,12 +76,42 @@ def test_queue_query_is_member_only_parameterized_and_deterministically_ordered(
     assert [row["id"] for row in rows] == [7, 9]
     assert len(calls) == 2
     for query, params, _one in calls:
+        assert query.lstrip().upper().startswith("SELECT")
         assert "FROM members m" in query
         assert "crm_leads" not in query
         assert "phone" not in query.lower()
         assert "%s" in query
         assert "ORDER BY membership_end_date ASC, id ASC" in query or "COUNT(*)" in query
         assert any("Same Name" in str(value) for value in params)
+
+
+def test_query_db_compatibility_reads_top_level_select_count_and_rows(monkeypatch):
+    calls = []
+    expected_rows = [_test_member(198, "Eligible")]
+
+    def select_only_query_db(query, params=(), one=False):
+        calls.append((query, params, one))
+        if not query.lstrip().upper().startswith("SELECT"):
+            return None
+        return {"count": 198} if one else expected_rows
+
+    monkeypatch.setattr("system_app.renewal.queries.query_db", select_only_query_db)
+    rows, total = get_renewal_queue(
+        today=date(2026, 9, 17),
+        queue_filter="urgent",
+        search="198",
+        page=3,
+        per_page=10,
+    )
+
+    assert total == 198
+    assert rows == expected_rows
+    assert len(calls) == 2
+    assert all(query.lstrip().upper().startswith("SELECT") for query, _, _ in calls)
+    assert "LOWER(urgency) = %s" in calls[0][0]
+    assert "CAST(id AS TEXT) = %s OR name ILIKE %s" in calls[0][0]
+    assert "ORDER BY membership_end_date ASC, id ASC" in calls[1][0]
+    assert calls[1][1][-2:] == (10, 20)
 
 
 def test_queue_filter_and_page_are_bounded(monkeypatch):
