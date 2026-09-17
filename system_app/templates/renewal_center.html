@@ -61,6 +61,10 @@
         .pagination { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 20px; }
         .pagination a, .pagination span { min-height: 44px; display: inline-flex; align-items: center; padding: 9px 13px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
         .pagination .current { color: #06110a; background: #70d774; font-weight: 700; }
+        .workflow-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; }
+        .assignment-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 12px; }
+        .assignment-form label { min-width: 180px; flex: 1 1 180px; }
+        .assignment-form select { min-width: 0; }
         :focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
         @media (min-width: 760px) {
@@ -100,6 +104,28 @@
             <label for="renewal-search">Search by member ID or name
                 <input id="renewal-search" name="search" value="{{ search }}" autocomplete="off" maxlength="120">
             </label>
+            {% if workflow_enabled %}
+            <label for="renewal-status">Workflow status
+                <select id="renewal-status" name="status" data-renewal-auto-filter>
+                    <option value="all" {% if workflow_status_filter == 'all' %}selected{% endif %}>All statuses</option>
+                    <option value="unassigned" {% if workflow_status_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
+                    <option value="open" {% if workflow_status_filter == 'open' %}selected{% endif %}>Open</option>
+                    <option value="waiting" {% if workflow_status_filter == 'waiting' %}selected{% endif %}>Waiting</option>
+                    <option value="paused" {% if workflow_status_filter == 'paused' %}selected{% endif %}>Paused</option>
+                </select>
+            </label>
+            {% if workflow_manager %}
+            <label for="renewal-owner">Owner
+                <select id="renewal-owner" name="owner" data-renewal-auto-filter>
+                    <option value="all" {% if owner_filter == 'all' %}selected{% endif %}>All owners</option>
+                    <option value="unassigned" {% if owner_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
+                    {% for assignee in assignees %}
+                    <option value="{{ assignee.id }}" {% if owner_filter|int == assignee.id %}selected{% endif %}>{{ assignee.username }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            {% endif %}
+            {% endif %}
             <button type="submit">Search</button>
         </form>
 
@@ -127,9 +153,33 @@
                                 </span>
                                 {% if item.membership_packages %}<span class="detail">Package: {{ item.membership_packages }}</span>{% endif %}
                                 {% if item.membership_status %}<span class="detail">Status: {{ item.membership_status }}</span>{% endif %}
+                                {% if workflow_enabled %}
+                                <div class="workflow-meta">
+                                    <span class="detail">Workflow: {{ item.operational_status }}</span>
+                                    <span class="detail">Owner: {{ item.owner_username or 'Unassigned' }}</span>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
-                        <a class="member-link" href="{{ url_for(member_url_endpoint, member_id=item.id) }}">Open member</a>
+                        <div>
+                            <a class="member-link" href="{{ url_for(member_url_endpoint, member_id=item.id) }}">Open member</a>
+                            {% if workflow_enabled and assignment_allowed %}
+                            <form class="assignment-form" method="post" action="{{ url_for('renewal.assign_case', filter=queue_filter, status=workflow_status_filter, owner=owner_filter, search=search, page=page) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="member_id" value="{{ item.id }}">
+                                <input type="hidden" name="expected_version" value="{{ item.version }}">
+                                <label>Assign Renewal owner
+                                    <select name="owner_user_id" required>
+                                        <option value="">Choose owner</option>
+                                        {% for assignee in assignees %}
+                                        <option value="{{ assignee.id }}" {% if item.owner_user_id == assignee.id %}selected{% endif %}>{{ assignee.username }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Assign</button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </article>
                     {% endfor %}
                 </div>
@@ -137,7 +187,7 @@
                 <div class="table-wrap">
                     <table>
                         <caption class="table-note" style="text-align:left; padding: 0 0 10px;">Renewal queue ordered by membership end date, then member ID.</caption>
-                        <thead><tr><th>Member</th><th>Package</th><th>End date</th><th>Days</th><th>Urgency</th><th>Status</th><th>Action</th></tr></thead>
+                        <thead><tr><th>Member</th><th>Package</th><th>End date</th><th>Days</th><th>Urgency</th><th>Status</th>{% if workflow_enabled %}<th>Workflow</th><th>Owner</th>{% endif %}<th>Action</th></tr></thead>
                         <tbody>
                         {% for item in items %}
                             <tr>
@@ -147,7 +197,26 @@
                                 <td>{% if item.days_remaining > 0 %}+{{ item.days_remaining }}{% else %}{{ item.days_remaining }}{% endif %}</td>
                                 <td><span class="badge badge-{{ item.urgency|lower|replace('_', '-') }}">{{ item.urgency|replace('_', ' ')|title }}</span></td>
                                 <td>{{ item.membership_status or '—' }}</td>
-                                <td><a class="member-link" href="{{ url_for(member_url_endpoint, member_id=item.id) }}">Open member</a></td>
+                                {% if workflow_enabled %}<td>{{ item.operational_status }}</td><td>{{ item.owner_username or 'Unassigned' }}</td>{% endif %}
+                                <td>
+                                    <a class="member-link" href="{{ url_for(member_url_endpoint, member_id=item.id) }}">Open member</a>
+                                    {% if workflow_enabled and assignment_allowed %}
+                                    <form class="assignment-form" method="post" action="{{ url_for('renewal.assign_case', filter=queue_filter, status=workflow_status_filter, owner=owner_filter, search=search, page=page) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="member_id" value="{{ item.id }}">
+                                        <input type="hidden" name="expected_version" value="{{ item.version }}">
+                                        <label class="sr-only">Assign Renewal owner
+                                            <select name="owner_user_id" required aria-label="Assign Renewal owner">
+                                                <option value="">Choose owner</option>
+                                                {% for assignee in assignees %}
+                                                <option value="{{ assignee.id }}" {% if item.owner_user_id == assignee.id %}selected{% endif %}>{{ assignee.username }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                        <button type="submit">Assign</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endfor %}
                         </tbody>
