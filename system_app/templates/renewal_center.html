@@ -87,9 +87,9 @@
 
     <section class="panel" aria-labelledby="renewal-filters-title">
         <h2 id="renewal-filters-title" class="sr-only" style="position:absolute;left:-10000px;">Renewal filters</h2>
-        <form class="filters" method="get" action="{{ url_for('renewal.renewal_center') }}">
+        <form class="filters" method="get" action="{{ url_for('renewal.renewal_center') }}" data-renewal-filter-form>
             <label for="renewal-filter">Urgency
-                <select id="renewal-filter" name="filter">
+                <select id="renewal-filter" name="filter" data-renewal-urgency-filter>
                     <option value="all" {% if queue_filter == 'all' %}selected{% endif %}>All eligible</option>
                     <option value="upcoming" {% if queue_filter == 'upcoming' %}selected{% endif %}>Upcoming</option>
                     <option value="due_soon" {% if queue_filter == 'due_soon' %}selected{% endif %}>Due soon</option>
@@ -100,7 +100,7 @@
             <label for="renewal-search">Search by member ID or name
                 <input id="renewal-search" name="search" value="{{ search }}" autocomplete="off" maxlength="120">
             </label>
-            <button type="submit">Apply filters</button>
+            <button type="submit">Search</button>
         </form>
 
         {% if error_message %}
@@ -165,5 +165,6 @@
     </nav>
     {% endif %}
 </main>
+<script src="{{ url_for('static', filename='js/renewal_center.js') }}" defer></script>
 </body>
 </html>

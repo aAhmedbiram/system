@@ -147,6 +147,36 @@ def test_template_is_read_only_and_uses_the_existing_member_route():
     assert 'type="submit"' in template
 
 
+def test_renewal_filter_uses_scoped_change_listener_and_manual_search_fallback():
+    template = Path("system_app/templates/renewal_center.html").read_text(encoding="utf-8")
+    script = Path("system_app/static/js/renewal_center.js").read_text(encoding="utf-8")
+
+    assert "data-renewal-filter-form" in template
+    assert "data-renewal-urgency-filter" in template
+    assert 'method="get"' in template.lower()
+    assert 'type="submit"' in template
+    assert "renewal_center.js" in template
+    assert "addEventListener('change'" in script
+    assert "requestSubmit" in script
+    assert "data-renewal-filter-form" in script
+    assert "form.addEventListener('submit', function (event)" in script
+    assert "event.preventDefault()" in script
+    assert "if (typeof form.requestSubmit === 'function')" in script
+    assert "submitting = true;\n            form.requestSubmit()" not in script
+    assert "submitting = true;\n        form.submit()" in script
+    assert "form.requestSubmit();\n            return;" in script
+    assert "form.submit();" in script
+    assert ">Search</button>" in template
+    assert "Apply filters" not in template
+    assert "input" not in script
+    assert "keyup" not in script
+    assert "fetch" not in script
+    assert "XMLHttpRequest" not in script
+    assert "setInterval" not in script
+    assert "setTimeout" not in script
+    assert "location.reload" not in script
+
+
 def _test_member(member_id, name="Member", days_remaining=3):
     return {
         "id": member_id,
