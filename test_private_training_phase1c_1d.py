@@ -273,6 +273,8 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         trainer_user = trainer_user or self.trainer_user
         client = app.test_client()
         self._login_as(client, trainer_user)
+        if not get_private_training_pending_session(subscription_id):
+            create_private_training_session_checkin(trainer_user, subscription_id, "Portal Workout")
         detail_response = client.get(f"/private-training/subscriptions/{subscription_id}")
         csrf_token = self._csrf_from_html(detail_response.data.decode())
         response = client.post(
@@ -368,7 +370,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
 
         completed = self._make_active_subscription(self.member_e_id, total_sessions=1)
         _, _, _, completed_token = self._generate_portal(completed["id"])
-        pending = create_private_training_session_checkin(self.trainer_user, completed["id"], "Upper Body")
+        pending = get_private_training_pending_session(completed["id"])
         approve_private_training_session(completed["id"], pending["id"], {"subscription_id": completed["id"]})
         self.assertEqual(self._portal_get(completed_token).status_code, 410)
 
@@ -446,17 +448,18 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
 
     def test_10_trainer_and_super_admin_token_controls(self):
         subscription = self._make_active_subscription(self.member_c_id)
+        create_private_training_session_checkin(self.trainer_user, subscription["id"], "Leg Day")
         _, response = self._open_detail(subscription["id"], self.trainer_user)
         html = response.data.decode()
         self.assertEqual(response.status_code, 200)
         self.assertIn("Generate Link", html)
-        self.assertIn("Revoke Link", html)
+        self.assertNotIn("Revoke Link", html)
 
         _, super_admin_response = self._open_detail(subscription["id"], self.super_admin_user)
         super_admin_html = super_admin_response.data.decode()
         self.assertEqual(super_admin_response.status_code, 200)
         self.assertIn("Generate Link", super_admin_html)
-        self.assertIn("Revoke Link", super_admin_html)
+        self.assertNotIn("Revoke Link", super_admin_html)
         self.assertIn("Private Training Subscription", super_admin_html)
 
     def test_11_trainer_selector_requires_explicit_permission_and_create_validation(self):
@@ -679,7 +682,8 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
             "Trainer needs to reschedule",
             {"subscription_id": subscription["id"]},
         )
-        self.assertEqual(repeated["outcome"], "already_rejected")
+        second = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Arms Day")
+        self.assertEqual(second["status"], "PENDING_MEMBER_APPROVAL")
 
         _, _, _, raw_token = self._generate_portal(subscription["id"])
         portal_html = self._portal_get(raw_token).data.decode()
@@ -687,10 +691,7 @@ class PrivateTrainingPhase1C1DTest(unittest.TestCase):
         self.assertNotIn("Rejected At", portal_html)
         self.assertNotIn("Reason", portal_html)
         self.assertNotIn("rejection_reason", portal_html)
-        self.assertIn("No session history yet.", portal_html)
-
-        second = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Arms Day")
-        self.assertEqual(second["status"], "PENDING_MEMBER_APPROVAL")
+        self.assertIn("Arms Day", portal_html)
 
     def test_19_wrong_token_cannot_access_other_subscription_session(self):
         sub_a = self._make_active_subscription(self.member_e_id)

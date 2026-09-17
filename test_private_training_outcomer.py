@@ -270,6 +270,7 @@ class PrivateTrainingOutcomerSupportTest(unittest.TestCase):
 
     def test_07_portal_revoke_and_regenerate_still_work(self):
         subscription = self._create_outcomer_subscription()
+        create_private_training_session_checkin(self.trainer_user, subscription["id"], "Outcomer Workout 07")
         self._login_as(self.trainer_user)
         first_response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token")
         first_token = self._extract_generated_url(first_response.data.decode())[1]

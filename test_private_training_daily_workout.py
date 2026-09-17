@@ -265,6 +265,8 @@ class PrivateTrainingDailyWorkoutTest(unittest.TestCase):
     def _generate_portal(self, subscription_id):
         client = app.test_client()
         self._login_as(client, self.trainer_user)
+        if not get_private_training_pending_session(subscription_id):
+            create_private_training_session_checkin(self.trainer_user, subscription_id, "Portal Daily Workout")
         detail = client.get(f"/private-training/subscriptions/{subscription_id}")
         csrf = self._csrf_from_html(detail.data.decode())
         response = client.post(
@@ -351,6 +353,7 @@ class PrivateTrainingDailyWorkoutTest(unittest.TestCase):
         self.assertNotIn("Rejected At", staff_html)
         self.assertNotIn("Reason", staff_html)
 
+        create_private_training_session_checkin(self.trainer_user, subscription["id"], "Leg Day Second")
         _, _, portal_url, raw_token = self._generate_portal(subscription["id"])
         portal_html = app.test_client().get(urlparse(portal_url).path).data.decode()
         self.assertIn("Workout", portal_html)
@@ -503,8 +506,8 @@ class PrivateTrainingDailyWorkoutTest(unittest.TestCase):
 
     def test_13_old_member_reject_endpoint_still_returns_404(self):
         subscription = self._make_active_subscription(self.member_b_id)
-        portal_client, csrf, portal_url, raw_token = self._generate_portal(subscription["id"])
         pending = create_private_training_session_checkin(self.trainer_user, subscription["id"], "Boxing")
+        portal_client, csrf, portal_url, raw_token = self._generate_portal(subscription["id"])
 
         response = portal_client.post(
             f"/private-training/member/{raw_token}/sessions/{pending['id']}/reject",

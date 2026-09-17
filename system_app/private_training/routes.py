@@ -685,6 +685,9 @@ def generate_subscription_portal_token(subscription_id: int):
     except (PrivateTrainingCompletedError, PrivateTrainingExpiredError, PrivateTrainingCancelledError) as exc:
         flash(str(exc), "error")
         return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
+    except PrivateTrainingValidationError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))
     except PrivateTrainingError as exc:
         flash(str(exc), "error")
         return redirect(url_for("private_training.subscription_detail", subscription_id=subscription_id))

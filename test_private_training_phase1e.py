@@ -236,6 +236,8 @@ class PrivateTrainingPhase1ETest(unittest.TestCase):
     def _portal_client_and_html(self, subscription_id):
         client = app.test_client()
         self._login_as(client, self.trainer_user)
+        if not get_private_training_pending_session(subscription_id):
+            create_private_training_session_checkin(self.trainer_user, subscription_id, "Portal Phase1e Workout")
         detail = client.get(f"/private-training/subscriptions/{subscription_id}")
         csrf = self._csrf_from_html(detail.data.decode())
         generated = client.post(

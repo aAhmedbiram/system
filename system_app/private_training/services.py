@@ -1031,7 +1031,7 @@ def reject_private_training_session(
     return result
 
 
-def generate_portal_token(current_user: dict[str, Any], subscription_id: Any) -> dict[str, Any]:
+def generate_portal_token(current_user: dict[str, Any], subscription_id: Any, session_id: Any | None = None) -> dict[str, Any]:
     _require_trainer_current_user(current_user)
     subscription_id_int = validate_positive_int(subscription_id, "subscription_id")
 
@@ -1050,6 +1050,26 @@ def generate_portal_token(current_user: dict[str, Any], subscription_id: Any) ->
         if effective_status == "EXPIRED":
             raise PrivateTrainingExpiredError("Subscription is expired")
 
+        cur.execute(
+            """
+            SELECT *
+            FROM private_training_sessions
+            WHERE subscription_id = %s
+              AND status = 'PENDING_MEMBER_APPROVAL'
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            FOR UPDATE
+            """,
+            (subscription_id_int,),
+        )
+        pending_session = cur.fetchone()
+        if not pending_session:
+            raise PrivateTrainingValidationError("No session is currently waiting for member approval.", "no_pending_session")
+
+        target_session_id = pending_session["id"]
+        if session_id is not None and validate_positive_int(session_id, "session_id") != target_session_id:
+            raise PrivateTrainingForbiddenError("Target session is no longer pending approval")
+
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
         cur.execute(
@@ -1065,17 +1085,18 @@ def generate_portal_token(current_user: dict[str, Any], subscription_id: Any) ->
         cur.execute(
             """
             INSERT INTO private_training_portal_tokens (
-                subscription_id, token_hash, created_by_user_id
-            ) VALUES (%s, %s, %s)
-            RETURNING id, subscription_id, token_hash, created_by_user_id, created_at, revoked_at, last_used_at
+                subscription_id, session_id, token_hash, created_by_user_id
+            ) VALUES (%s, %s, %s, %s)
+            RETURNING id, subscription_id, session_id, token_hash, created_by_user_id, created_at, revoked_at, last_used_at
             """,
-            (subscription_id_int, token_hash, current_user["id"]),
+            (subscription_id_int, target_session_id, token_hash, current_user["id"]),
         )
         token_row = cur.fetchone()
         return {
             "raw_token": raw_token,
             "token": dict(token_row) if token_row else None,
             "subscription": subscription,
+            "session": dict(pending_session),
         }
 
     result = run_in_transaction(_generate)

@@ -561,12 +561,14 @@ class PrivateTrainingPhase1ATest(unittest.TestCase):
 
     def test_33_portal_token_raw_value_is_not_stored(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)
+        self._check_in(subscription["id"])
         token_result = generate_portal_token(self.trainer_a_user, subscription["id"])
         self.assertIn("raw_token", token_result)
         self.assertNotEqual(token_result["raw_token"], token_result["token"]["token_hash"])
 
     def test_34_portal_token_hash_resolves_correctly(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)
+        self._check_in(subscription["id"])
         token_result = generate_portal_token(self.trainer_a_user, subscription["id"])
         resolved = resolve_portal_token(token_result["raw_token"])
         self.assertEqual(resolved["subscription"]["id"], subscription["id"])
@@ -574,6 +576,7 @@ class PrivateTrainingPhase1ATest(unittest.TestCase):
 
     def test_35_regenerated_token_invalidates_old_token(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)
+        self._check_in(subscription["id"])
         first = generate_portal_token(self.trainer_a_user, subscription["id"])
         second = generate_portal_token(self.trainer_a_user, subscription["id"])
         with self.assertRaises(PrivateTrainingNotFoundError):
@@ -583,6 +586,7 @@ class PrivateTrainingPhase1ATest(unittest.TestCase):
 
     def test_36_revoke_invalidates_token(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)
+        self._check_in(subscription["id"])
         token_result = generate_portal_token(self.trainer_a_user, subscription["id"])
         revoke_result = revoke_portal_token(self.trainer_a_user, subscription["id"])
         self.assertGreaterEqual(revoke_result["revoked_count"], 1)
@@ -591,14 +595,15 @@ class PrivateTrainingPhase1ATest(unittest.TestCase):
 
     def test_37_completed_subscription_token_no_longer_resolves(self):
         subscription = self._create_subscription(self.member_a_id, self.trainer_a_user_id, 1, 0, 30)
-        token_result = generate_portal_token(self.trainer_a_user, subscription["id"])
         session_row = self._check_in(subscription["id"])
+        token_result = generate_portal_token(self.trainer_a_user, subscription["id"])
         self._approve(subscription["id"], session_row["id"])
         with self.assertRaises(PrivateTrainingCompletedError):
             resolve_portal_token(token_result["raw_token"])
 
     def test_38_expired_subscription_token_no_longer_resolves(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)
+        self._check_in(subscription["id"])
         token_result = generate_portal_token(self.trainer_a_user, subscription["id"])
         self._expire_subscription(subscription["id"])
         with self.assertRaises(PrivateTrainingExpiredError):

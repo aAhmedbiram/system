@@ -599,11 +599,12 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_14c_assigned_trainer_sees_portal_controls(self):
         subscription = self._create_subscription(self.member_a_id, self.trainer_a_user_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 14c")
         self._login_as(self.trainer_a_user)
         response = self.client.get(f"/private-training/subscriptions/{subscription['id']}")
         html = response.data.decode()
         self.assertIn("Generate Link", html)
-        self.assertIn("Revoke Link", html)
+        self.assertNotIn("Revoke Link", html)
 
     def test_14d_super_admin_without_trainer_permission_is_not_assignable_but_can_manage_token(self):
         self._login_as(self.manager_user)
@@ -611,11 +612,12 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
         self.assertNotIn("ptb_super_admin", create_response.data.decode())
 
         subscription = self._create_subscription(self.member_b_id, self.trainer_a_user_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 14d")
         self._login_as(self.super_admin_user)
         response = self.client.get(f"/private-training/subscriptions/{subscription['id']}")
         html = response.data.decode()
         self.assertIn("Generate Link", html)
-        self.assertIn("Revoke Link", html)
+        self.assertNotIn("Revoke Link", html)
 
     def test_15_effective_status_displayed(self):
         subscription = self._make_active_subscription(self.member_c_id, total_sessions=2)
@@ -638,6 +640,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_17_correct_trainer_can_generate_portal_link(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 17")
         self._login_as(self.trainer_a_user)
         response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token")
         self.assertEqual(response.status_code, 200)
@@ -657,6 +660,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_18_raw_token_displayed_once_and_hidden_after_reload(self):
         subscription = self._make_active_subscription(self.member_b_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 18")
         self._login_as(self.trainer_a_user)
         response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token")
         html = response.data.decode()
@@ -672,6 +676,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_19_correct_trainer_can_revoke_token(self):
         subscription = self._make_active_subscription(self.member_a_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 19")
         self._login_as(self.trainer_a_user)
         self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token")
         revoke_response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token/revoke", follow_redirects=True)
@@ -680,6 +685,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_20_revoked_token_no_longer_resolves(self):
         subscription = self._make_active_subscription(self.member_c_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 20")
         self._login_as(self.trainer_a_user)
         generate_response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token")
         raw_token = self._extract_generated_url(generate_response.data.decode())[1]
@@ -689,6 +695,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_21_regenerate_invalidates_old_token(self):
         subscription = self._make_active_subscription(self.member_d_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 21")
         self._login_as(self.trainer_a_user)
         first_response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token")
         first_token = self._extract_generated_url(first_response.data.decode())[1]
@@ -700,6 +707,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_22_wrong_trainer_cannot_generate_token(self):
         subscription = self._make_active_subscription(self.member_a_id, trainer_user_id=self.trainer_a_user_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 22")
         self._login_as(self.trainer_b_user)
         response = self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token", follow_redirects=True)
         self.assertEqual(response.status_code, 200)
@@ -708,6 +716,7 @@ class PrivateTrainingPhase1BTest(unittest.TestCase):
 
     def test_23_wrong_trainer_cannot_revoke_token(self):
         subscription = self._make_active_subscription(self.member_b_id, trainer_user_id=self.trainer_a_user_id, total_sessions=2)
+        create_private_training_session_checkin(self.trainer_a_user, subscription["id"], "Workout 23")
         self._login_as(self.trainer_a_user)
         self.client.post(f"/private-training/subscriptions/{subscription['id']}/portal-token")
         self._login_as(self.trainer_b_user)

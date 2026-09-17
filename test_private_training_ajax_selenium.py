@@ -100,7 +100,7 @@ class LocalPrivateTrainingServer:
                 can_manage_tokens=True,
                 can_check_in=True,
                 check_in_status_message=None,
-                pending_session=None,
+                pending_session={"id": 1, "workout_name": "Pending Workout"},
                 portal_link_status="No active link",
                 show_generate_result=False,
                 generated_portal_url=None,
@@ -330,7 +330,7 @@ class TestPrivateTrainingAjaxSelenium(unittest.TestCase):
         self.assertIsNone(driver.find_element(By.CSS_SELECTOR, 'form[action*="/cancel"]').get_attribute("data-private-training-checkin-ajax"))
         self.assertEqual(
             len(driver.find_elements(By.CSS_SELECTOR, 'form[action*="/portal-token"]')),
-            2,
+            1,
         )
 
     def test_feature_enabled_real_template_whatsapp_success_and_same_uuid_replay(self):

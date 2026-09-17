@@ -279,14 +279,20 @@
                 {% endif %}
                 {% if can_manage_tokens %}
                     <div class="actions">
-                        <form method="post" action="{{ url_for('private_training.generate_subscription_portal_token', subscription_id=subscription.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-primary" type="submit">{% if portal_link_status == 'Active link exists' %}Regenerate Link{% else %}Generate Link{% endif %}</button>
-                        </form>
-                        <form method="post" action="{{ url_for('private_training.revoke_subscription_portal_token', subscription_id=subscription.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-danger" type="submit">Revoke Link</button>
-                        </form>
+                        {% if pending_session %}
+                            <form method="post" action="{{ url_for('private_training.generate_subscription_portal_token', subscription_id=subscription.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-primary" type="submit">{% if portal_link_status == 'Active link exists' %}Regenerate Link{% else %}Generate Link{% endif %}</button>
+                            </form>
+                        {% else %}
+                            <div class="muted">No session is currently waiting for member approval.</div>
+                        {% endif %}
+                        {% if portal_link_status == 'Active link exists' %}
+                            <form method="post" action="{{ url_for('private_training.revoke_subscription_portal_token', subscription_id=subscription.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-danger" type="submit">Revoke Link</button>
+                            </form>
+                        {% endif %}
                     </div>
                 {% endif %}
             </div>

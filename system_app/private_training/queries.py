@@ -173,6 +173,7 @@ def ensure_private_training_tables() -> None:
             CREATE TABLE IF NOT EXISTS private_training_portal_tokens (
                 id SERIAL PRIMARY KEY,
                 subscription_id INTEGER NOT NULL REFERENCES private_training_subscriptions(id) ON DELETE RESTRICT,
+                session_id INTEGER NULL REFERENCES private_training_sessions(id) ON DELETE RESTRICT,
                 token_hash CHAR(64) NOT NULL UNIQUE,
                 created_by_user_id INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -181,17 +182,27 @@ def ensure_private_training_tables() -> None:
             )
             """
         )
+        cur.execute(
+            """
+            ALTER TABLE private_training_portal_tokens
+            ADD COLUMN IF NOT EXISTS session_id INTEGER NULL
+            REFERENCES private_training_sessions(id) ON DELETE RESTRICT
+            """
+        )
 
         cur.execute(
             """
-            CREATE TABLE IF NOT EXISTS private_training_daily_workouts (
-                id SERIAL PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS private_training_checkin_operations (
+                client_operation_id UUID PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
                 subscription_id INTEGER NOT NULL REFERENCES private_training_subscriptions(id) ON DELETE RESTRICT,
-                workout_date DATE NOT NULL,
-                workout_name TEXT NOT NULL,
+                session_id INTEGER NULL REFERENCES private_training_sessions(id) ON DELETE RESTRICT,
+                portal_token_id INTEGER NULL REFERENCES private_training_portal_tokens(id) ON DELETE RESTRICT,
+                status VARCHAR(24) NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                CONSTRAINT uq_private_training_daily_workouts_subscription_date UNIQUE (subscription_id, workout_date)
+                CONSTRAINT chk_private_training_checkin_operations_status
+                    CHECK (status IN ('PROCESSING', 'COMPLETED'))
             )
             """
         )
