@@ -48,3 +48,16 @@ through the normal reviewed migration process. The application does not apply it
 automatically. Set `PRIVATE_TRAINING_PORTAL_TOKEN_SIGNING_KEY` to a dedicated,
 strong secret before enabling the feature; rotating it invalidates deterministic
 replay of prior combined-operation links unless a versioned key strategy is added.
+
+## Renewal Command Center Phase 1B.1
+
+`add_renewal_workflow.sql` is an additive migration for the feature-flagged Renewal
+ownership and follow-up foundation. It creates `renewal_cases`,
+`renewal_follow_ups`, and `renewal_assignment_events`, with foreign keys,
+status/result checks, uniqueness constraints, and indexes for planned queues.
+
+The migration does not create cases, backfill members, alter CRM tables, or run at
+application startup. Apply it first to an isolated test database and verify it can
+be applied twice before the normal reviewed production migration process.
+Keep `RENEWAL_WORKFLOW_ENABLED=false` until later ownership/follow-up phases are
+reviewed; Phase 1A continues to use `RENEWAL_COMMAND_CENTER_ENABLED`.

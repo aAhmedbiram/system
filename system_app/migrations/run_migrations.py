@@ -64,6 +64,9 @@ if __name__ == '__main__':
         success = run_migration('add_private_training_checkin_invitations.sql')
 
     if success:
+        success = run_migration('add_renewal_workflow.sql')
+
+    if success:
         print("\n" + "=" * 80)
         print("✅ All migrations completed successfully!")
         print("=" * 80)

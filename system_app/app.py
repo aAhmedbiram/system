@@ -56,6 +56,10 @@ app.config['RENEWAL_COMMAND_CENTER_ENABLED'] = (
     os.environ.get('RENEWAL_COMMAND_CENTER_ENABLED', '').strip().lower()
     in {'1', 'true', 'yes', 'on'}
 )
+app.config['RENEWAL_WORKFLOW_ENABLED'] = (
+    os.environ.get('RENEWAL_WORKFLOW_ENABLED', '').strip().lower()
+    in {'1', 'true', 'yes', 'on'}
+)
 
 # Enable CSRF protection
 csrf = CSRFProtect(app)
@@ -1174,7 +1178,6 @@ def user_permissions():
         ('online_users', 'Online Users'),
         ('invitations_view', 'Invitations - View History'),
         ('invitations_use', 'Invitations - Use Invitation'),
-        ('renewal_center_view', 'Renewal Center - View'),
     ]
     crm_permissions = [
         ('crm_view', 'CRM - View CRM'),
@@ -1192,7 +1195,9 @@ def user_permissions():
         ('private_training_manage', 'Private Training - Manage'),
         ('private_training_trainer', 'Private Training - Trainer'),
     ]
-    all_permissions = general_permissions + crm_permissions + private_training_permissions
+    from system_app.renewal.permissions import RENEWAL_PERMISSIONS
+    renewal_permissions = list(RENEWAL_PERMISSIONS)
+    all_permissions = general_permissions + crm_permissions + renewal_permissions + private_training_permissions
 
     if request.method == 'POST':
         user_id = request.form.get('user_id')
@@ -1240,7 +1245,8 @@ def user_permissions():
         users=normalized_users,
         all_permissions=all_permissions,
         general_permissions=general_permissions,
-        crm_permissions=crm_permissions
+        crm_permissions=crm_permissions,
+        renewal_permissions=renewal_permissions,
     )
 
 

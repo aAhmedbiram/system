@@ -267,6 +267,7 @@ def test_renewal_permission_is_not_granted_by_crm_or_username(web_app, monkeypat
     response = client.get("/renewal/")
 
     assert response.status_code == 302
+    assert response.location == "/attendance_table", response.location
 
 
 def test_existing_generic_super_admin_mechanism_allows_access(web_app, monkeypatch):
@@ -428,6 +429,102 @@ def test_queue_identity_is_members_id_and_never_phone_or_crm(monkeypatch):
     assert len({item["id"] for item in result}) == 2
     assert all("phone" not in item for item in result)
     assert all("crm_leads" not in query.lower() for query in calls)
+
+
+def test_phase1b_workflow_flag_does_not_disable_phase1a(web_app, monkeypatch):
+    from system_app import app as app_module
+
+    web_app.config["RENEWAL_COMMAND_CENTER_ENABLED"] = True
+    web_app.config["RENEWAL_WORKFLOW_ENABLED"] = False
+    monkeypatch.setattr(app_module, "get_current_user", lambda: {
+        "id": 1,
+        "username": "staff",
+        "is_approved": True,
+        "permissions": {"renewal_center_view": True},
+    })
+    monkeypatch.setattr(
+        "system_app.renewal.routes.get_renewal_queue",
+        lambda **_: ([_test_member(12, "Phase 1A")], 1),
+    )
+    client = web_app.test_client()
+    _login_as(client, {"id": 1})
+
+    response = client.get("/renewal/")
+
+    assert response.status_code == 200
+    assert b"Phase 1A" in response.data
+
+
+def test_user_permission_save_preserves_renewal_and_crm_keys(web_app, monkeypatch):
+    import importlib
+
+    app_module = importlib.import_module("system_app.app")
+    web_app.config["WTF_CSRF_ENABLED"] = False
+
+    captured = []
+
+    def fake_query_db(query, args=(), one=False, commit=False):
+        captured.append((query, args, one, commit))
+        return None
+
+    class CapturedJson:
+        def __init__(self, value):
+            self.obj = value
+
+    monkeypatch.setitem(
+        app_module.user_permissions.__wrapped__.__globals__,
+        "query_db",
+        fake_query_db,
+    )
+    monkeypatch.setitem(
+        app_module.user_permissions.__wrapped__.__globals__,
+        "Json",
+        CapturedJson,
+    )
+    assert app_module.user_permissions.__wrapped__.__globals__["query_db"] is fake_query_db
+    with web_app.test_request_context(
+        "/user_permissions",
+        method="POST",
+        data={
+            "user_id": "22",
+            "is_approved": "on",
+            "perms": [
+                "crm_view",
+                "renewal_center_view",
+                "renewal_center_follow_up",
+                "renewal_center_assign",
+                "renewal_center_manager",
+            ],
+        },
+    ):
+        from flask import session
+        from flask import request
+
+        session["user_id"] = 1
+        session["username"] = "rino"
+        assert request.method == "POST"
+        assert request.form.get("user_id") == "22"
+        response = app_module.user_permissions.__wrapped__()
+
+    assert response.status_code == 302
+    update = next(call for call in captured if "UPDATE users SET is_approved" in call[0])
+    permission_payload = update[1][1].obj
+    assert permission_payload["crm_view"] is True
+    assert permission_payload["renewal_center_view"] is True
+    assert permission_payload["renewal_center_follow_up"] is True
+    assert permission_payload["renewal_center_assign"] is True
+    assert permission_payload["renewal_center_manager"] is True
+
+
+def test_default_users_do_not_receive_workflow_permissions(web_app):
+    from system_app.app import get_default_permissions_for_username
+
+    defaults = get_default_permissions_for_username("ordinary_new_user")
+
+    assert defaults == {"attendance": True}
+    assert "renewal_center_follow_up" not in defaults
+    assert "renewal_center_assign" not in defaults
+    assert "renewal_center_manager" not in defaults
 
 
 def test_rendered_queue_does_not_expose_phone(web_app):

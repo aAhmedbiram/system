@@ -9,10 +9,10 @@ from flask import Blueprint, abort, current_app, render_template, request, url_f
 
 from system_app.app import permission_required
 from system_app.renewal.queries import RENEWAL_FILTERS, get_renewal_queue
+from system_app.renewal.permissions import RENEWAL_CENTER_VIEW
 
 renewal_bp = Blueprint("renewal", __name__)
 
-RENEWAL_CENTER_VIEW = "renewal_center_view"
 PER_PAGE = 25
 
 
