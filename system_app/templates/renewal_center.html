@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Renewal Command Center - Rival Gym</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0b1020;
+            --panel: rgba(22, 30, 52, .94);
+            --panel-soft: rgba(31, 42, 70, .78);
+            --text: #f4f7fb;
+            --muted: #b5c0d4;
+            --line: rgba(255, 255, 255, .12);
+            --green: #4caf50;
+            --blue: #42a5f5;
+            --orange: #ffb74d;
+            --red: #ef5350;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #080b15, #151d38 55%, #0d172c);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+
+        a { color: #b9dcff; }
+        .page { width: min(1180px, 100%); margin: 0 auto; padding: 24px 16px 48px; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+        h1 { margin: 0; color: #70d774; font-size: clamp(1.55rem, 4vw, 2.25rem); }
+        .back-link { min-height: 44px; display: inline-flex; align-items: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: 9px; text-decoration: none; }
+        .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: 0 12px 28px rgba(0,0,0,.22); }
+        .filters { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto; gap: 12px; align-items: end; margin-bottom: 18px; }
+        label { display: grid; gap: 6px; color: var(--muted); font-size: .9rem; }
+        input, select, button, .member-link { min-height: 44px; border-radius: 8px; border: 1px solid var(--line); font: inherit; }
+        input, select { width: 100%; padding: 10px 12px; color: var(--text); background: #111a30; }
+        button, .member-link { display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; color: #06110a; background: #70d774; font-weight: 700; cursor: pointer; text-decoration: none; }
+        button:hover, .member-link:hover { filter: brightness(1.08); }
+        .summary { color: var(--muted); margin: 0 0 14px; }
+        .error, .empty { border-radius: 10px; padding: 16px; color: var(--text); background: rgba(239, 83, 80, .16); border: 1px solid rgba(239, 83, 80, .45); }
+        .empty { background: rgba(66, 165, 245, .13); border-color: rgba(66, 165, 245, .35); }
+        .cards { display: grid; gap: 12px; }
+        .renewal-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 16px; background: var(--panel-soft); border: 1px solid var(--line); border-radius: 12px; }
+        .member-title { margin: 0 0 6px; font-size: 1.1rem; overflow-wrap: anywhere; }
+        .member-id, .detail, .table-note { color: var(--muted); }
+        .details { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; }
+        .badge { display: inline-flex; align-items: center; width: fit-content; padding: 5px 9px; border-radius: 999px; font-size: .82rem; font-weight: 700; }
+        .badge-upcoming { color: #06110a; background: #81c784; }
+        .badge-due-soon { color: #261a00; background: var(--orange); }
+        .badge-urgent { color: #fff; background: #e57373; }
+        .badge-expired { color: #fff; background: var(--red); }
+        .table-wrap { display: none; overflow-x: auto; max-width: 100%; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+        th { color: var(--muted); font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+        td { overflow-wrap: anywhere; }
+        .pagination { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 20px; }
+        .pagination a, .pagination span { min-height: 44px; display: inline-flex; align-items: center; padding: 9px 13px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
+        .pagination .current { color: #06110a; background: #70d774; font-weight: 700; }
+        :focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+        @media (min-width: 760px) {
+            .table-wrap { display: block; }
+            .cards { display: none; }
+        }
+
+        @media (max-width: 600px) {
+            .page { padding: 18px 12px 36px; }
+            .topbar { align-items: flex-start; flex-direction: column; }
+            .filters { grid-template-columns: 1fr; }
+            .filters button { width: 100%; }
+            .renewal-card { grid-template-columns: 1fr; }
+            .member-link { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<main class="page">
+    <div class="topbar">
+        <h1>Renewal Command Center</h1>
+        <a class="back-link" href="{{ url_for('index') }}">← Back Home</a>
+    </div>
+
+    <section class="panel" aria-labelledby="renewal-filters-title">
+        <h2 id="renewal-filters-title" class="sr-only" style="position:absolute;left:-10000px;">Renewal filters</h2>
+        <form class="filters" method="get" action="{{ url_for('renewal.renewal_center') }}">
+            <label for="renewal-filter">Urgency
+                <select id="renewal-filter" name="filter">
+                    <option value="all" {% if queue_filter == 'all' %}selected{% endif %}>All eligible</option>
+                    <option value="upcoming" {% if queue_filter == 'upcoming' %}selected{% endif %}>Upcoming</option>
+                    <option value="due_soon" {% if queue_filter == 'due_soon' %}selected{% endif %}>Due soon</option>
+                    <option value="urgent" {% if queue_filter == 'urgent' %}selected{% endif %}>Urgent</option>
+                    <option value="expired" {% if queue_filter == 'expired' %}selected{% endif %}>Expired</option>
+                </select>
+            </label>
+            <label for="renewal-search">Search by member ID or name
+                <input id="renewal-search" name="search" value="{{ search }}" autocomplete="off" maxlength="120">
+            </label>
+            <button type="submit">Apply filters</button>
+        </form>
+
+        {% if error_message %}
+            <div class="error" role="alert">{{ error_message }}</div>
+        {% else %}
+            <p class="summary" aria-live="polite">{{ total_count }} eligible member{% if total_count != 1 %}s{% endif %}</p>
+
+            {% if not items %}
+                <div class="empty" role="status">No members match the selected renewal filters.</div>
+            {% else %}
+                <div class="cards">
+                    {% for item in items %}
+                    <article class="renewal-card">
+                        <div>
+                            <h2 class="member-title">{{ item.name or 'Unnamed member' }}</h2>
+                            <div class="member-id">Member ID: {{ item.id }}</div>
+                            <div class="details">
+                                <span class="badge badge-{{ item.urgency|lower|replace('_', '-') }}">{{ item.urgency|replace('_', ' ')|title }}</span>
+                                <span class="detail">End date: {{ item.membership_end_date }}</span>
+                                <span class="detail">
+                                    {% if item.days_remaining > 0 %}{{ item.days_remaining }} days remaining
+                                    {% elif item.days_remaining == 0 %}Expires today
+                                    {% else %}{{ item.days_remaining|abs }} days expired{% endif %}
+                                </span>
+                                {% if item.membership_packages %}<span class="detail">Package: {{ item.membership_packages }}</span>{% endif %}
+                                {% if item.membership_status %}<span class="detail">Status: {{ item.membership_status }}</span>{% endif %}
+                            </div>
+                        </div>
+                        <a class="member-link" href="{{ url_for(member_url_endpoint, member_id=item.id) }}">Open member</a>
+                    </article>
+                    {% endfor %}
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <caption class="table-note" style="text-align:left; padding: 0 0 10px;">Renewal queue ordered by membership end date, then member ID.</caption>
+                        <thead><tr><th>Member</th><th>Package</th><th>End date</th><th>Days</th><th>Urgency</th><th>Status</th><th>Action</th></tr></thead>
+                        <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td>{{ item.name or 'Unnamed member' }}<br><span class="member-id">#{{ item.id }}</span></td>
+                                <td>{{ item.membership_packages or '—' }}</td>
+                                <td>{{ item.membership_end_date }}</td>
+                                <td>{% if item.days_remaining > 0 %}+{{ item.days_remaining }}{% else %}{{ item.days_remaining }}{% endif %}</td>
+                                <td><span class="badge badge-{{ item.urgency|lower|replace('_', '-') }}">{{ item.urgency|replace('_', ' ')|title }}</span></td>
+                                <td>{{ item.membership_status or '—' }}</td>
+                                <td><a class="member-link" href="{{ url_for(member_url_endpoint, member_id=item.id) }}">Open member</a></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        {% endif %}
+    </section>
+
+    {% if total_pages > 1 %}
+    <nav class="pagination" aria-label="Renewal queue pages">
+        {% if page > 1 %}<a href="{{ url_for('renewal.renewal_center', page=page - 1, filter=queue_filter, search=search) }}">Previous</a>{% endif %}
+        <span class="current" aria-current="page">Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}<a href="{{ url_for('renewal.renewal_center', page=page + 1, filter=queue_filter, search=search) }}">Next</a>{% endif %}
+    </nav>
+    {% endif %}
+</main>
+</body>
+</html>

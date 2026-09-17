@@ -52,6 +52,10 @@ app.config['PRIVATE_TRAINING_WHATSAPP_CHECKIN_ENABLED'] = (
 app.config['PRIVATE_TRAINING_PORTAL_TOKEN_SIGNING_KEY'] = os.environ.get(
     'PRIVATE_TRAINING_PORTAL_TOKEN_SIGNING_KEY', ''
 ).strip()
+app.config['RENEWAL_COMMAND_CENTER_ENABLED'] = (
+    os.environ.get('RENEWAL_COMMAND_CENTER_ENABLED', '').strip().lower()
+    in {'1', 'true', 'yes', 'on'}
+)
 
 # Enable CSRF protection
 csrf = CSRFProtect(app)
@@ -936,6 +940,7 @@ def get_common_template_context():
         'revenue_last_month': 0.0,
         'revenue_growth': 0.0,
         'revenue_by_package': [],
+        'renewal_center_enabled': bool(app.config.get('RENEWAL_COMMAND_CENTER_ENABLED', False)),
         'server_now_iso': datetime.now().isoformat()
     }
     
@@ -1169,6 +1174,7 @@ def user_permissions():
         ('online_users', 'Online Users'),
         ('invitations_view', 'Invitations - View History'),
         ('invitations_use', 'Invitations - Use Invitation'),
+        ('renewal_center_view', 'Renewal Center - View'),
     ]
     crm_permissions = [
         ('crm_view', 'CRM - View CRM'),
@@ -6779,6 +6785,8 @@ from system_app.private_training.public_routes import private_training_public_bp
 app.register_blueprint(private_training_public_bp, url_prefix='/private-training')
 from system_app.private_training.routes import private_training_bp
 app.register_blueprint(private_training_bp, url_prefix='/private-training')
+from system_app.renewal.routes import renewal_bp
+app.register_blueprint(renewal_bp, url_prefix='/renewal')
 
 # === Run application ===
 if __name__ == '__main__':
