@@ -204,6 +204,75 @@ def test_invalid_assignees_do_not_create_case_or_event(renewal_db):
         assert cur.fetchone()[0] == 0
 
 
+def test_assignee_candidates_match_renewal_bypass_policy(renewal_db, monkeypatch):
+    from psycopg2.extras import RealDictCursor
+    from system_app.renewal import queries as renewal_queries
+
+    conn, _today, _schema = renewal_db
+    _seed_user(conn, 70, "rino", {}, approved=False)
+    _seed_user(conn, 71, "approved_viewer", {"renewal_center_view": True})
+    _seed_user(conn, 72, "approved_super", {"super_admin": True})
+    _seed_user(conn, 73, "unapproved_viewer", {"renewal_center_view": True}, approved=False)
+    _seed_user(conn, 74, "unapproved_super", {"super_admin": True}, approved=False)
+    _seed_user(conn, 75, "approved_plain", {})
+
+    def isolated_query_db(query, params=(), one=False):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+        return (dict(rows[0]) if rows else None) if one else [dict(row) for row in rows]
+
+    monkeypatch.setattr(renewal_queries, "query_db", isolated_query_db)
+    candidates = renewal_queries.get_renewal_assignees()
+
+    assert candidates == [
+        {"id": 72, "username": "approved_super"},
+        {"id": 71, "username": "approved_viewer"},
+        {"id": 70, "username": "rino"},
+    ]
+    assert len({candidate["id"] for candidate in candidates}) == 3
+
+
+def test_unapproved_rino_can_be_assigned_but_other_unapproved_users_cannot(renewal_db):
+    from system_app.renewal.queries import RenewalAssignmentError, assign_renewal_case
+
+    conn, today, _schema = renewal_db
+    _seed_user(conn, 80, "rino", {}, approved=False)
+    _seed_user(conn, 81, "actor", {"renewal_center_manager": True})
+    _seed_user(conn, 82, "unapproved_viewer", {"renewal_center_view": True}, approved=False)
+    _seed_user(conn, 83, "unapproved_super", {"super_admin": True}, approved=False)
+    _seed_member(conn, 80, (today + timedelta(days=5)).isoformat())
+    _seed_member(conn, 82, (today + timedelta(days=5)).isoformat())
+    _seed_member(conn, 83, (today + timedelta(days=5)).isoformat())
+
+    result = assign_renewal_case(
+        actor_user_id=81, member_id=80, expected_version=0, owner_user_id=80
+    )
+    assert result["changed"] is True
+    assert result["case"]["owner_user_id"] == 80
+    assert result["case"]["operational_status"] == "OPEN"
+    assert result["case"]["version"] == 2
+
+    for member_id, owner_id in ((82, 82), (83, 83)):
+        with pytest.raises(RenewalAssignmentError) as exc_info:
+            assign_renewal_case(
+                actor_user_id=81,
+                member_id=member_id,
+                expected_version=0,
+                owner_user_id=owner_id,
+            )
+        assert exc_info.value.code == "invalid_assignee"
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM renewal_cases WHERE member_id IN (82, 83)")
+        assert cur.fetchone()[0] == 0
+        cur.execute(
+            "SELECT COUNT(*) FROM renewal_assignment_events WHERE renewal_case_id IN "
+            "(SELECT id FROM renewal_cases WHERE member_id IN (82, 83))"
+        )
+        assert cur.fetchone()[0] == 0
+
+
 @pytest.mark.parametrize(
     "member_id,end_date,expected_code",
     [

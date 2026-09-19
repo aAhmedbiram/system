@@ -316,18 +316,22 @@ def get_renewal_workflow_queue(
 
 
 def get_renewal_assignees() -> list[dict[str, Any]]:
-    """Return approved users explicitly eligible for Renewal ownership."""
+    """Return users eligible for Renewal ownership under the app's bypass rules."""
     rows = query_db(
         """
         SELECT id, username
         FROM users
-        WHERE is_approved = TRUE
-          AND username IS NOT NULL
+        WHERE username IS NOT NULL
           AND BTRIM(username) <> ''
           AND (
-              COALESCE(permissions ->> 'renewal_center_view', 'false') = 'true'
-              OR COALESCE(permissions ->> 'super_admin', 'false') = 'true'
-              OR username = 'rino'
+              username = 'rino'
+              OR (
+                  is_approved = TRUE
+                  AND (
+                      COALESCE(permissions ->> 'renewal_center_view', 'false') = 'true'
+                      OR COALESCE(permissions ->> 'super_admin', 'false') = 'true'
+                  )
+              )
           )
         ORDER BY username ASC, id ASC
         """
@@ -365,6 +369,17 @@ def _has_permission(user: dict[str, Any], permission_key: str) -> bool:
         user.get("username") == "rino"
         or permissions.get("super_admin")
         or permissions.get(permission_key)
+    )
+
+
+def _is_eligible_renewal_assignee(user: dict[str, Any]) -> bool:
+    """Keep candidate lookup and transactional owner validation consistent."""
+    return bool(
+        user.get("username") == "rino"
+        or (
+            user.get("is_approved")
+            and _has_permission(user, "renewal_center_view")
+        )
     )
 
 
@@ -421,9 +436,7 @@ def assign_renewal_case(
             (owner_user_id,),
         )
         assignee = cur.fetchone()
-        if not assignee or not assignee["is_approved"] or not _has_permission(
-            assignee, "renewal_center_view"
-        ):
+        if not assignee or not _is_eligible_renewal_assignee(dict(assignee)):
             raise RenewalAssignmentError(
                 "invalid_assignee",
                 "The selected Renewal owner is not eligible.",

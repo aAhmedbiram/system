@@ -77,6 +77,17 @@ def test_workflow_queue_enforces_employee_scope_and_manager_owner_filter(monkeyp
     assert "LOWER(renewal_result.operational_status) = %s" in calls[0][0]
 
 
+def test_renewal_assignee_policy_allows_only_rino_bypass_or_approved_permissioned_users():
+    from system_app.renewal.queries import _is_eligible_renewal_assignee
+
+    assert _is_eligible_renewal_assignee({"username": "rino", "is_approved": False, "permissions": {}})
+    assert _is_eligible_renewal_assignee({"username": "viewer", "is_approved": True, "permissions": {"renewal_center_view": True}})
+    assert _is_eligible_renewal_assignee({"username": "admin", "is_approved": True, "permissions": {"super_admin": True}})
+    assert not _is_eligible_renewal_assignee({"username": "viewer", "is_approved": False, "permissions": {"renewal_center_view": True}})
+    assert not _is_eligible_renewal_assignee({"username": "admin", "is_approved": False, "permissions": {"super_admin": True}})
+    assert not _is_eligible_renewal_assignee({"username": "plain", "is_approved": True, "permissions": {}})
+
+
 def test_assignment_requires_both_manager_and_assign_permissions(web_app, monkeypatch):
     from system_app import app as app_module
     import system_app.renewal.routes as renewal_routes
