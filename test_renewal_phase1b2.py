@@ -356,6 +356,185 @@ def test_assignment_errors_are_safe_and_invalid_input_does_not_write(web_app, mo
         assert "assignment_conflict" not in str(session.get("_flashes"))
 
 
+def _configure_flash_test_page(monkeypatch, user, app_module, renewal_routes):
+    monkeypatch.setattr(app_module, "get_current_user", lambda: user)
+    monkeypatch.setattr(renewal_routes, "get_current_user", lambda: user)
+    monkeypatch.setattr(
+        renewal_routes,
+        "get_renewal_workflow_queue",
+        lambda **_: ([], 0),
+    )
+    monkeypatch.setattr(
+        renewal_routes,
+        "get_renewal_assignees",
+        lambda: [{"id": 2, "username": "owner"}],
+    )
+
+
+def _assert_flash_consumed(client, message):
+    with client.session_transaction() as session:
+        assert session.get("_flashes") is None
+    assert message not in client.get("/renewal/").get_data(as_text=True)
+
+
+def test_assignment_success_flash_renders_on_renewal_and_is_consumed(web_app, monkeypatch):
+    from system_app import app as app_module
+    import system_app.renewal.routes as renewal_routes
+
+    user = _user(permissions={"renewal_center_view": True, "renewal_center_manager": True, "renewal_center_assign": True})
+    _configure_flash_test_page(monkeypatch, user, app_module, renewal_routes)
+    monkeypatch.setattr(
+        renewal_routes,
+        "assign_renewal_case",
+        lambda **_: {"changed": True, "created": True, "case": {"id": 9}},
+    )
+    client = web_app.test_client()
+    _login(client)
+
+    response = client.post(
+        "/renewal/cases/assign",
+        data={"member_id": "4", "owner_user_id": "2", "expected_version": "0"},
+        follow_redirects=True,
+    )
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Renewal case assigned successfully." in body
+    assert "secret database details" not in body
+    _assert_flash_consumed(client, "Renewal case assigned successfully.")
+
+
+def test_assignment_noop_flash_renders_once_on_renewal(web_app, monkeypatch):
+    from system_app import app as app_module
+    import system_app.renewal.routes as renewal_routes
+
+    user = _user(permissions={"renewal_center_view": True, "renewal_center_manager": True, "renewal_center_assign": True})
+    _configure_flash_test_page(monkeypatch, user, app_module, renewal_routes)
+    monkeypatch.setattr(renewal_routes, "assign_renewal_case", lambda **_: {"changed": False})
+    client = web_app.test_client()
+    _login(client)
+
+    response = client.post(
+        "/renewal/cases/assign",
+        data={"member_id": "4", "owner_user_id": "2", "expected_version": "1"},
+        follow_redirects=True,
+    )
+
+    message = "Renewal case is already assigned to this user."
+    assert message in response.get_data(as_text=True)
+    _assert_flash_consumed(client, message)
+
+
+def test_assignment_controlled_error_flash_is_safe_and_consumed(web_app, monkeypatch):
+    from system_app import app as app_module
+    import system_app.renewal.routes as renewal_routes
+
+    user = _user(permissions={"renewal_center_view": True, "renewal_center_manager": True, "renewal_center_assign": True})
+    _configure_flash_test_page(monkeypatch, user, app_module, renewal_routes)
+    monkeypatch.setattr(
+        renewal_routes,
+        "assign_renewal_case",
+        lambda **_: (_ for _ in ()).throw(
+            renewal_routes.RenewalAssignmentError(
+                "assignment_conflict", "The case changed. Refresh and try again."
+            )
+        ),
+    )
+    client = web_app.test_client()
+    _login(client)
+
+    response = client.post(
+        "/renewal/cases/assign",
+        data={"member_id": "4", "owner_user_id": "2", "expected_version": "1"},
+        follow_redirects=True,
+    )
+
+    body = response.get_data(as_text=True)
+    assert "The case changed. Refresh and try again." in body
+    assert "assignment_conflict" not in body
+    _assert_flash_consumed(client, "The case changed. Refresh and try again.")
+
+
+def test_assignment_generic_error_flash_hides_exception_details(web_app, monkeypatch):
+    from system_app import app as app_module
+    import system_app.renewal.routes as renewal_routes
+
+    user = _user(permissions={"renewal_center_view": True, "renewal_center_manager": True, "renewal_center_assign": True})
+    _configure_flash_test_page(monkeypatch, user, app_module, renewal_routes)
+    monkeypatch.setattr(
+        renewal_routes,
+        "assign_renewal_case",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("secret database details")),
+    )
+    client = web_app.test_client()
+    _login(client)
+
+    response = client.post(
+        "/renewal/cases/assign",
+        data={"member_id": "4", "owner_user_id": "2", "expected_version": "1"},
+        follow_redirects=True,
+    )
+
+    safe_message = "Renewal assignment is temporarily unavailable. Please try again."
+    body = response.get_data(as_text=True)
+    assert safe_message in body
+    assert "secret database details" not in body
+    _assert_flash_consumed(client, safe_message)
+
+
+def test_invalid_assignment_flash_renders_and_service_is_not_called(web_app, monkeypatch):
+    from system_app import app as app_module
+    import system_app.renewal.routes as renewal_routes
+
+    user = _user(permissions={"renewal_center_view": True, "renewal_center_manager": True, "renewal_center_assign": True})
+    _configure_flash_test_page(monkeypatch, user, app_module, renewal_routes)
+    monkeypatch.setattr(
+        renewal_routes,
+        "assign_renewal_case",
+        lambda **_: pytest.fail("invalid form must not call assignment service"),
+    )
+    client = web_app.test_client()
+    _login(client)
+
+    response = client.post(
+        "/renewal/cases/assign",
+        data={"member_id": "not-an-id", "owner_user_id": "2", "expected_version": "0"},
+        follow_redirects=True,
+    )
+
+    message = "Invalid Renewal assignment request."
+    assert message in response.get_data(as_text=True)
+    _assert_flash_consumed(client, message)
+
+
+def test_renewal_flash_content_is_html_escaped(web_app, monkeypatch):
+    from system_app import app as app_module
+    import system_app.renewal.routes as renewal_routes
+
+    user = _user(permissions={"renewal_center_view": True, "renewal_center_manager": True, "renewal_center_assign": True})
+    _configure_flash_test_page(monkeypatch, user, app_module, renewal_routes)
+    raw_message = "<script>alert('x')</script>"
+    monkeypatch.setattr(
+        renewal_routes,
+        "assign_renewal_case",
+        lambda **_: (_ for _ in ()).throw(
+            renewal_routes.RenewalAssignmentError("controlled", raw_message)
+        ),
+    )
+    client = web_app.test_client()
+    _login(client)
+
+    response = client.post(
+        "/renewal/cases/assign",
+        data={"member_id": "4", "owner_user_id": "2", "expected_version": "1"},
+        follow_redirects=True,
+    )
+
+    body = response.get_data(as_text=True)
+    assert "&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;" in body
+    assert "<script>alert('x')</script>" not in body
+
+
 def test_phase1a_path_remains_unchanged_when_workflow_disabled(web_app, monkeypatch):
     from system_app import app as app_module
     import system_app.renewal.routes as renewal_routes

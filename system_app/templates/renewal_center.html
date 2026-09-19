@@ -44,6 +44,12 @@
         .summary { color: var(--muted); margin: 0 0 14px; }
         .error, .empty { border-radius: 10px; padding: 16px; color: var(--text); background: rgba(239, 83, 80, .16); border: 1px solid rgba(239, 83, 80, .45); }
         .empty { background: rgba(66, 165, 245, .13); border-color: rgba(66, 165, 245, .35); }
+        .renewal-messages { display: grid; gap: 10px; margin-bottom: 16px; }
+        .renewal-message { border-radius: 10px; padding: 12px 14px; color: var(--text); }
+        .renewal-message-success { background: rgba(76, 175, 80, .16); border: 1px solid rgba(76, 175, 80, .5); }
+        .renewal-message-info { background: rgba(66, 165, 245, .13); border: 1px solid rgba(66, 165, 245, .4); }
+        .renewal-message-error { background: rgba(239, 83, 80, .16); border: 1px solid rgba(239, 83, 80, .5); }
+        .renewal-message-neutral { background: rgba(181, 192, 212, .12); border: 1px solid var(--line); }
         .cards { display: grid; gap: 12px; }
         .renewal-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; min-width: 0; padding: 16px; background: var(--panel-soft); border: 1px solid var(--line); border-radius: 12px; }
         .member-title { margin: 0 0 6px; font-size: 1.1rem; overflow-wrap: anywhere; word-break: normal; }
@@ -111,6 +117,23 @@
 
     <section class="panel" aria-labelledby="renewal-filters-title">
         <h2 id="renewal-filters-title" class="sr-only" style="position:absolute;left:-10000px;">Renewal filters</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <section class="renewal-messages" aria-label="Renewal notifications">
+                {% for category, message in messages %}
+                    {% if category == 'success' %}
+                        <div class="renewal-message renewal-message-success" role="status">{{ message }}</div>
+                    {% elif category == 'info' %}
+                        <div class="renewal-message renewal-message-info" role="status">{{ message }}</div>
+                    {% elif category == 'error' %}
+                        <div class="renewal-message renewal-message-error" role="alert">{{ message }}</div>
+                    {% else %}
+                        <div class="renewal-message renewal-message-neutral" role="status">{{ message }}</div>
+                    {% endif %}
+                {% endfor %}
+            </section>
+            {% endif %}
+        {% endwith %}
         <form class="filters" method="get" action="{{ url_for('renewal.renewal_center') }}" data-renewal-filter-form>
             <label for="renewal-filter">Urgency
                 <select id="renewal-filter" name="filter" data-renewal-urgency-filter>
